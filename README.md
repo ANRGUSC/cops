@@ -1,6 +1,7 @@
 Graph connectivity for intermittent connectivity in multi-agent networks
 
 California Institute of Technology
+
 Jet Propulsion Laboratory, NASA
 
 ---------------------------------------------------------------------
