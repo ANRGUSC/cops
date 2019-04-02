@@ -37,7 +37,7 @@ cp = ConnectivityProblem()
 # Specify graph
 cp.graph = G
 # Specify time horizon
-cp.T = 3
+cp.T = 7
 # Specify bases
 cp.b = agent_positions
 
@@ -48,7 +48,11 @@ dc = DynamicConstraints(cp)
 
 cp.add_constraints([dc])
 
-solution = cp.solve()
+
+#Compile Problem
+cp.compile()
+
+z, e = cp.solve()
 
 #cp.test_solution()
 
@@ -58,4 +62,5 @@ print("finished")
 #plt.show()
 
 
-print(solution)
+print("z:", len(z), '\n', np.reshape(z, (8, 12)))
+print("e:", len(e), '\n', np.reshape(e, (7, 16)))
