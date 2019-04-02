@@ -9,16 +9,16 @@ try:
     from gurobipy import *
     TIME_LIMIT = 10 * 3600
 
-except Exception, e:
-    print "warning: gurobi not found"
+except Exception as e:
+    print("warning: gurobi not found")
     default_solver = 'mosek'
 
 # Try to import mosek/cvxopt
 try:
     import mosek
 
-except Exception, e:
-    print "warning: cvxopt and or mosek not found"
+except Exception as e:
+    print("warning: cvxopt and or mosek not found")
     default_solver = 'gurobi'
 
 
@@ -180,7 +180,7 @@ def _solve_gurobi(c, Aiq, biq, Aeq, beq, J, output):
     return sol
 
 
-def solve_mip(c, Aiq, biq, Aeq, beq, J=None, solver=default_solver, output=0):
+def solve_ilp(c, Aiq, biq, Aeq, beq, J=None, solver=default_solver, output=0):
     """
     Solve the ILP
         min c' x
