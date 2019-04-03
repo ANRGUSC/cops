@@ -23,7 +23,7 @@ node_positions = {0: (0,0), 1: (0, 1), 2: (0,2), 3: (0,3)}
 G.set_node_positions(node_positions)
 
 #Set initial position of agents
-agent_positions = {0: 0, 1: 0, 2: 3}    #agent:position
+agent_positions = {0: 0, 1: 1, 2: 3}    #agent:position
 #Init agents in graphs
 G.init_agents(agent_positions)
 
@@ -44,16 +44,19 @@ cp.b = agent_positions
 
 
 #Set up Dynamic Constraints
-dc = DynamicConstraints(cp)
+dynamic = DynamicConstraints(cp)
+
+#Set up Dummy Constraints
+#dummy = DummyConstraints(cp)
 
 
-cp.add_constraints([dc])
+cp.add_constraints([dynamic])
 
 
 #Compile Problem
 cp.compile()
 
-z, e = cp.solve()
+z, e, y= cp.solve()
 
 #Plot Graph (saves image as graph.png)
 cp.plot_solution()
@@ -66,5 +69,6 @@ print("finished")
 #plt.show()
 
 
-#print("z:", len(z), '\n', np.reshape(z, (8, 12)))
-#print("e:", len(e), '\n', np.reshape(e, (7, 16)))
+print("z:", len(z), '\n', np.reshape(z, (6, 12)))
+print("e:", len(e), '\n', np.reshape(e, (5, 16)))
+print("y:", len(y), '\n', np.reshape(y, (6, 12)))
