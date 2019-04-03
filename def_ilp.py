@@ -8,6 +8,8 @@ from optimization_wrappers import *
 from networkx.drawing.nx_pydot import write_dot
 from networkx.drawing.nx_agraph import to_agraph
 
+from copy import deepcopy
+
 
 #MultiDiGraph-------------------------------------------------------------------
 
@@ -20,30 +22,43 @@ class Graph(nx.MultiDiGraph):
         self.agents = None
 
     def plot_graph(self):
+
+        #copy graph to add plot attributes
+        graph_copy = deepcopy(self)
+
+        #set 'pos' attribute for accurate position in plot (use ! in end for accurate positioning)
+        for n in graph_copy:
+            graph_copy.nodes[n]['pos'] =  ",".join(map(str,[graph_copy.nodes[n]['x'],graph_copy.nodes[n]['y']])) + '!'
+
         #Set general edge-attributes
-        self.graph['edge'] = {'arrowsize': '0.6', 'splines': 'curved'}
+        graph_copy.graph['edge'] = {'arrowsize': '0.6', 'splines': 'curved'}
 
         #Set individual attributes
-        for n in self:
-            if self.nodes[n]['number_of_agents']!=0:
-                self.nodes[n]['color'] = 'black'
-                self.nodes[n]['fillcolor'] = 'red'
-                self.nodes[n]['style'] = 'filled'
+        for n in graph_copy:
+            if graph_copy.nodes[n]['number_of_agents']!=0:
+                graph_copy.nodes[n]['color'] = 'black'
+                graph_copy.nodes[n]['fillcolor'] = 'red'
+                graph_copy.nodes[n]['style'] = 'filled'
             else:
-                self.nodes[n]['color'] = 'black'
-                self.nodes[n]['fillcolor'] = 'white'
-                self.nodes[n]['style'] = 'filled'
+                graph_copy.nodes[n]['color'] = 'black'
+                graph_copy.nodes[n]['fillcolor'] = 'white'
+                graph_copy.nodes[n]['style'] = 'filled'
             for nbr in self[n]:
-                for edge in self[n][nbr]:
-                    if self[n][nbr][edge]['type']=='connectivity':
-                        self[n][nbr][edge]['color']='grey'
-                        self[n][nbr][edge]['style']='dashed'
+                for edge in graph_copy[n][nbr]:
+                    if graph_copy[n][nbr][edge]['type']=='connectivity':
+                        graph_copy[n][nbr][edge]['color']='grey'
+                        graph_copy[n][nbr][edge]['style']='dashed'
                     else:
-                        self[n][nbr][edge]['color']='black'
-                        self[n][nbr][edge]['style']='solid'
+                        graph_copy[n][nbr][edge]['color']='grey'
+                        graph_copy[n][nbr][edge]['style']='solid'
+
+        #Change node label to agents in node
+        for n in graph_copy:
+            graph_copy.nodes[n]['label'] = " ".join(map(str,(graph_copy.nodes[n]['agents'])))
+
 
         #Plot/save graph
-        A = to_agraph(self)
+        A = to_agraph(graph_copy)
         A.layout()
         A.draw('graph.png')
 
@@ -63,7 +78,8 @@ class Graph(nx.MultiDiGraph):
     def set_node_positions(self, position_dictionary):
         self.add_nodes_from(position_dictionary.keys())
         for n, p in position_dictionary.items():
-            self.node[n]['pos'] = p
+            self.node[n]['x'] = p[0]
+            self.node[n]['y'] = p[1]
 
     def init_agents(self, agent_position_dictionary):
 
@@ -74,11 +90,16 @@ class Graph(nx.MultiDiGraph):
 
         for agent in agent_position_dictionary:
             self.node[agent_position_dictionary[agent]]['number_of_agents']+=1
-            #Change node label to number of agents in node
-            #self.node[agent_position_dictionary[agent]]['label']=self.node[agent_position_dictionary[agent]]['number_of_agents']
 
         self.agents = agent_position_dictionary
         self.num_nodes = self.number_of_nodes()
+        for n in self.nodes:
+            self.nodes[n]['agents'] = []
+        for agent in self.agents:
+            self.nodes[self.agents[agent]]['agents'].append(agent)
+
+
+
 
     def transition_adjacency_matrix(self):
         num_nodes = self.number_of_nodes()
@@ -121,7 +142,6 @@ class DynamicConstraints(object):
         transition_adj = problem.graph.transition_adjacency_matrix()
         connectivity_adj = problem.graph.connectivity_adjacency_matrix()
 
-        print(transition_adj)
 
         # Constructing A_eq and b_eq for equality (27) as sp.coo matrix
         A_eq_row  = np.array([])
@@ -246,20 +266,66 @@ class DynamicConstraints(object):
         self.A_iq = sp.bmat([[A_iq_ubz], [A_iq_id]])
         self.b_iq = np.hstack([b_iq_ubz, b_iq_id])
 
-
-
-
-
-
-
 #Occupancy constraints----------------------------------------------------------
 
-class OccupancyConstraints(object):
-    def __init__(self):
+class DummyConstraints(object):
+    def __init__(self, problem):
         self.A_eq = None
         self.b_eq = None
         self.A_iq = None
         self.b_iq = None
+        self.problem = problem
+        self.generate_dummy_contraints(self.problem)
+
+        # variables: z^b_rvt, e_ijt, y^b_vt, x^b_ijt, xbar^b_ijt
+
+    def generate_dummy_contraints(self, problem):
+        """Generate equalities (35),(36)"""
+
+        if problem.num_vars == None: problem.add_num_var()
+
+        # Obtain adjacency matrix for transition/connectivity edges separately
+        transition_adj = problem.graph.transition_adjacency_matrix()
+        connectivity_adj = problem.graph.connectivity_adjacency_matrix()
+
+
+        # Constructing A_eq and b_eq for equality (27) as sp.coo matrix
+        A_eq_row  = np.array([])
+        A_eq_col  = np.array([])
+        A_eq_data = np.array([])
+
+
+        constraint_idx = 0
+        for t in range(problem.T):
+            for v in problem.graph.nodes:
+                #left side of (27)
+                for r in problem.graph.agents:
+                    A_eq_row = np.append(A_eq_row, constraint_idx)
+                    A_eq_col = np.append(A_eq_col, problem.get_z_idx(r, v, t+1))
+                    A_eq_data = np.append(A_eq_data, 1)
+                #right side of (27)
+                for edge in problem.graph.in_edges(v, data = True):
+                    if edge[2]['type'] == 'transition':
+                        A_eq_row = np.append(A_eq_row, constraint_idx)
+                        A_eq_col = np.append(A_eq_col, problem.get_e_idx(edge[0], edge[1], t))
+                        A_eq_data = np.append(A_eq_data, -1)
+                constraint_idx += 1
+        A_eq_35 = sp.coo_matrix((A_eq_data, (A_eq_row, A_eq_col)), shape=(constraint_idx, problem.num_vars))#.toarray()
+        b_eq_35 = np.zeros(constraint_idx)#.toarray()
+
+
+        self.A_eq = sp.bmat([[A_eq_35], [A_eq_36], [A_eq_32], [A_eq_ex]])
+        self.b_eq = np.hstack([b_eq_35, b_eq_36, b_eq_32, b_eq_ex])
+
+        self.A_iq = sp.bmat([[A_iq_ubz], [A_iq_id]])
+        self.b_iq = np.hstack([b_iq_ubz, b_iq_id])
+
+
+
+
+
+
+
 
 #Connectivity constraints-------------------------------------------------------
 
@@ -293,10 +359,11 @@ class ConnectivityProblem(object):
         self.num_xbar = None
         self.num_vars = None
 
+        self.solution = None
+
         # variables: z^b_rvt, e_ijt, y^b_vt, x^b_ijt, xbar^b_ijt
 
     def add_num_var(self):
-
         self.num_b = len(self.b)
         self.num_r = len(self.graph.agents)
         self.num_v = self.graph.num_nodes
@@ -309,14 +376,11 @@ class ConnectivityProblem(object):
         self.num_x = self.T * self.num_b * self.num_i * self.num_j
         self.num_xbar = self.T * self.num_b * self.num_i * self.num_j
 
-        print(self.num_z)
-
         self.num_vars = self.num_z + self.num_e + self.num_y + self.num_x + self.num_xbar
         print("Number of variables: {}".format(self.num_vars))
 
 
     def get_z_idx(self, r, v, t):
-
         start = 0
         z_t = (self.num_r * self.num_v) * t
         z_v = (self.num_r) * v
@@ -325,7 +389,6 @@ class ConnectivityProblem(object):
         return(idx)
 
     def get_e_idx(self, i, j, t):
-
         start = self.num_z
         e_t = (self.num_i * self.num_j) * t
         e_i = (self.num_j) * i
@@ -335,7 +398,6 @@ class ConnectivityProblem(object):
 
 
     def get_y_idx(self, b, v, t):
-
         start = self.num_z + self.num_e
         y_t = (self.num_b * self.num_v) * t
         y_b = (self.num_v) * b
@@ -344,7 +406,6 @@ class ConnectivityProblem(object):
         return(idx)
 
     def get_x_idx(self, b, i, j, t):
-
         start = self.num_z + self.num_e + self.num_y
         x_t = (self.num_b * self.num_i * self.num_j) * t
         x_b = (self.num_i * self.num_j) * b
@@ -355,7 +416,6 @@ class ConnectivityProblem(object):
 
 
     def get_xbar_idx(self, b, i, j, t):
-
         start = self.num_z + self.num_e + self.num_y + self.num_x
         xbar_t = (self.num_b * self.num_i * self.num_j) * t
         xbar_b = (self.num_i * self.num_j) * b
@@ -364,23 +424,31 @@ class ConnectivityProblem(object):
         idx = start + xbar_t + xbar_b +xbar_i + xbar_j
         return(idx)
 
+    def get_time_augmented_id(self, n, t):
+        idx = (self.graph.num_nodes) * t + n
+        return(idx)
+
+    def get_time_augmented_n_t(self, id):
+        n = id % self.graph.num_nodes
+        t = id // self.graph.num_nodes
+        return(n,t)
+
 
     def add_constraints(self, constraints):
         for constraint in constraints:
-            if type(constraint) is DynamicConstraints:
-                if self.equality_constraints is not None:
-                    self.equality_constraints[0] = sp.bmat([[self.equality_constraints[0]], [constraint.A_eq]])
-                    self.equality_constraints[1] = np.hstack([self.equality_constraints[1], constraint.b_eq])
+            if self.equality_constraints is not None:
+                self.equality_constraints[0] = sp.bmat([[self.equality_constraints[0]], [constraint.A_eq]])
+                self.equality_constraints[1] = np.hstack([self.equality_constraints[1], constraint.b_eq])
 
-                else:
-                    self.equality_constraints = [constraint.A_eq, constraint.b_eq]
+            else:
+                self.equality_constraints = [constraint.A_eq, constraint.b_eq]
 
-                if self.inequality_constraints is not None:
-                    self.inequality_constraints[0] = sp.bmat([[self.inequality_constraints[0]], [constraint.A_iq]])
-                    self.inequality_constraints[1] = np.hstack([self.inequality_constraints[1], constraint.b_iq])
+            if self.inequality_constraints is not None:
+                self.inequality_constraints[0] = sp.bmat([[self.inequality_constraints[0]], [constraint.A_iq]])
+                self.inequality_constraints[1] = np.hstack([self.inequality_constraints[1], constraint.b_iq])
 
-                else:
-                    self.inequality_constraints = [constraint.A_iq, constraint.b_iq]
+            else:
+                self.inequality_constraints = [constraint.A_iq, constraint.b_iq]
 
 
     def compile(self):
@@ -411,6 +479,96 @@ class ConnectivityProblem(object):
             self.equality_constraints = b_init
 
 
+    def plot_solution(self):
+        if self.solution is None:
+            print("No solution found: call solve() to obtain solution")
+        else:
+            g = self.graph
+            #create time-augmented graph G
+            G = Graph()
+            #space between timesteps
+            space = 2
+
+            #loop of graph and add nodes to time-augmented graph
+            for t in range(self.T+1):
+                for n in g.nodes:
+                    id = self.get_time_augmented_id(n, t)
+                    G.add_node(id)
+                    G.nodes[id]['x'] = g.nodes[n]['x'] + space*t
+                    G.nodes[id]['y'] = g.nodes[n]['y']
+                    G.nodes[id]['agents'] = []
+
+
+
+            #loop of graph and add edges to time-augmented graph
+            i = 0
+            for n in g.nodes:
+                for t in range(self.T+1):
+                    for edge in g.out_edges(n, data = True):
+                        if edge[2]['type'] == 'transition' and t < self.T:
+                            out_id = self.get_time_augmented_id(n, t)
+                            in_id = self.get_time_augmented_id(edge[1], t+1)
+                            G.add_edge(out_id , in_id, type='transition')
+                        elif edge[2]['type'] == 'connectivity':
+                            out_id = self.get_time_augmented_id(n, t)
+                            in_id = self.get_time_augmented_id(edge[1], t)
+                            G.add_edge(out_id , in_id, type='connectivity')
+
+
+            #set 'pos' attribute for accurate position in plot (use ! in end for accurate positioning)
+            for n in G:
+                G.nodes[n]['pos'] =  ",".join(map(str,[G.nodes[n]['x'],G.nodes[n]['y']])) + '!'
+
+            #Set general edge-attributes
+            G.graph['edge'] = {'arrowsize': '0.6', 'splines': 'curved'}
+
+            #Set individual attributes based on solution
+            sol = self.solution
+            z = sol['x'][0 : self.num_z]
+
+            for r in self.graph.agents:
+                for v in self.graph.nodes:
+                    for t in range(self.T+1):
+                        if z[self.get_z_idx(r, v, t)] != 0:
+                            id = self.get_time_augmented_id(v, t)
+                            G.nodes[id]['agents'].append(r)
+
+            for v in G.nodes:
+                G.nodes[v]['number_of_agents'] = len(G.nodes[v]['agents'])
+                G.nodes[v]['label'] = " ".join(map(str,(G.nodes[v]['agents'])))
+
+
+            for n in G:
+                if G.nodes[n]['number_of_agents']!=0:
+                    G.nodes[n]['color'] = 'black'
+                    G.nodes[n]['fillcolor'] = 'red'
+                    G.nodes[n]['style'] = 'filled'
+                else:
+                    G.nodes[n]['color'] = 'black'
+                    G.nodes[n]['fillcolor'] = 'white'
+                    G.nodes[n]['style'] = 'filled'
+                for nbr in G[n]:
+                    for edge in G[n][nbr]:
+                        if G[n][nbr][edge]['type']=='connectivity':
+                            if len(G.nodes[n]['agents']) != 0 and len(G.nodes[nbr]['agents'])!= 0:
+                                G[n][nbr][edge]['color']='black'
+                                G[n][nbr][edge]['style']='dashed'
+                            else:
+                                G[n][nbr][edge]['color']='grey'
+                                G[n][nbr][edge]['style']='dashed'
+                        else:
+                            if len(G.nodes[n]['agents']) != 0 and len(G.nodes[nbr]['agents'])!= 0:
+                                G[n][nbr][edge]['color']='black'
+                                G[n][nbr][edge]['style']='solid'
+                            else:
+                                G[n][nbr][edge]['color']='grey'
+                                G[n][nbr][edge]['style']='solid'
+
+
+            #Plot/save graph
+            A = to_agraph(G)
+            A.layout()
+            A.draw('solution.png')
 
 
 
@@ -444,8 +602,6 @@ class ConnectivityProblem(object):
             A_iq = sp.coo_matrix(([], ([],[])), shape=(0, self.num_vars))
             b_iq = []
 
-        print(A_iq.shape)
-
         obj = np.zeros(self.num_vars)
 
         # Solve it
@@ -456,8 +612,55 @@ class ConnectivityProblem(object):
             sol = solve_ilp(obj, A_iq, b_iq, A_eq, b_eq,
                             [], solver, output);
 
+        self.solution = sol
+
         return sol['x'][0 : self.num_z], \
                sol['x'][self.num_z : self.num_z + self.num_e]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     def test_solution(self):
@@ -923,330 +1126,3 @@ class ConnectivityProblem(object):
             actions.append(actions_g)
 
         return actions
-
-
-def solve_prefix(cp, solver=None, output=False):
-
-    # cp.check_well_defined()
-
-    # Make sure that we have a valid suffix
-    for g in range(len(cp.graphs)):
-        assert(len(cp.cycle_sets[g]))
-        assert(len(cp.assignments[g]) == len(cp.cycle_sets[g]))
-        for i in range(len(cp.cycle_sets[g])):
-            assert(len(cp.assignments[g][i]) == len(cp.cycle_sets[g][i]))
-
-    # Variables for each g in cp.graphs:
-    #  v_g := u_g[0] ... u_g[T-1] x_g[0] ... x_g[T-1]
-    # These are stacked horizontally as
-    #  v_0 v_1 ... v_G-1
-
-    L = len(cp.constraints)
-    T = cp.T
-
-    # Variable counts for each class g
-    N_u_list = [T * G.K() * G.M() for G in cp.graphs]   # input vars
-    N_x_list = [T * G.K() for G in cp.graphs]   # state vars
-
-    N_tot = sum(N_u_list) + sum(N_x_list)
-
-    # Add dynamics constraints, should be block diagonalized
-    A_eq_list = []
-    b_eq_list = []
-
-    for g in range(len(cp.graphs)):
-        A_eq1_u, A_eq1_x, b_eq1 = \
-            generate_prefix_dyn_cstr(cp.graphs[g], T, cp.inits[g])
-        A_eq2_x, A_eq2_a, b_eq2 = \
-            generate_prefix_suffix_cstr(cp.graphs[g], T,
-                                        cp.cycle_sets[g])
-
-        A_eq_list.append(
-            sp.bmat([[A_eq1_u, A_eq1_x],
-                     [None, A_eq2_x]])
-        )
-
-        b_eq_list.append(
-            np.hstack([b_eq1, b_eq2 - A_eq2_a.dot(np.hstack(cp.assignments[g]))])
-        )
-
-    A_eq = sp.block_diag(A_eq_list)
-    b_eq = np.hstack(b_eq_list)
-
-    # Add counting constraints
-    A_iq_list = []
-    b_iq_list = []
-    for l in range(len(cp.constraints)):
-        cc = cp.constraints[l]
-
-        # Count over classes: Should be stacked horizontally
-        A_iq1_list = []
-
-        for g in range(len(cp.graphs)):
-            # Prefix counting
-            A_iq1_u, b_iq1 = \
-                generate_prefix_counting_cstr(cp.graphs[g], T,
-                                              cc.X[g], cc.R)
-            A_iq1_list.append(
-                sp.bmat([[A_iq1_u, sp.coo_matrix((T, N_x_list[g]))]])
-            )
-
-        # Stack horizontally
-        A_iq_list.append(sp.bmat([A_iq1_list]))
-        b_iq_list.append(b_iq1)
-
-    # Stack everything vertically
-    if len(A_iq_list) > 0:
-        A_iq = sp.bmat([[A] for A in A_iq_list])
-        b_iq = np.hstack(b_iq_list)
-    else:
-        A_iq = sp.coo_matrix((0, N_tot))
-        b_iq = np.zeros(0)
-
-    # Solve it
-    sol = solve_mip(np.zeros(N_tot), A_iq, b_iq, A_eq, b_eq,
-                    range(N_tot), solver, output);
-
-    # Extract solution (if valid)
-    if sol['status'] == 2:
-        cp.u = []
-        cp.x = []
-
-        idx0 = 0
-        for g in range(len(cp.graphs)):
-            cp.u.append(
-                np.array(sol['x'][idx0:idx0 + N_u_list[g]], dtype=int)
-                  .reshape(T, cp.graphs[g].K() * cp.graphs[g].M())
-                  .transpose()
-            )
-            cp.x.append(
-                np.hstack([
-                    np.array(cp.inits[g]).reshape(len(cp.inits[g]), 1),
-                    np.array(sol['x'][idx0 + N_u_list[g]:
-                                      idx0 + N_u_list[g] + N_x_list[g]])
-                      .reshape(T, cp.graphs[g].K()).transpose()
-                ])
-            )
-            idx0 += N_u_list[g] + N_x_list[g]
-    return sol['status']
-
-
-####################################
-#  Constraint-generating functions #
-####################################
-
-
-def generate_dyn_cstr(G, T, init):
-    """Generate equalities (35),(36)"""
-    K = G.K()
-    M = G.M()
-
-    # variables: u[0], ..., u[T-1], x[1], ..., x[T]
-
-    # Obtain system matrix
-    B = G.system_matrix()
-
-    # (47c)
-    # T*K equalities
-    A_eq1_u = sp.block_diag((B,) * T)
-    A_eq1_x = sp.block_diag((sp.identity(K),) * T)
-    b_eq1 = np.zeros(T * K)
-
-    # (47e)
-    # T*K equalities
-    A_eq2_u = sp.block_diag((_id_stacked(K, M),) * T)
-    A_eq2_x = sp.bmat([[sp.coo_matrix((K, K * (T - 1))),
-                        sp.coo_matrix((K, K))],
-                       [sp.block_diag((sp.identity(K),) * (T - 1)),
-                        sp.coo_matrix((K * (T - 1), K))]
-                       ])
-    b_eq2 = np.hstack([init, np.zeros((T - 1) * K)])
-
-    # Forbid non-existent modes
-    # T * len(ban_idx) equalities
-    ban_idx = [G.order_fcn(v) + m * K
-               for v in G.nodes_iter()
-               for m in range(M)
-               if G.mode(m) not in G.node_modes(v)]
-    A_eq3_u_part = sp.coo_matrix(
-        (np.ones(len(ban_idx)), (range(len(ban_idx)), ban_idx)),
-        shape=(len(ban_idx), K * M)
-    )
-    A_eq3_u = sp.block_diag((A_eq3_u_part,) * T)
-    A_eq3_x = sp.coo_matrix((T * len(ban_idx), T * K))
-    b_eq3 = np.zeros(T * len(ban_idx))
-
-    # Stack everything
-    A_eq_u = sp.bmat([[A_eq1_u],
-                     [A_eq2_u],
-                     [A_eq3_u]])
-    A_eq_x = sp.bmat([[-A_eq1_x],
-                      [-A_eq2_x],
-                      [A_eq3_x]])
-    b_eq = np.hstack([b_eq1, b_eq2, b_eq3])
-
-    return A_eq_u, A_eq_x, b_eq
-
-
-
-def generate_prefix_dyn_cstr(G, T, init):
-    """Generate equalities (47c), (47e) for prefix dynamics"""
-    K = G.K()
-    M = G.M()
-
-    # variables: u[0], ..., u[T-1], x[1], ..., x[T]
-
-    # Obtain system matrix
-    B = G.system_matrix()
-
-    # (47c)
-    # T*K equalities
-    A_eq1_u = sp.block_diag((B,) * T)
-    A_eq1_x = sp.block_diag((sp.identity(K),) * T)
-    b_eq1 = np.zeros(T * K)
-
-    # (47e)
-    # T*K equalities
-    A_eq2_u = sp.block_diag((_id_stacked(K, M),) * T)
-    A_eq2_x = sp.bmat([[sp.coo_matrix((K, K * (T - 1))),
-                        sp.coo_matrix((K, K))],
-                       [sp.block_diag((sp.identity(K),) * (T - 1)),
-                        sp.coo_matrix((K * (T - 1), K))]
-                       ])
-    b_eq2 = np.hstack([init, np.zeros((T - 1) * K)])
-
-    # Forbid non-existent modes
-    # T * len(ban_idx) equalities
-    ban_idx = [G.order_fcn(v) + m * K
-               for v in G.nodes_iter()
-               for m in range(M)
-               if G.mode(m) not in G.node_modes(v)]
-    A_eq3_u_part = sp.coo_matrix(
-        (np.ones(len(ban_idx)), (range(len(ban_idx)), ban_idx)),
-        shape=(len(ban_idx), K * M)
-    )
-    A_eq3_u = sp.block_diag((A_eq3_u_part,) * T)
-    A_eq3_x = sp.coo_matrix((T * len(ban_idx), T * K))
-    b_eq3 = np.zeros(T * len(ban_idx))
-
-    # Stack everything
-    A_eq_u = sp.bmat([[A_eq1_u],
-                     [A_eq2_u],
-                     [A_eq3_u]])
-    A_eq_x = sp.bmat([[-A_eq1_x],
-                      [-A_eq2_x],
-                      [A_eq3_x]])
-    b_eq = np.hstack([b_eq1, b_eq2, b_eq3])
-
-    return A_eq_u, A_eq_x, b_eq
-
-
-def generate_prefix_counting_cstr(G, T, X, R):
-    """Generate inequalities (47a) for prefix counting constraints"""
-    K = G.K()
-    M = G.M()
-
-    # variables: u[0], ..., u[T-1]
-
-    col_idx = [G.order_fcn(v) + G.index_of_mode(m) * K for (v, m) in X]
-    if len(col_idx) == 0:
-        # No matches
-        return sp.coo_matrix((T, T * K * M)), R * np.ones(T)
-
-    val = np.ones(len(col_idx))
-    row_idx = np.zeros(len(col_idx))
-    A_pref_cc = sp.coo_matrix(
-        (val, (row_idx, col_idx)), shape=(1, K * M)
-    )
-
-    A_iq_u = sp.block_diag((A_pref_cc,) * T)
-    b_iq = R * np.ones(T)
-
-    return A_iq_u, b_iq
-
-
-def generate_prefix_suffix_cstr(G, T, cycle_set):
-    """Generate K equalities (47d) that connect prefix and suffix"""
-    K = G.K()
-
-    # Variables x[1] ... x[T] a[0] ... a[C-1]
-
-    Psi_mats = [G.index_matrix(C) for C in cycle_set]
-
-    A_eq_x = sp.bmat(
-        [[sp.coo_matrix((K, K * (T - 1))), -sp.identity(K)]]
-    )
-
-    A_eq_a = sp.bmat([Psi_mats])
-    b_eq = np.zeros(K)
-
-    return A_eq_x, A_eq_a, b_eq
-
-
-def generate_suffix_counting_cstr(cycle_set, X, R):
-    """Generate inequalities (47b) for suffix counting"""
-
-    # Variables a[0] ... a[C-1] + slack vars b[c][l]
-
-    J = len(cycle_set)
-    N_cycle_tot = sum(len(C) for C in cycle_set)
-
-    # First set: A_iq1_a a + A_iq1_b b \leq b_iq1
-    # guarantee that count in each cycle is less than
-    # slack var
-    A_iq1_a = sp.block_diag(tuple([_cycle_matrix(C, X)
-                            for C in cycle_set]))
-
-    A_iq1_b = sp.block_diag(tuple([-np.ones([len(C), 1])
-                            for C in cycle_set]))
-    b_iq1 = np.zeros(N_cycle_tot)
-
-    # Second set: A_iq2_b b \leq b_iq2
-    # guarantees that sum of slack vars
-    # less than R
-    A_iq2_a = sp.coo_matrix((1, N_cycle_tot))
-    A_iq2_b = sp.coo_matrix((np.ones(J), (np.zeros(J), range(J))),
-                            shape=(1, J))
-
-    b_iq2 = np.array([R])
-
-    return A_iq1_a, A_iq1_b, b_iq1, A_iq2_a, A_iq2_b, b_iq2
-
-####################
-# Helper functions #
-####################
-
-
-def _id_stacked(K, M):
-    """Return the (K x MK) sparse matrix [I I ... I]"""
-    return sp.coo_matrix((np.ones(K * M),
-                         ([k
-                           for k in range(K)
-                           for m in range(M)],
-                          [k + m * K
-                           for k in range(K)
-                           for m in range(M)]
-                          )
-                          ),
-                         shape=(K, K * M))
-
-
-def _cycle_row(C, X):
-    """Compute vector v s.t. <v,alpha> is
-       the number of subsystems in `X`"""
-    return [1 if C[i] in X else 0 for i in range(len(C))]
-
-
-def _cycle_matrix(C, X):
-    """Compute matrix A_C s.t. A_C alpha is
-       all rotated numbers of subsystems in `X`"""
-    idx = deque([i for i in range(len(C)) if C[i] in X])
-    vals = np.ones(len(idx) * len(C))
-    row_idx = []
-    col_idx = []
-    for i in range(len(C)):
-        row_idx += (i,) * len(idx)
-        col_idx += [(j - i) % len(C) for j in idx]
-    return sp.coo_matrix(
-        (vals, (row_idx, col_idx)), shape=(len(C), len(C))
-    )

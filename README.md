@@ -1,4 +1,4 @@
-Graph connectivity for intermittent connectivity in multi-agent networks
+Graph connectivity for intermittent connection in multi-agent networks
 
 California Institute of Technology
 
