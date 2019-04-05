@@ -36,11 +36,11 @@ cp = ConnectivityProblem()
 # Specify graph
 cp.graph = G
 # Specify time horizon
-cp.T = 1
+cp.T = 2
 # Specify bases
-cp.b = {0: 3}
+cp.b = {0: 0, 1: 1, 2: 3}
 
-cp.static_agents = [2]
+cp.static_agents = [0, 2]
 
 
 #Set up Dynamic Constraints
@@ -69,6 +69,6 @@ print("finished")
 #ani = animate_count(cp, 8)
 #plt.show()
 
-print("z:", len(z), '\n', np.reshape(z, (2, 12)))
-print("e:", len(e), '\n', np.reshape(e, (1, 16)))
-print("y:", len(y), '\n', np.reshape(y, (2, 4)))
+#print("z:", len(z), '\n', np.reshape(z, (2, 12)))
+#print("e:", len(e), '\n', np.reshape(e, (1, 16)))
+#print("y:", len(y), '\n', np.reshape(y, (2, 4)))
