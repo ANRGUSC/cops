@@ -1,12 +1,10 @@
-import sys
 import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 from itertools import product
 
-sys.path.append('../')
-from def_ilp import *
+from graph_connectivity.def_ilp import *
 
 # Define a connectivity graph
 G = Graph()
