@@ -1,3 +1,5 @@
+import time
+
 import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -28,15 +30,17 @@ G.init_agents(agent_positions)
 #Plot Graph (saves image as graph.png)
 G.plot_graph()
 
-
-
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 
 # Specify graph
 cp.graph = G
 # Specify time horizon
+<<<<<<< HEAD
 cp.T = 2
+=======
+cp.T = 3
+>>>>>>> 32d76db74da9deb1f451dddf873ed482cecc3d9e
 # Specify bases
 cp.b = {0: 0, 1: 1, 2: 3}
 
@@ -47,8 +51,9 @@ cp.static_agents = [0, 2]
 dc = DynamicConstraints(cp)
 
 #Set up Connectivity contraint
+t0 = time.time()
 cc = ConnectivityConstraint(cp)
-
+print("cc took", time.time() - t0)
 
 cp.add_constraints([dc, cc])
 
@@ -69,6 +74,6 @@ print("finished")
 #ani = animate_count(cp, 8)
 #plt.show()
 
-#print("z:", len(z), '\n', np.reshape(z, (2, 12)))
-#print("e:", len(e), '\n', np.reshape(e, (1, 16)))
-#print("y:", len(y), '\n', np.reshape(y, (2, 4)))
+print("z:", len(z), '\n', np.reshape(z, (cp.T+1, cp.num_v * cp.num_r)))
+print("e:", len(e), '\n', np.reshape(e, (cp.T, cp.num_v**2)))
+print("y:", len(y), '\n', np.reshape(y, (cp.T+1, cp.num_v)))
