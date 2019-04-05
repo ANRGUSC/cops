@@ -38,24 +38,27 @@ cp = ConnectivityProblem()
 # Specify graph
 cp.graph = G
 # Specify time horizon
-cp.T = 5
+cp.T = 1
 # Specify bases
-cp.b = agent_positions
+cp.b = {0: 3}
+
+cp.static_agents = [2]
 
 
 #Set up Dynamic Constraints
-dynamic = DynamicConstraints(cp)
+dc = DynamicConstraints(cp)
 
-#Set up Dummy Constraints
-#dummy = DummyConstraints(cp)
+#Set up Connectivity contraint
+cc = ConnectivityConstraint(cp)
 
 
-cp.add_constraints([dynamic])
+cp.add_constraints([dc, cc])
 
 
 #Compile Problem
 cp.compile()
 
+print('Solving')
 z, e, y= cp.solve()
 
 #Plot Graph (saves image as graph.png)
@@ -68,7 +71,6 @@ print("finished")
 #ani = animate_count(cp, 8)
 #plt.show()
 
-
-print("z:", len(z), '\n', np.reshape(z, (6, 12)))
-print("e:", len(e), '\n', np.reshape(e, (5, 16)))
-print("y:", len(y), '\n', np.reshape(y, (6, 12)))
+print("z:", len(z), '\n', np.reshape(z, (2, 12)))
+print("e:", len(e), '\n', np.reshape(e, (1, 16)))
+print("y:", len(y), '\n', np.reshape(y, (2, 4)))
