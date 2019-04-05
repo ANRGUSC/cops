@@ -1,3 +1,7 @@
 *.png
 *.log
 **/__*
+
+*.pyc
+
+*.egg-info

@@ -3,16 +3,17 @@ import networkx as nx
 import scipy.sparse as sp
 from collections import deque
 
-from optimization_wrappers import *
+from graph_connectivity.optimization_wrappers import *
 
 from networkx.drawing.nx_pydot import write_dot
 from networkx.drawing.nx_agraph import to_agraph
 
 from copy import deepcopy
 
+from itertools import chain, combinations
+
 
 #MultiDiGraph-------------------------------------------------------------------
-
 
 class Graph(nx.MultiDiGraph):
 
@@ -68,7 +69,6 @@ class Graph(nx.MultiDiGraph):
         for n in self:
             self.add_edge( n,n , type='transition', self_loop = True)
 
-
     def add_connectivity_path(self, connectivity_list):
         self.add_path(connectivity_list, type='connectivity', self_loop = False)
         self.add_path(connectivity_list[::-1] , type='connectivity', self_loop = False)
@@ -85,8 +85,6 @@ class Graph(nx.MultiDiGraph):
 
         for n in self:
             self.node[n]['number_of_agents']=0
-            #Change node label to number of agents in node
-            #self.node[n]['label']=0
 
         for agent in agent_position_dictionary:
             self.node[agent_position_dictionary[agent]]['number_of_agents']+=1
@@ -97,9 +95,6 @@ class Graph(nx.MultiDiGraph):
             self.nodes[n]['agents'] = []
         for agent in self.agents:
             self.nodes[self.agents[agent]]['agents'].append(agent)
-
-
-
 
     def transition_adjacency_matrix(self):
         num_nodes = self.number_of_nodes()
@@ -118,6 +113,24 @@ class Graph(nx.MultiDiGraph):
                 if edge[2]['type'] == 'connectivity':
                     adj[edge[0]][edge[1]] = 1
         return adj
+
+
+    def get_pre_S_transition(self, S_v_t):
+        pre_S = set()
+        for v, t in S_v_t:
+            if t > 0:
+                for edge in self.in_edges(v, data = True):
+                    if edge[2]['type'] == 'transition' and (edge[0], t - 1) not in S_v_t:
+                        pre_S.add((edge[0], edge[1], t - 1))
+        return pre_S
+
+    def get_pre_S_connectivity(self, S_v_t):
+        pre_S = set()
+        for v, t in S_v_t:
+            for edge in self.in_edges(v, data = True):
+                if edge[2]['type'] == 'connectivity' and (edge[0], t) not in S_v_t:
+                    pre_S.add((edge[0], edge[1], t))
+        return pre_S
 
 
 #Dynamic constraints------------------------------------------------------------
@@ -232,7 +245,7 @@ class DynamicConstraints(object):
         b_eq_32 = np.zeros(constraint_idx)#.toarray()
 
 
-        # Constructing A_eq and b_eq for equality for agent existance as sp.coo matrix (change x -> e in text)
+        # Constructing A_eq and b_eq for equality for agent existance as sp.coo matrix
         A_eq_row  = np.array([])
         A_eq_col  = np.array([])
         A_eq_data = np.array([])
@@ -263,7 +276,7 @@ class DynamicConstraints(object):
 
         constraint_idx = 0
         for t in range(problem.T+1):
-            for b in problem.graph.agents:
+            for b in problem.b:
                 for v in problem.graph.nodes:
                     A_iq_row = np.append(A_iq_row, constraint_idx)
                     A_iq_col = np.append(A_iq_col, problem.get_y_idx(b, v, t))
@@ -273,21 +286,6 @@ class DynamicConstraints(object):
         b_iq_uby = np.ones(constraint_idx)#.toarray()
 
 
-
-
-
-
-
-
-
-
-
-
-        """Generate equations (30) - (36)"""
-
-        if problem.num_vars == None: problem.add_num_var()
-
-
         # Constructing A_eq and b_eq for equality (30) as sp.coo matrix
         A_iq_row  = np.array([])
         A_iq_col  = np.array([])
@@ -295,7 +293,7 @@ class DynamicConstraints(object):
 
         constraint_idx = 0
         for t in range(problem.T):
-            for b in range(len(self.problem.graph.agents)):
+            for b in self.problem.b:
                 for v1 in problem.graph.nodes:
                     for v2 in problem.graph.nodes:
                         A_iq_row = np.append(A_iq_row, constraint_idx)
@@ -317,10 +315,10 @@ class DynamicConstraints(object):
         A_eq_data = np.array([])
 
         constraint_idx = 0
-        for t in range(problem.T):
+        for t in range(problem.T+1):
             for v1 in problem.graph.nodes:
                 for v2 in problem.graph.nodes:
-                    for b in range(len(self.problem.graph.agents)):
+                    for b in self.problem.b:
                         if connectivity_adj[v1][v2] == 0:
                             A_eq_row = np.append(A_eq_row, constraint_idx)
                             A_eq_col = np.append(A_eq_col, problem.get_xbar_idx(b, v1, v2, t))
@@ -340,7 +338,7 @@ class DynamicConstraints(object):
         for t in range(problem.T+1):
             for v1 in problem.graph.nodes:
                 for v2 in problem.graph.nodes:
-                    for b in range(len(self.problem.graph.agents)):
+                    for b in self.problem.b:
                         A_iq_row = np.append(A_iq_row, constraint_idx)
                         A_iq_col = np.append(A_iq_col, problem.get_xbar_idx(b, v1, v2, t))
                         A_iq_data = np.append(A_iq_data, 1)
@@ -363,7 +361,7 @@ class DynamicConstraints(object):
         for t in range(problem.T+1):
             for v1 in problem.graph.nodes:
                 for v2 in problem.graph.nodes:
-                    for b in range(len(self.problem.graph.agents)):
+                    for b in self.problem.b:
                         A_iq_row = np.append(A_iq_row, constraint_idx)
                         A_iq_col = np.append(A_iq_col, problem.get_xbar_idx(b, v1, v2, t))
                         A_iq_data = np.append(A_iq_data, 1)
@@ -385,9 +383,9 @@ class DynamicConstraints(object):
 
 
         constraint_idx = 0
-        for t in range(problem.T):
+        for t in range(problem.T+1):
             for v in problem.graph.nodes:
-                for b in range(len(self.problem.graph.agents)):
+                for b in self.problem.b:
                     A_iq_row = np.append(A_iq_row, constraint_idx)
                     A_iq_col = np.append(A_iq_col, problem.get_y_idx(b, v, t))
                     A_iq_data = np.append(A_iq_data, 1)
@@ -401,31 +399,7 @@ class DynamicConstraints(object):
         b_iq_35 = np.zeros(constraint_idx)#.toarray()
 
 
-
-        # Constructing A_eq and b_eq for equality (36 left) as sp.coo matrix
-        A_iq_row  = np.array([])
-        A_iq_col  = np.array([])
-        A_iq_data = np.array([])
-
-
-        constraint_idx = 0
-        for v in problem.graph.nodes:
-            for b in range(len(self.problem.graph.agents)):
-                A_iq_row = np.append(A_iq_row, constraint_idx)
-                A_iq_col = np.append(A_iq_col, problem.get_y_idx(b, v, self.problem.T))
-                A_iq_data = np.append(A_iq_data, 1)
-                for r in range(len(self.problem.graph.agents)):
-                    A_iq_row = np.append(A_iq_row, constraint_idx)
-                    A_iq_col = np.append(A_iq_col, problem.get_z_idx(r, v, self.problem.T))
-                    A_iq_data = np.append(A_iq_data, -1)
-                constraint_idx += 1
-
-        A_iq_36l = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))#.toarray()
-        b_iq_36l = np.zeros(constraint_idx)#.toarray()
-
-
-
-        # Constructing A_eq and b_eq for equality (36 right) as sp.coo matrix
+        # Constructing A_eq and b_eq for equality (36) as sp.coo matrix
         A_iq_row  = np.array([])
         A_iq_col  = np.array([])
         A_iq_data = np.array([])
@@ -434,8 +408,8 @@ class DynamicConstraints(object):
 
         constraint_idx = 0
         for v in problem.graph.nodes:
-            for b in range(len(self.problem.graph.agents)):
-                for r in range(len(self.problem.graph.agents)):
+            for b in self.problem.b:
+                for r in self.problem.graph.agents:
                     A_iq_row = np.append(A_iq_row, constraint_idx)
                     A_iq_col = np.append(A_iq_col, problem.get_z_idx(r, v, self.problem.T))
                     A_iq_data = np.append(A_iq_data, 1)
@@ -444,28 +418,101 @@ class DynamicConstraints(object):
                 A_iq_data = np.append(A_iq_data, -N)
                 constraint_idx += 1
 
-        A_iq_36r = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))#.toarray()
-        b_iq_36r = np.zeros(constraint_idx)#.toarray()
+        A_iq_36 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))#.toarray()
+        b_iq_36 = np.zeros(constraint_idx)#.toarray()
 
+
+        # Constructing A_eq and b_eq for dynamic condition on static agents as sp.coo matrix
+        A_stat_row  = np.array([])
+        A_stat_col  = np.array([])
+        A_stat_data = np.array([])
+        b_stat = []
+
+        constraint_idx = 0
+        for t in range(self.problem.T+1):
+            for r in self.problem.static_agents:
+                for v in self.problem.graph.nodes:
+                    A_stat_row = np.append(A_stat_row, constraint_idx)
+                    A_stat_col = np.append(A_stat_col, self.problem.get_z_idx(r, v, t))
+                    A_stat_data = np.append(A_stat_data, 1)
+                    if self.problem.graph.agents[r] == v: b_stat.append(1)
+                    else: b_stat.append(0)
+                    constraint_idx += 1
+        A_stat = sp.coo_matrix((A_stat_data, (A_stat_row, A_stat_col)), shape=(constraint_idx, self.problem.num_vars))#.toarray(
 
 
         #Stack all (equality/inequality) constraints vertically
-        self.A_eq = sp.bmat([[A_eq_35], [A_eq_36], [A_eq_32], [A_eq_ex], [A_eq_31]])
-        self.b_eq = np.hstack([b_eq_35, b_eq_36, b_eq_32, b_eq_ex, b_eq_31])
+        self.A_eq = sp.bmat([[A_eq_35], [A_eq_36], [A_eq_32], [A_eq_ex], [A_eq_31], [A_stat]])
+        self.b_eq = np.hstack([b_eq_35, b_eq_36, b_eq_32, b_eq_ex, b_eq_31, b_stat])
 
-        self.A_iq = sp.bmat([[A_iq_ubz], [A_iq_uby], [A_iq_id], [A_iq_30], [A_iq_33], [A_iq_34], [A_iq_35], [A_iq_36l], [A_iq_36r]])
-        self.b_iq = np.hstack([b_iq_ubz, b_iq_uby, b_iq_id, b_iq_30, b_iq_33, b_iq_34, b_iq_35, b_iq_36l, b_iq_36r])
+        self.A_iq = sp.bmat([[A_iq_ubz], [A_iq_uby], [A_iq_id], [A_iq_30], [A_iq_33], [A_iq_34], [A_iq_35], [A_iq_36]])
+        self.b_iq = np.hstack([b_iq_ubz, b_iq_uby, b_iq_id, b_iq_30, b_iq_33, b_iq_34, b_iq_35, b_iq_36])
 
 
 #Connectivity constraints-------------------------------------------------------
 
 class ConnectivityConstraint(object):
-    def __init__(self):
+    def __init__(self, problem):
         self.A_eq = None
         self.b_eq = None
         self.A_iq = None
         self.b_iq = None
+        self.problem = problem
+        self.generate_connectivity_contraints(self.problem)
 
+        # variables: z^b_rvt, e_ijt, y^b_vt, x^b_ijt, xbar^b_ijt
+
+    def generate_connectivity_contraints(self, problem):
+        """Generate connectivity inequality (37)"""
+
+        if problem.num_vars == None: problem.add_num_var()
+
+
+        # Constructing A_iq and b_iq for inequality (37) as sp.coo matrix
+        A_iq_row  = np.array([])
+        A_iq_col  = np.array([])
+        A_iq_data = np.array([])
+
+
+        constraint_idx = 0
+        #For each base
+        for b in problem.b:
+            #Find all sets S exclude node where b is
+            S_b_list = self.problem.powerset_exclude_vertex(b)
+            for S in S_b_list:
+                #Represent set S as list of tuples (vertex, time)
+                S_v_t = [self.problem.get_time_augmented_n_t(id) for id in S]
+
+                pre_S_transition = self.problem.graph.get_pre_S_transition(S_v_t)
+                pre_S_connectivity = self.problem.graph.get_pre_S_connectivity(S_v_t)
+
+                #For each v in S
+                for v, t in S_v_t:
+                    #add y
+                    A_iq_row = np.append(A_iq_row, constraint_idx)
+                    A_iq_col = np.append(A_iq_col, problem.get_y_idx(b, v, t))
+                    A_iq_data = np.append(A_iq_data, 1)
+                    for v0, v1, t0 in pre_S_transition:
+                        A_iq_row = np.append(A_iq_row, constraint_idx)
+                        A_iq_col = np.append(A_iq_col, problem.get_x_idx(b, v0, v1, t0))
+                        A_iq_data = np.append(A_iq_data, -1)
+                    for v0, v1, t1 in pre_S_connectivity:
+                        A_iq_row = np.append(A_iq_row, constraint_idx)
+                        A_iq_col = np.append(A_iq_col, problem.get_xbar_idx(b, v0, v1, t1))
+                        A_iq_data = np.append(A_iq_data, -1)
+                    constraint_idx += 1
+                    print(constraint_idx)
+        A_iq_37 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))#.toarray()
+        b_iq_37 = np.zeros(constraint_idx)#.toarray()
+
+        #Stack all (equality/inequality) constraints vertically (no equality constraints)
+        self.A_eq = sp.coo_matrix(([], ([], [])), shape=(0, problem.num_vars))#.toarray()
+        self.b_eq = np.array([])
+        self.A_iq = A_iq_37
+        self.b_iq = b_iq_37
+
+        #self.problem.inequality_constraints[0] = sp.bmat([[self.problem.inequality_constraints[0]], [self.A_iq]])
+        #self.problem.inequality_constraints[1] = np.hstack([self.problem.inequality_constraints[1], self.b_iq])
 
 #Connectivity problem-----=-----------------------------------------------------
 
@@ -488,6 +535,7 @@ class ConnectivityProblem(object):
         self.num_x = None
         self.num_xbar = None
         self.num_vars = None
+        self.static_agents = None
 
         self.solution = None
 
@@ -509,7 +557,6 @@ class ConnectivityProblem(object):
         self.num_vars = self.num_z + self.num_e + self.num_y + self.num_x + self.num_xbar
         print("Number of variables: {}".format(self.num_vars))
 
-
     def get_z_idx(self, r, v, t):
         start = 0
         z_t = (self.num_r * self.num_v) * t
@@ -525,7 +572,6 @@ class ConnectivityProblem(object):
         e_j = j
         idx = start + e_t + e_i + e_j
         return(idx)
-
 
     def get_y_idx(self, b, v, t):
         start = self.num_z + self.num_e
@@ -544,7 +590,6 @@ class ConnectivityProblem(object):
         idx = start + x_t + x_b +x_i + x_j
         return(idx)
 
-
     def get_xbar_idx(self, b, i, j, t):
         start = self.num_z + self.num_e + self.num_y + self.num_x
         xbar_t = (self.num_b * self.num_i * self.num_j) * t
@@ -559,10 +604,21 @@ class ConnectivityProblem(object):
         return(idx)
 
     def get_time_augmented_n_t(self, id):
-        n = id % self.graph.num_nodes
         t = id // self.graph.num_nodes
+        if id >= self.graph.num_nodes:
+            n = id % (self.graph.num_nodes * t)
+        else:
+            n = id
         return(n,t)
 
+    def powerset_exclude_vertex(self, b):
+        time_augmented_nodes = []
+        for t in range(self.T+1):
+            for v in self.graph.nodes:
+                time_augmented_nodes.append(self.get_time_augmented_id(v,t))
+        s = list(time_augmented_nodes)
+        s.remove(self.get_time_augmented_id(self.b[b],0))
+        return(chain.from_iterable(combinations(s, r) for r in range(1, len(s)+1)))
 
     def add_constraints(self, constraints):
         for constraint in constraints:
@@ -579,6 +635,7 @@ class ConnectivityProblem(object):
 
             else:
                 self.inequality_constraints = [constraint.A_iq, constraint.b_iq]
+        print("Number of constraints: {}".format(len(self.equality_constraints[1])+len(self.inequality_constraints[1])))
 
 
     def compile(self):
@@ -607,7 +664,6 @@ class ConnectivityProblem(object):
         else:
             self.equality_constraints = A_init
             self.equality_constraints = b_init
-
 
     def plot_solution(self):
         if self.solution is None:
@@ -687,20 +743,22 @@ class ConnectivityProblem(object):
                                 G[n][nbr][edge]['color']='grey'
                                 G[n][nbr][edge]['style']='dashed'
                         else:
-                            if len(G.nodes[n]['agents']) != 0 and len(G.nodes[nbr]['agents'])!= 0:
-                                G[n][nbr][edge]['color']='black'
-                                G[n][nbr][edge]['style']='solid'
-                            else:
-                                G[n][nbr][edge]['color']='grey'
-                                G[n][nbr][edge]['style']='solid'
+                            G[n][nbr][edge]['color']='grey'
+                            G[n][nbr][edge]['style']='solid'
+            for n in G:
+                for nbr in G[n]:
+                    for edge in G[n][nbr]:
+                        if G[n][nbr][edge]['type']=='transition':
+                            for a in G.nodes[n]['agents']:
+                                if a in G.nodes[nbr]['agents']:
+                                    G[n][nbr][edge]['color']='black'
+                                    G[n][nbr][edge]['style']='solid'
 
 
             #Plot/save graph
             A = to_agraph(G)
             A.layout()
             A.draw('solution.png')
-
-
 
     def check_well_defined(self):
         # Check input data
@@ -709,8 +767,6 @@ class ConnectivityProblem(object):
 
         if self.graph is None:
             raise Exception("No graph 'G' specified")
-
-
 
     def solve(self, solver=None, output=False, integer=True):
 
@@ -747,514 +803,3 @@ class ConnectivityProblem(object):
         return sol['x'][0 : self.num_z], \
                sol['x'][self.num_z : self.num_z + self.num_e], \
                sol['x'][self.num_z + self.num_e : self.num_z + self.num_e + self.num_y], \
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def test_solution(self):
-        for g in range(len(self.graphs)):
-            # Check dynamics
-            np.testing.assert_almost_equal(
-                self.x[g][:, 1:],
-                self.graphs[g].system_matrix().dot(self.u[g])
-            )
-
-            # Check control constraints
-            np.testing.assert_almost_equal(
-                self.x[g][:, :-1],
-                _id_stacked(self.graphs[g].K(), self.graphs[g].M())
-                    .dot(self.u[g])
-            )
-
-            # Check prefix-suffix connection
-            assgn_sum_g = np.zeros(self.graphs[g].K())
-            for C, a in zip(self.cycle_sets[g], self.assignments[g]):
-                for (Ci, ai) in zip(C, a):
-                    assgn_sum_g[self.graphs[g].order_fcn(Ci[0])] += ai
-
-            np.testing.assert_almost_equal(
-                self.x[g][:, -1],
-                assgn_sum_g
-            )
-
-        # Check counting constraints
-        for cc in self.constraints:
-            for t in range(1000):  # enough to do T + LCM(cycle_lengths)
-                assert(self.mode_count(cc.X, t) <= cc.R)
-
-    def mode_count(self, X, t):
-        """When a solution has been found, return the `X`-count
-        at time `t`"""
-        X_count = 0
-        for g in range(len(self.graphs)):
-            G = self.graphs[g]
-            if t < self.T:
-                u_t_g = self.u[g][:, t]
-                X_count += sum(u_t_g[G.order_fcn(v) +
-                                     G.index_of_mode(m) * G.K()]
-                               for (v, m) in X[g])
-            else:
-                ass_rot = [deque(a) for a in self.assignments[g]]
-                for a in ass_rot:
-                    a.rotate(t - self.T)
-                X_count += sum(np.inner(_cycle_row(C, X[g]), a)
-                               for C, a in zip(self.cycle_sets[g],
-                                               ass_rot))
-        return X_count
-
-    def get_aggregate_input(self, t):
-        """When an integer solution has been found, return aggregate inputs `u`
-            at time t"""
-        if self.u is None:
-            raise Exception("No solution available")
-
-        agg_u = []
-
-        for g in range(len(self.graphs)):
-            G = self.graphs[g]
-
-            if t < self.T:
-                # We are in prefix; states are available
-                u_g = self.u[g][:, t]
-
-            else:
-                u_g = np.zeros(G.K() * G.M())
-                # Rotate assignments
-                ass_rot = [deque(a) for a in self.assignments[g]]
-                for a in ass_rot:
-                    a.rotate(t - self.T)
-
-                for assgn, c in zip(ass_rot,
-                                    self.cycle_sets[g]):
-                    for ai, ci in zip(assgn, c):
-                        u_g[G.order_fcn(ci[0]) +
-                            G.index_of_mode(ci[1]) * G.K()] += ai
-            agg_u.append(u_g)
-
-        return agg_u
-
-
-    def get_input(self, xi_list, t):
-        """When an integer solution has been found, given individual states
-        `xi_list` at time t, return individual inputs `sigma`"""
-        if self.u is None:
-            raise Exception("No solution available")
-
-        actions = []
-
-        for g in range(len(self.graphs)):
-            G = self.graphs[g]
-            N_g = np.sum(self.inits[g])
-
-            actions_g = [None] * N_g
-
-            if t < self.T:
-                # We are in prefix; states are available
-                x_g = self.x[g][:, t]
-                u_g = self.u[g][:, t]
-
-            else:
-                # We are in suffix, must build x_g, u_g from cycle assignments
-                u_g = np.zeros(G.K() * G.M())
-                x_g = np.zeros(len(self.graphs[g]))
-
-                # Rotate assignments
-                ass_rot = [deque(a) for a in self.assignments[g]]
-                for a in ass_rot:
-                    a.rotate(t - self.T)
-
-                for assgn, c in zip(ass_rot,
-                                    self.cycle_sets[g]):
-                    x_g += self.graphs[g].index_matrix(c) \
-                               .dot(assgn).flatten()
-                    for ai, ci in zip(assgn, c):
-                        u_g[G.order_fcn(ci[0]) +
-                            G.index_of_mode(ci[1]) * G.K()] += ai
-
-            # Assert that xi_list agrees with aggregate solution
-            xi_sum = np.zeros(len(self.graphs[g]))
-            for xi in xi_list[g]:
-                xi_sum[self.graphs[g].order_fcn(xi)] += 1
-            print(xi_sum)
-            try:
-                np.testing.assert_almost_equal(xi_sum,
-                                               x_g)
-            except:
-                raise Exception("States don't agree with aggregate" +
-                                " at time " + str(t))
-
-            for n in range(N_g):
-                k = G.order_fcn(xi_list[g][n])
-                u_state = [u_g[k + G.K() * m] for m in range(G.M())]
-                m = next(i for i in range(len(u_state))
-                         if u_state[i] >= 1)
-                actions_g[n] = G.mode(m)
-                u_g[k + G.K() * m] -= 1
-            actions.append(actions_g)
-
-        return actions
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def solve_prefix_suffix(self, solver=None, output=False, integer=True):
-
-        # self.check_well_defined()
-
-        # Variables for each g in self.graphs:
-        #  v_g := u_g[0] ... u_g[T-1] x_g[0] ... x_g[T-1]
-        #         a_g[0] ... a_g[C1-1] b[0] ... b[LJ-1]
-        # These are stacked horizontally as
-        #  v_0 v_1 ... v_G-1
-
-        L = len(self.constraints)
-        T = self.T
-
-        # Variable counts for each class g
-        N_u = T * self.graph.K() * self.graph.M()   # input vars
-        N_x = T * self.graph.K()   # state vars
-
-        N_tot = sum(N_u) + sum(N_x)
-
-        # Add dynamic constraints
-        A_eq_list = []
-        b_eq_list = []
-
-        A_eq1_u, A_eq1_x, b_eq1 = \
-            generate_prefix_dyn_cstr(self.graph, T)
-        A_eq2_x, A_eq2_a, b_eq2 = \
-            generate_prefix_suffix_cstr(self.graph, T)
-        A_eq1_b = sp.coo_matrix((A_eq1_u.shape[0], N_b_list[g]))
-
-        A_eq_list.append(
-            sp.bmat([[A_eq1_u, A_eq1_x, None, A_eq1_b],
-                     [None, A_eq2_x, A_eq2_a, None]])
-        )
-        b_eq_list.append(
-            np.hstack([b_eq1, b_eq2])
-        )
-
-        A_eq = sp.block_diag(A_eq_list)
-        b_eq = np.hstack(b_eq_list)
-
-        # Add counting constraints
-        A_iq_list = []
-        b_iq_list = []
-        for l in range(len(self.constraints)):
-            cc = self.constraints[l]
-
-            # Count over classes: Should be stacked horizontally
-            A_iq1_list = []
-
-            # Bounded by slack vars: Should be block diagonalized
-            A_iq2_list = []
-            b_iq2_list = []
-
-            # Count over bound vars for each class: Should be stacked
-            # horizontally
-            A_iq3_list = []
-
-            for g in range(len(self.graphs)):
-                # Prefix counting
-                A_iq1_u, b_iq1 = \
-                    generate_prefix_counting_cstr(self.graphs[g], T,
-                                                  cc.X[g], cc.R)
-                A_iq1_list.append(
-                    sp.bmat([[A_iq1_u, sp.coo_matrix((T, N_x_list[g] +
-                                                      N_a_list[g] +
-                                                      N_b_list[g]))]])
-                )
-
-                # Suffix counting
-                A_iq2_a, A_iq2_b, b_iq2, A_iq3_a, A_iq3_b, b_iq3 = \
-                    generate_suffix_counting_cstr(self.cycle_sets[g],
-                                                  cc.X[g], cc.R)
-
-                b_head2 = sp.coo_matrix((N_a_list[g], l * J_list[g]))
-                b_tail2 = sp.coo_matrix((N_a_list[g], (L - 1 - l) * J_list[g]))
-                A_iq2_b = sp.bmat([[b_head2, A_iq2_b, b_tail2]])
-                b_head3 = sp.coo_matrix((1, l * J_list[g]))
-                b_tail3 = sp.coo_matrix((1, (L - 1 - l) * J_list[g]))
-                A_iq3_b = sp.bmat([[b_head3, A_iq3_b, b_tail3]])
-
-                A_iq2_u = sp.coo_matrix((N_a_list[g], N_u_list[g]))
-                A_iq2_x = sp.coo_matrix((N_a_list[g], N_x_list[g]))
-
-                A_iq2_list.append(
-                    sp.bmat([[A_iq2_u, A_iq2_x, A_iq2_a, A_iq2_b]])
-                )
-                b_iq2_list.append(b_iq2)
-
-                A_iq3_list.append(
-                    sp.bmat([[sp.coo_matrix((1, N_u_list[g] + N_x_list[g])),
-                              A_iq3_a, A_iq3_b]])
-                )
-
-            # Stack horizontally
-            A_iq_list.append(sp.bmat([A_iq1_list]))
-            b_iq_list.append(b_iq1)
-
-            # Stack by block
-            A_iq_list.append(sp.block_diag(A_iq2_list))
-            b_iq_list.append(np.hstack(b_iq2_list))
-
-            # Stack horizontally
-            A_iq_list.append(sp.bmat([A_iq3_list]))
-            b_iq_list.append(b_iq3)
-
-        # Stack everything vertically
-        if len(A_iq_list) > 0:
-            A_iq = sp.bmat([[A] for A in A_iq_list])
-            b_iq = np.hstack(b_iq_list)
-        else:
-            A_iq = sp.coo_matrix((0, N_tot))
-            b_iq = np.zeros(0)
-
-        # Solve it
-        if integer:
-            sol = solve_mip(np.zeros(N_tot), A_iq, b_iq, A_eq, b_eq,
-                            range(N_tot), solver, output);
-        else:
-            sol = solve_mip(np.zeros(N_tot), A_iq, b_iq, A_eq, b_eq,
-                            [], solver, output);
-
-        # Extract solution (if valid)
-        if sol['status'] == 2:
-            self.u = []
-            self.x = []
-            self.assignments = []
-
-            idx0 = 0
-            for g in range(len(self.graphs)):
-                self.u.append(
-                    np.array(sol['x'][idx0:idx0 + N_u_list[g]], dtype=int)
-                      .reshape(T, self.graphs[g].K() * self.graphs[g].M())
-                      .transpose()
-                )
-                self.x.append(
-                    np.hstack([
-                        np.array(self.inits[g]).reshape(len(self.inits[g]), 1),
-                        np.array(sol['x'][idx0 + N_u_list[g]:
-                                          idx0 + N_u_list[g] + N_x_list[g]])
-                          .reshape(T, self.graphs[g].K()).transpose()
-                    ])
-                )
-
-                cycle_lengths = [len(C) for C in self.cycle_sets[g]]
-                self.assignments.append(
-                    [sol['x'][idx0 + N_u_list[g] + N_x_list[g] + an:
-                              idx0 + N_u_list[g] + N_x_list[g] + an + dn]
-                     for an, dn in zip(np.cumsum([0] +
-                                       cycle_lengths[:-1]),
-                                       cycle_lengths)]
-                )
-                idx0 += N_u_list[g] + N_x_list[g] + N_a_list[g] + N_b_list[g]
-        return sol['status']
-
-
-    def test_solution(self):
-        for g in range(len(self.graphs)):
-            # Check dynamics
-            np.testing.assert_almost_equal(
-                self.x[g][:, 1:],
-                self.graphs[g].system_matrix().dot(self.u[g])
-            )
-
-            # Check control constraints
-            np.testing.assert_almost_equal(
-                self.x[g][:, :-1],
-                _id_stacked(self.graphs[g].K(), self.graphs[g].M())
-                    .dot(self.u[g])
-            )
-
-            # Check prefix-suffix connection
-            assgn_sum_g = np.zeros(self.graphs[g].K())
-            for C, a in zip(self.cycle_sets[g], self.assignments[g]):
-                for (Ci, ai) in zip(C, a):
-                    assgn_sum_g[self.graphs[g].order_fcn(Ci[0])] += ai
-
-            np.testing.assert_almost_equal(
-                self.x[g][:, -1],
-                assgn_sum_g
-            )
-
-        # Check counting constraints
-        for cc in self.constraints:
-            for t in range(1000):  # enough to do T + LCM(cycle_lengths)
-                assert(self.mode_count(cc.X, t) <= cc.R)
-
-    def mode_count(self, X, t):
-        """When a solution has been found, return the `X`-count
-        at time `t`"""
-        X_count = 0
-        for g in range(len(self.graphs)):
-            G = self.graphs[g]
-            if t < self.T:
-                u_t_g = self.u[g][:, t]
-                X_count += sum(u_t_g[G.order_fcn(v) +
-                                     G.index_of_mode(m) * G.K()]
-                               for (v, m) in X[g])
-            else:
-                ass_rot = [deque(a) for a in self.assignments[g]]
-                for a in ass_rot:
-                    a.rotate(t - self.T)
-                X_count += sum(np.inner(_cycle_row(C, X[g]), a)
-                               for C, a in zip(self.cycle_sets[g],
-                                               ass_rot))
-        return X_count
-
-    def get_aggregate_input(self, t):
-        """When an integer solution has been found, return aggregate inputs `u`
-            at time t"""
-        if self.u is None:
-            raise Exception("No solution available")
-
-        agg_u = []
-
-        for g in range(len(self.graphs)):
-            G = self.graphs[g]
-
-            if t < self.T:
-                # We are in prefix; states are available
-                u_g = self.u[g][:, t]
-
-            else:
-                u_g = np.zeros(G.K() * G.M())
-                # Rotate assignments
-                ass_rot = [deque(a) for a in self.assignments[g]]
-                for a in ass_rot:
-                    a.rotate(t - self.T)
-
-                for assgn, c in zip(ass_rot,
-                                    self.cycle_sets[g]):
-                    for ai, ci in zip(assgn, c):
-                        u_g[G.order_fcn(ci[0]) +
-                            G.index_of_mode(ci[1]) * G.K()] += ai
-            agg_u.append(u_g)
-
-        return agg_u
-
-
-    def get_input(self, xi_list, t):
-        """When an integer solution has been found, given individual states
-        `xi_list` at time t, return individual inputs `sigma`"""
-        if self.u is None:
-            raise Exception("No solution available")
-
-        actions = []
-
-        for g in range(len(self.graphs)):
-            G = self.graphs[g]
-            N_g = np.sum(self.inits[g])
-
-            actions_g = [None] * N_g
-
-            if t < self.T:
-                # We are in prefix; states are available
-                x_g = self.x[g][:, t]
-                u_g = self.u[g][:, t]
-
-            else:
-                # We are in suffix, must build x_g, u_g from cycle assignments
-                u_g = np.zeros(G.K() * G.M())
-                x_g = np.zeros(len(self.graphs[g]))
-
-                # Rotate assignments
-                ass_rot = [deque(a) for a in self.assignments[g]]
-                for a in ass_rot:
-                    a.rotate(t - self.T)
-
-                for assgn, c in zip(ass_rot,
-                                    self.cycle_sets[g]):
-                    x_g += self.graphs[g].index_matrix(c) \
-                               .dot(assgn).flatten()
-                    for ai, ci in zip(assgn, c):
-                        u_g[G.order_fcn(ci[0]) +
-                            G.index_of_mode(ci[1]) * G.K()] += ai
-
-            # Assert that xi_list agrees with aggregate solution
-            xi_sum = np.zeros(len(self.graphs[g]))
-            for xi in xi_list[g]:
-                xi_sum[self.graphs[g].order_fcn(xi)] += 1
-            print(xi_sum)
-            try:
-                np.testing.assert_almost_equal(xi_sum,
-                                               x_g)
-            except:
-                raise Exception("States don't agree with aggregate" +
-                                " at time " + str(t))
-
-            for n in range(N_g):
-                k = G.order_fcn(xi_list[g][n])
-                u_state = [u_g[k + G.K() * m] for m in range(G.M())]
-                m = next(i for i in range(len(u_state))
-                         if u_state[i] >= 1)
-                actions_g[n] = G.mode(m)
-                u_g[k + G.K() * m] -= 1
-            actions.append(actions_g)
-
-        return actions
