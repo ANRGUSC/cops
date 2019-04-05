@@ -36,7 +36,7 @@ cp = ConnectivityProblem()
 # Specify graph
 cp.graph = G
 # Specify time horizon
-cp.T = 2
+cp.T = 3
 # Specify bases
 cp.b = {0: 3}
 
