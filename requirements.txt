@@ -1,0 +1,6 @@
+# use with `pip install -r requirements.txt`
+
+networkx
+matplotlib
+scipy
+nose
