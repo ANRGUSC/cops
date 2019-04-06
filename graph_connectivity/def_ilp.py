@@ -1,6 +1,5 @@
 import time
 from dataclasses import dataclass
-from functools import reduce
 
 import numpy as np
 import networkx as nx
@@ -127,7 +126,7 @@ class Graph(nx.MultiDiGraph):
                     pre_S.add((edge[0], edge[1], t))
         return pre_S
 
-#Class for constraints------------------------------------------------------------
+#Class for constraints----------------------------------------------------------
 
 @dataclass
 class Constraint(object):
@@ -478,48 +477,26 @@ def generate_dynamic_contraints(problem):
 
 #Connectivity constraints-------------------------------------------------------
 
-# TODO: merge common parts in these two functions
-
-def generate_connectivity_contraints(problem):
+def generate_connectivity_constraint_all(problem):
+    '''Generate connectivity constraints corresponding to all subsets
+       in the graph, for all bases'''
 
     if problem.num_vars == None: problem.compute_num_var()
 
-    # Constructing A_iq and b_iq for inequality (37) as sp.coo matrix
-    A_iq_row  = []
-    A_iq_col  = []
-    A_iq_data = []
+    ret = Constraint()
 
-    constraint_idx = 0
-    #For each base
+    # Iterator over all (v, t) subsets in the graph
     for b in problem.b:
-        #Find all sets S exclude node where b is
-        for S in problem.powerset_exclude_vertex(b):
-            #Represent set S as list of tuples (vertex, time)
-            S_v_t = [problem.get_time_augmented_n_t(id) for id in S]
+        #Convert each set in the iterator to (v,t) format
+        add_S = map(lambda S: list(map(problem.get_time_augmented_n_t, S)), 
+                    problem.powerset_exclude_vertex(b))
+        ret &= generate_connectivity_constraint(problem, [b], add_S)
+    
+    return ret
 
-            pre_S_transition = problem.graph.get_pre_S_transition(S_v_t)
-            pre_S_connectivity = problem.graph.get_pre_S_connectivity(S_v_t)
-
-            #For each v in S
-            for v, t in S_v_t:
-                #add y
-                A_iq_row.append(constraint_idx)
-                A_iq_col.append(problem.get_y_idx(b, v, t))
-                A_iq_data.append(1)
-                for v0, v1, t0 in pre_S_transition:
-                    A_iq_row.append(constraint_idx)
-                    A_iq_col.append(problem.get_x_idx(b, v0, v1, t0))
-                    A_iq_data.append(-1)
-                for v0, v1, t1 in pre_S_connectivity:
-                    A_iq_row.append(constraint_idx)
-                    A_iq_col.append(problem.get_xbar_idx(b, v0, v1, t1))
-                    A_iq_data.append(-1)
-                constraint_idx += 1
-    A_iq_37 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), 
-                            shape=(constraint_idx, problem.num_vars))
-    return Constraint(A_iq=A_iq_37, b_iq=np.zeros(constraint_idx))
-
-def add_connectivity_constraint(problem, add_S):
+def generate_connectivity_constraint(problem, b_list, add_S):
+    '''Generate connectivity constraints for the S subsets in add_S, for
+       all bases in b_list'''
 
     # Constructing A_iq and b_iq for inequality (37) for all S in add_S as sp.coo matrix
     A_iq_row  = []
@@ -528,33 +505,28 @@ def add_connectivity_constraint(problem, add_S):
 
     constraint_idx = 0
     #For each base
-    for b in problem.b:
-        #For each S to add
-        for S_v_t in add_S:
-
-            pre_S_transition = problem.graph.get_pre_S_transition(S_v_t)
-            pre_S_connectivity = problem.graph.get_pre_S_connectivity(S_v_t)
-
-            #For each v in S
-            for v, t in S_v_t:
-                #add y
+    for b, S_v_t in product(b_list, add_S):
+        pre_S_transition = problem.graph.get_pre_S_transition(S_v_t)
+        pre_S_connectivity = problem.graph.get_pre_S_connectivity(S_v_t)
+        for v, t in S_v_t:
+            #add y
+            A_iq_row.append(constraint_idx)
+            A_iq_col.append(problem.get_y_idx(b, v, t))
+            A_iq_data.append(1)
+            for v0, v1, t0 in pre_S_transition:
                 A_iq_row.append(constraint_idx)
-                A_iq_col.append(problem.get_y_idx(b, v, t))
-                A_iq_data.append(1)
-                for v0, v1, t0 in pre_S_transition:
-                    A_iq_row.append(constraint_idx)
-                    A_iq_col.append(problem.get_x_idx(b, v0, v1, t0))
-                    A_iq_data.append(-1)
-                for v0, v1, t1 in pre_S_connectivity:
-                    A_iq_row.append(constraint_idx)
-                    A_iq_col.append(problem.get_xbar_idx(b, v0, v1, t1))
-                    A_iq_data.append(-1)
-                constraint_idx += 1
+                A_iq_col.append(problem.get_x_idx(b, v0, v1, t0))
+                A_iq_data.append(-1)
+            for v0, v1, t1 in pre_S_connectivity:
+                A_iq_row.append(constraint_idx)
+                A_iq_col.append(problem.get_xbar_idx(b, v0, v1, t1))
+                A_iq_data.append(-1)
+            constraint_idx += 1
     A_iq_37 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
 
     return Constraint(A_iq=A_iq_37, b_iq=np.zeros(constraint_idx))
 
-#Initial constraints-------------------------------------------------------
+#Initial constraints------------------------------------------------------------
 
 def generate_initial_contraints(problem):
 
@@ -578,7 +550,6 @@ def generate_initial_contraints(problem):
     A_init = sp.coo_matrix((A_init_data, (A_init_row, A_init_col)), shape=(constraint_idx, problem.num_vars))#.toarray(
  
     return Constraint(A_eq=A_init, b_eq=b_init)
-
 
 #Connectivity problem-----------------------------------------------------------
 
@@ -606,7 +577,7 @@ class ConnectivityProblem(object):
 
         # variables: z^b_rvt, e_ijt, y^b_vt, x^b_ijt, xbar^b_ijt
 
-##INDEX HELPER FUNCTIONS##
+    ##INDEX HELPER FUNCTIONS##
 
     def compute_num_var(self):
         self.num_b = len(self.b)
@@ -645,7 +616,7 @@ class ConnectivityProblem(object):
         idx = np.ravel_multi_index((t,b,i,j), (self.T+1, self.num_b, self.num_v, self.num_v))
         return start + idx
 
-##GRAPH HELPER FUNCTIONS##
+    ##GRAPH HELPER FUNCTIONS##
 
     def get_time_augmented_id(self, n, t):
         return np.ravel_multi_index((t,n), (self.T+1, self.num_v))
@@ -663,7 +634,7 @@ class ConnectivityProblem(object):
         s.remove(self.get_time_augmented_id(self.b[b],0))
         return(chain.from_iterable(combinations(s, r) for r in range(1, len(s)+1)))
 
-##PROBLEM SETUP HELPER FUNCTIONS##
+    ##PROBLEM SETUP HELPER FUNCTIONS##
 
     def check_well_defined(self):
         # Check input data
@@ -673,7 +644,7 @@ class ConnectivityProblem(object):
         if self.graph is None:
             raise Exception("No graph 'G' specified")
 
-##SOLUTION HELPER FUNCTIONS##
+    ##SOLUTION HELPER FUNCTIONS##
 
     def plot_solution(self):
         if self.solution is None:
@@ -818,7 +789,7 @@ class ConnectivityProblem(object):
         else:
             return True, add_S
 
-##SOLVER FUNCTIONS##
+    ##SOLVER FUNCTIONS##
 
     def solve(self, solver=None, output=False, integer=True):
 
@@ -832,12 +803,11 @@ class ConnectivityProblem(object):
 
         #Set up Connectivity contraint
         cct0 = time.time()
-        self.constraint &= generate_connectivity_contraints(self)
+        self.constraint &= generate_connectivity_constraint_all(self)
         print("Connectivity constraints setup time {:.2f}s".format(time.time() - cct0))
 
         print("Number of constraints: {}".format(self.constraint.A_eq.shape[1]+self.constraint.A_iq.shape[1]))
         return self.solve_(solver=None, output=False, integer=True)
-
 
     def solve_adaptive(self, solver=None, output=False, integer=True):
 
@@ -855,7 +825,7 @@ class ConnectivityProblem(object):
         while not valid_solution:
             solution = self.solve_(solver, output, integer)
             valid_solution, add_S = self.test_solution()
-            self.constraint &= add_connectivity_constraint(self, add_S)
+            self.constraint &= generate_connectivity_constraint(self, self.b, add_S)
         return solution
 
     def solve_(self, solver=None, output=False, integer=True):
@@ -873,4 +843,3 @@ class ConnectivityProblem(object):
         return sol['x'][0 : self.num_z], \
                sol['x'][self.num_z : self.num_z + self.num_e], \
                sol['x'][self.num_z + self.num_e : self.num_z + self.num_e + self.num_y]
-
