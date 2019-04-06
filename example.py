@@ -32,14 +32,10 @@ cp.T = 2                                #time
 cp.b = {0: 0, 1: 1, 2:3}                #base:node
 cp.static_agents = [0, 2]               #static agents
 
-#Compile (compile() or compile_adaptive())
-cp.compile_adaptive()
-
 #Solve (solve() or solve_adaptive())
-print('Solving')
 st0 = time.time()
 z, e, y= cp.solve_adaptive()
-print("solver time:", time.time() - st0)
+print("solver time: {:.2f}s".format(time.time() - st0))
 
 #Plot Graph (saves image as graph.png)
 cp.plot_solution()

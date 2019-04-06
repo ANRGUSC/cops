@@ -26,16 +26,6 @@ def test_horiz1():
 
     cp.static_agents = [2]
 
-    #Set up Dynamic Constraints
-    dc = DynamicConstraints(cp)
-
-    #Set up Connectivity contraint
-    cc = ConnectivityConstraint(cp)
-    
-    #Compile Problem
-    cp.add_constraints([dc, cc])
-    cp.compile()
-
     print('Solving')
     z, e, y= cp.solve()
 
@@ -75,16 +65,6 @@ def test_horiz2():
     cp.b = {0: 3}
 
     cp.static_agents = [0, 2]
-
-    #Set up Dynamic Constraints
-    dc = DynamicConstraints(cp)
-
-    #Set up Connectivity contraint
-    cc = ConnectivityConstraint(cp)
-
-    #Compile Problem
-    cp.add_constraints([dc, cc])
-    cp.compile()
 
     print('Solving')
     z, e, y= cp.solve()
