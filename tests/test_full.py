@@ -27,19 +27,19 @@ def test_horiz1():
     cp.static_agents = [2]
 
     print('Solving')
-    z, e, y= cp.solve()
+    cp.solve()
 
     # positions of robot 0
-    np.testing.assert_equal(z[cp.get_z_idx(0,0,0)], 1)
-    np.testing.assert_equal(z[cp.get_z_idx(0,1,1)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,0,0)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,1,1)], 1)
             
     # positions of robot 1
-    np.testing.assert_equal(z[cp.get_z_idx(1,1,0)], 1)
-    np.testing.assert_equal(z[cp.get_z_idx(1,2,1)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(1,1,0)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(1,2,1)], 1)
             
     # positions of robot 2 (fixed)
-    np.testing.assert_equal(z[cp.get_z_idx(2,3,0)], 1)
-    np.testing.assert_equal(z[cp.get_z_idx(2,3,1)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(2,3,0)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(2,3,1)], 1)
 
 def test_horiz2():
     G = Graph()
@@ -67,19 +67,19 @@ def test_horiz2():
     cp.static_agents = [0, 2]
 
     print('Solving')
-    z, e, y= cp.solve()
+    cp.solve()
 
     # positions of robot 0
-    np.testing.assert_equal(z[cp.get_z_idx(0,0,0)], 1)
-    np.testing.assert_equal(z[cp.get_z_idx(0,0,1)], 1)
-    np.testing.assert_equal(z[cp.get_z_idx(0,0,2)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,0,0)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,0,1)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,0,2)], 1)
             
     # positions of robot 1
-    np.testing.assert_equal(z[cp.get_z_idx(1,1,0)], 1)
-    np.testing.assert_equal(z[cp.get_z_idx(1,2,1)], 1)
-    np.testing.assert_equal(z[cp.get_z_idx(1,1,2)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(1,1,0)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(1,2,1)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(1,1,2)], 1)
             
     # positions of robot 2 (fixed)
-    np.testing.assert_equal(z[cp.get_z_idx(2,3,0)], 1)
-    np.testing.assert_equal(z[cp.get_z_idx(2,3,1)], 1)
-    np.testing.assert_equal(z[cp.get_z_idx(2,3,2)], 1)            
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(2,3,0)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(2,3,1)], 1)
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(2,3,2)], 1)            

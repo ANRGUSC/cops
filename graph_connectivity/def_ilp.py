@@ -1,11 +1,10 @@
 import time
-from dataclasses import dataclass
 
 import numpy as np
 import networkx as nx
 import scipy.sparse as sp
 
-from graph_connectivity.optimization_wrappers import *
+from graph_connectivity.optimization_wrappers import solve_ilp, Constraint
 from networkx.drawing.nx_agraph import to_agraph
 from copy import deepcopy
 from itertools import chain, combinations, product
@@ -125,56 +124,6 @@ class Graph(nx.MultiDiGraph):
                 if edge[2]['type'] == 'connectivity' and (edge[0], t) not in S_v_t:
                     pre_S.add((edge[0], edge[1], t))
         return pre_S
-
-#Class for constraints----------------------------------------------------------
-
-@dataclass
-class Constraint(object):
-    A_eq: sp.coo_matrix = None
-    b_eq: np.array = None
-    A_iq: sp.coo_matrix = None
-    b_iq: np.array = None
-
-    @property
-    def has_iq(self):
-        return self.A_iq is not None
-
-    @property
-    def has_eq(self):
-        return self.A_eq is not None
-
-    def __and__(self, other):
-        A_eq = None
-        b_eq = None
-
-        if self.has_eq or other.has_eq:
-            A_eq = sp.bmat([[c.A_eq] for c in [self, other] if c.A_eq is not None])
-            b_eq = np.hstack([c.b_eq for c in [self, other] if c.b_eq is not None])
-
-        A_iq = None
-        b_iq = None
-
-        if self.has_iq or other.has_iq:
-            A_iq = sp.bmat([[c.A_iq] for c in [self, other] if c.A_iq is not None])
-            b_iq = np.hstack([c.b_iq for c in [self, other] if c.b_iq is not None])
-
-        return Constraint(A_eq=A_eq, b_eq=b_eq, A_iq=A_iq, b_iq=b_iq)
-
-    def __iand__(self, other):
-        if self.has_eq and other.has_eq:
-            self.A_eq = sp.bmat([[self.A_eq], [other.A_eq]])
-            self.b_eq = np.hstack([self.b_eq, other.b_eq])
-        elif other.has_eq:
-            self.A_eq = other.A_eq
-            self.b_eq = other.b_eq
-        if self.has_iq and other.has_iq:
-            self.A_iq = sp.bmat([[self.A_iq], [other.A_iq]])
-            self.b_iq = np.hstack([self.b_iq, other.b_iq])
-        elif other.has_iq:
-            self.A_iq = other.A_iq
-            self.b_iq = other.b_iq
-
-        return self
 
 #Dynamic constraints------------------------------------------------------------
 
@@ -473,7 +422,7 @@ def generate_dynamic_contraints(problem):
     c_uby = dynamic_constraint_uby(problem)
     c_stat = dynamic_constraint_static(problem)
 
-    return c_27 & c_28 & c_30 & c_31 & c_32 & c_33 & c_34 & c_35 & c_36 & c_id & c_ex & c_ubz & c_uby & c_stat
+    return c_27 & c_28 & c_30 & c_31 & c_32 & c_33 & c_34 & c_35 & c_36 & c_id & c_ex  & c_stat
 
 #Connectivity constraints-------------------------------------------------------
 
@@ -807,7 +756,8 @@ class ConnectivityProblem(object):
         print("Connectivity constraints setup time {:.2f}s".format(time.time() - cct0))
 
         print("Number of constraints: {}".format(self.constraint.A_eq.shape[1]+self.constraint.A_iq.shape[1]))
-        return self.solve_(solver=None, output=False, integer=True)
+        
+        self.solve_(solver=None, output=False, integer=True)
 
     def solve_adaptive(self, solver=None, output=False, integer=True):
 
@@ -823,23 +773,29 @@ class ConnectivityProblem(object):
 
         valid_solution = False
         while not valid_solution:
-            solution = self.solve_(solver, output, integer)
+            self.solve_(solver, output, integer)
+            if self.solution['status'] == 'infeasible':
+                break
             valid_solution, add_S = self.test_solution()
             self.constraint &= generate_connectivity_constraint(self, self.b, add_S)
-        return solution
 
     def solve_(self, solver=None, output=False, integer=True):
         obj = np.zeros(self.num_vars)
 
+        # Which variables are binary/integer
+        start = 0
+        J_bin = list(range(start, start + self.num_z))   # z binary
+        start += self.num_z
+        J_int = list(range(start, start + self.num_e))   # e integer
+        start += self.num_e  
+        J_bin += list(range(start, start + self.num_y))  # y binary
+        start += self.num_y
+        J_bin += list(range(start, start + self.num_x))  # x binary
+        start += self.num_x
+        J_bin += list(range(start, start + self.num_xbar))  # xbar binary
+
         # Solve it
-        itg_arg = None if integer else []
+        self.solution = solve_ilp(obj, self.constraint, J_int, J_bin, solver, output)
 
-        sol = solve_ilp(obj, self.constraint.A_iq, self.constraint.b_iq, 
-                        self.constraint.A_eq, self.constraint.b_eq,
-                        itg_arg, solver, output);
-
-        self.solution = sol
-
-        return sol['x'][0 : self.num_z], \
-               sol['x'][self.num_z : self.num_z + self.num_e], \
-               sol['x'][self.num_z + self.num_e : self.num_z + self.num_e + self.num_y]
+        if self.solution['status'] == 'infeasible':
+            print("Problem infeasible")

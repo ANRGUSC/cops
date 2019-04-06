@@ -34,11 +34,15 @@ cp.static_agents = [0, 2]               #static agents
 
 #Solve (solve() or solve_adaptive())
 st0 = time.time()
-z, e, y= cp.solve_adaptive()
+sol = cp.solve_adaptive()
 print("solver time: {:.2f}s".format(time.time() - st0))
 
 #Plot Graph (saves image as graph.png)
 cp.plot_solution()
+
+z = cp.solution['x'][0 : cp.num_z]
+e = cp.solution['x'][cp.num_z : cp.num_z + cp.num_e]
+y = cp.solution['x'][cp.num_z + cp.num_e : cp.num_z + cp.num_e + cp.num_y]
 
 print("Finished")
 print("z:", len(z), '\n', np.reshape(z, (cp.T+1, cp.num_v * cp.num_r)))
