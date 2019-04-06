@@ -2,9 +2,8 @@ import time
 import numpy as np
 import networkx as nx
 import scipy.sparse as sp
-from collections import deque
+
 from graph_connectivity.optimization_wrappers import *
-from networkx.drawing.nx_pydot import write_dot
 from networkx.drawing.nx_agraph import to_agraph
 from copy import deepcopy
 from itertools import chain, combinations, product
@@ -137,7 +136,7 @@ class DynamicConstraints(object):
         self.transition_adj = None
         self.connectivity_adj = None
         self.problem = problem
-        self.generate_dynamic_contraints(self.problem)
+        self.generate_dynamic_contraints()
 
         # variables: z^b_rvt, e_ijt, y^b_vt, x^b_ijt, xbar^b_ijt
 
@@ -426,14 +425,14 @@ class DynamicConstraints(object):
 
         return A_stat, b_stat
 
-    def generate_dynamic_contraints(self, problem):
+    def generate_dynamic_contraints(self):
 
         #Define number of variables
-        if problem.num_vars == None: problem.compute_num_var()
+        if self.problem.num_vars == None: self.problem.compute_num_var()
 
         # Obtain adjacency matrix for transition/connectivity edges separately
-        self.transition_adj = problem.graph.transition_adjacency_matrix()
-        self.connectivity_adj = problem.graph.connectivity_adjacency_matrix()
+        self.transition_adj = self.problem.graph.transition_adjacency_matrix()
+        self.connectivity_adj = self.problem.graph.connectivity_adjacency_matrix()
 
         #Setup constraints
         A_eq_27, b_eq_27 = self.dynamic_constraint_27()
@@ -469,7 +468,7 @@ class ConnectivityConstraint(object):
         self.A_iq = None
         self.b_iq = None
         self.problem = problem
-        self.generate_connectivity_contraints(self.problem)
+        self.generate_connectivity_contraints()
 
         # variables: z^b_rvt, e_ijt, y^b_vt, x^b_ijt, xbar^b_ijt
 
@@ -481,7 +480,7 @@ class ConnectivityConstraint(object):
 
         constraint_idx = 0
         #For each base
-        for b in problem.b:
+        for b in self.problem.b:
             #Find all sets S exclude node where b is
             for S in self.problem.powerset_exclude_vertex(b):
                 #Represent set S as list of tuples (vertex, time)
@@ -494,27 +493,28 @@ class ConnectivityConstraint(object):
                 for v, t in S_v_t:
                     #add y
                     A_iq_row.append(constraint_idx)
-                    A_iq_col.append(problem.get_y_idx(b, v, t))
+                    A_iq_col.append(self.problem.get_y_idx(b, v, t))
                     A_iq_data.append(1)
                     for v0, v1, t0 in pre_S_transition:
                         A_iq_row.append(constraint_idx)
-                        A_iq_col.append(problem.get_x_idx(b, v0, v1, t0))
+                        A_iq_col.append(self.problem.get_x_idx(b, v0, v1, t0))
                         A_iq_data.append(-1)
                     for v0, v1, t1 in pre_S_connectivity:
                         A_iq_row.append(constraint_idx)
-                        A_iq_col.append(problem.get_xbar_idx(b, v0, v1, t1))
+                        A_iq_col.append(self.problem.get_xbar_idx(b, v0, v1, t1))
                         A_iq_data.append(-1)
                     constraint_idx += 1
-        A_iq_37 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
+        A_iq_37 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), 
+                                shape=(constraint_idx, self.problem.num_vars))
         b_iq_37 = np.zeros(constraint_idx)
-        A_eq_37 = sp.coo_matrix((0, problem.num_vars))  # zero matrix
+        A_eq_37 = sp.coo_matrix((0, self.problem.num_vars))  # zero matrix
         b_eq_37 = []
 
         return A_eq_37, b_eq_37, A_iq_37, b_iq_37
 
-    def generate_connectivity_contraints(self, problem):
+    def generate_connectivity_contraints(self):
 
-        if problem.num_vars == None: problem.compute_num_var()
+        if self.problem.num_vars == None: self.problem.compute_num_var()
 
         #Setup constraints
         self.A_eq, self.b_eq, self.A_iq, self.b_iq = self.connectivity_constraint()
