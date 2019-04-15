@@ -418,8 +418,8 @@ def generate_dynamic_contraints(problem):
     c_36 = dynamic_constraint_36(problem)
     c_id = dynamic_constraint_id(problem)
     c_ex = dynamic_constraint_ex(problem)
-    c_ubz = dynamic_constraint_ubz(problem)
-    c_uby = dynamic_constraint_uby(problem)
+    # c_ubz = dynamic_constraint_ubz(problem)
+    # c_uby = dynamic_constraint_uby(problem)
     c_stat = dynamic_constraint_static(problem)
 
     return c_27 & c_28 & c_30 & c_31 & c_32 & c_33 & c_34 & c_35 & c_36 & c_id & c_ex  & c_stat
