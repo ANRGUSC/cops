@@ -418,8 +418,8 @@ def generate_dynamic_contraints(problem):
     c_36 = dynamic_constraint_36(problem)
     c_id = dynamic_constraint_id(problem)
     c_ex = dynamic_constraint_ex(problem)
-    # c_ubz = dynamic_constraint_ubz(problem)
-    # c_uby = dynamic_constraint_uby(problem)
+    c_ubz = dynamic_constraint_ubz(problem)
+    c_uby = dynamic_constraint_uby(problem)
     c_stat = dynamic_constraint_static(problem)
 
     return c_27 & c_28 & c_30 & c_31 & c_32 & c_33 & c_34 & c_35 & c_36 & c_id & c_ex  & c_stat
@@ -437,10 +437,10 @@ def generate_connectivity_constraint_all(problem):
     # Iterator over all (v, t) subsets in the graph
     for b in problem.b:
         #Convert each set in the iterator to (v,t) format
-        add_S = map(lambda S: list(map(problem.get_time_augmented_n_t, S)), 
+        add_S = map(lambda S: list(map(problem.get_time_augmented_n_t, S)),
                     problem.powerset_exclude_vertex(b))
         ret &= generate_connectivity_constraint(problem, [b], add_S)
-    
+
     return ret
 
 def generate_connectivity_constraint(problem, b_list, add_S):
@@ -497,7 +497,7 @@ def generate_initial_contraints(problem):
             else: b_init.append(0)
             constraint_idx += 1
     A_init = sp.coo_matrix((A_init_data, (A_init_row, A_init_col)), shape=(constraint_idx, problem.num_vars))#.toarray(
- 
+
     return Constraint(A_eq=A_init, b_eq=b_init)
 
 #Connectivity problem-----------------------------------------------------------
@@ -756,7 +756,7 @@ class ConnectivityProblem(object):
         print("Connectivity constraints setup time {:.2f}s".format(time.time() - cct0))
 
         print("Number of constraints: {}".format(self.constraint.A_eq.shape[1]+self.constraint.A_iq.shape[1]))
-        
+
         self.solve_(solver=None, output=False, integer=True)
 
     def solve_adaptive(self, solver=None, output=False, integer=True):
@@ -787,7 +787,7 @@ class ConnectivityProblem(object):
         J_bin = list(range(start, start + self.num_z))   # z binary
         start += self.num_z
         J_int = list(range(start, start + self.num_e))   # e integer
-        start += self.num_e  
+        start += self.num_e
         J_bin += list(range(start, start + self.num_y))  # y binary
         start += self.num_y
         J_bin += list(range(start, start + self.num_x))  # x binary
