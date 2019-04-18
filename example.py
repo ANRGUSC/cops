@@ -16,13 +16,6 @@ from graph_connectivity.def_flow_ilp import *
 # Define a connectivity graph
 G = Graph()
 
-#LINEAR EXAMPLE
-#Add edges to graph
-#connectivity_edges = list(range(11)) #directed connectivity path (one way)
-#transition_edges = list(range(11))   #directed transition path (one way)
-#G.add_transition_path(transition_edges)
-#G.add_connectivity_path(connectivity_edges)
-
 #Add edges to graph
 connectivity_edges = [0, 1, 2, 3, 4, 5]
 transition_edges = [0, 1, 2, 3, 4, 5]
@@ -50,8 +43,6 @@ connectivity_edges = [15, 24]
 G.add_connectivity_path(connectivity_edges)
 
 #Set node positions
-#LINEAR EXAMPLE
-#node_positions = {i: (0,i) for i in range(11)}   #example {0: (0,0), 1: (1,1)}
 node_positions = {0: (0,0), 1: (0,1), 2: (-2,1), 3: (-2,2), 4: (-3,2), 5: (-3,1),
                 6: (-3,3), 7: (-3.5,3.5), 8: (-2.5,3.5), 9: (0,3), 10: (-1.8,3),
                 11: (-1.6,4), 12: (0,4), 13: (0,5), 14: (1,3), 15: (1,4),
