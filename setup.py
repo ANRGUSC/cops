@@ -4,7 +4,7 @@ def main():
 	setup(
 		name="graph_connectivity",
 		packages=['graph_connectivity'],
-		author="Filip"
+		author="Filip Klaesson, Petter Nilsson"
 	)
 
 if __name__ == '__main__':
