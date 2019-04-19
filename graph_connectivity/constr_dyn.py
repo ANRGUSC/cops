@@ -6,7 +6,7 @@ import scipy.sparse as sp
 from graph_connectivity.optimization_wrappers import Constraint
 
 def generate_dynamic_constraints(problem):
-    '''constraints on z, e, y'''
+    '''constraints on z, e'''
 
     #Define number of variables
     if problem.num_vars == None: problem.compute_num_var()
