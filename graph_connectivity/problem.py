@@ -129,9 +129,9 @@ class ConnectivityProblem(object):
         t0 = time.time()        
 
         # Initial constraints on z
-        self.constraint &= generate_initial_contraints(self)
+        self.constraint &= generate_initial_constraints(self)
         # Dynamic constraints on z, e
-        self.constraint &= generate_dynamic_contraints(self)
+        self.constraint &= generate_dynamic_constraints(self)
         # Bridge z, e to x, xbar, yb
         self.constraint &= generate_bridge_constraints(self)
         # Connectivity constraints on x, xbar, yb
@@ -165,9 +165,9 @@ class ConnectivityProblem(object):
         t0 = time.time()        
 
         # Initial constraints on z
-        self.constraint &= generate_initial_contraints(self)
+        self.constraint &= generate_initial_constraints(self)
         # Dynamic constraints on z, e
-        self.constraint &= generate_dynamic_contraints(self)
+        self.constraint &= generate_dynamic_constraints(self)
         # Bridge z, e to x, xbar, yb
         self.constraint &= generate_bridge_constraints(self)
 
@@ -205,11 +205,13 @@ class ConnectivityProblem(object):
         t0 = time.time()        
 
         # Initial Constraints on z
-        self.constraint &= generate_initial_contraints(self)
-        # Dynamic Constraints on z, e, y
-        self.constraint &= generate_dynamic_contraints(self)
+        self.constraint &= generate_initial_constraints(self)
+        # Dynamic Constraints on z, e
+        self.constraint &= generate_dynamic_constraints(self)
+        # Constraints on y for optimization
+        self.constraint &= generate_optim_constraints(self)
         # Flow constraints on z, e, f, fbar
-        self.constraint &= generate_flow_contraints(self)
+        self.constraint &= generate_flow_constraints(self)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
@@ -464,28 +466,3 @@ class ConnectivityProblem(object):
 
         writer = animation.writers['ffmpeg'](fps = 0.5*ANIM_STEP)
         ani.save(filename, writer=writer,dpi=100)
-
-
-def _dynamic_constraint_51(problem):
-    '''constraint on z, y'''
-
-    A_iq_row  = []
-    A_iq_col  = []
-    A_iq_data = []
-
-    N = len(problem.graph.agents)
-
-    constraint_idx = 0
-    for t, v in product(range(problem.T+1), problem.graph.nodes):
-        A_iq_row.append(constraint_idx)
-        A_iq_col.append(problem.get_y_idx(v))
-        A_iq_data.append(1)
-        for r in range(len(problem.graph.agents)):
-            A_iq_row.append(constraint_idx)
-            A_iq_col.append(problem.get_z_idx(r, v, t))
-            A_iq_data.append(-1)
-        constraint_idx += 1
-
-    A_iq_51 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
-
-    return Constraint(A_iq=A_iq_51, b_iq=np.zeros(constraint_idx))

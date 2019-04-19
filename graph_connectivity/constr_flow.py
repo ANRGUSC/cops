@@ -5,7 +5,7 @@ import scipy.sparse as sp
 
 from graph_connectivity.optimization_wrappers import Constraint
 
-def generate_flow_contraints(problem):
+def generate_flow_constraints(problem):
     '''constraints on z, e, f, fbar'''
 
     c_48 = _dynamic_constraint_48(problem)

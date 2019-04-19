@@ -5,7 +5,7 @@ import scipy.sparse as sp
 
 from graph_connectivity.optimization_wrappers import Constraint
 
-def generate_dynamic_contraints(problem):
+def generate_dynamic_constraints(problem):
     '''constraints on z, e, y'''
 
     #Define number of variables
@@ -20,7 +20,7 @@ def generate_dynamic_contraints(problem):
 
     return c_44 & c_45 & c_46 & c_static & c_ex
 
-def generate_initial_contraints(problem):
+def generate_initial_constraints(problem):
     '''constraints on z'''
 
     # Constructing A_eq and b_eq for initial condition as sp.coo matrix
@@ -39,6 +39,12 @@ def generate_initial_contraints(problem):
     A_init = sp.coo_matrix((A_init_data, (A_init_row, A_init_col)), shape=(constraint_idx, problem.num_vars))
 
     return Constraint(A_eq=A_init, b_eq=b_init)
+
+def generate_optim_constraints(problem):
+    '''constraints on z, y'''
+
+    return _dynamic_constraint_51(problem)
+
 
 ##########################################################
 ##########################################################
@@ -138,3 +144,27 @@ def _dynamic_constraint_ex(problem):
     A_eq_ex = sp.coo_matrix((A_eq_data, (A_eq_row, A_eq_col)), shape=(constraint_idx, problem.num_vars))
 
     return Constraint(A_eq=A_eq_ex, b_eq=np.ones(constraint_idx))
+
+def _dynamic_constraint_51(problem):
+    '''constraint on z, y'''
+
+    A_iq_row  = []
+    A_iq_col  = []
+    A_iq_data = []
+
+    N = len(problem.graph.agents)
+
+    constraint_idx = 0
+    for t, v in product(range(problem.T+1), problem.graph.nodes):
+        A_iq_row.append(constraint_idx)
+        A_iq_col.append(problem.get_y_idx(v))
+        A_iq_data.append(1)
+        for r in range(len(problem.graph.agents)):
+            A_iq_row.append(constraint_idx)
+            A_iq_col.append(problem.get_z_idx(r, v, t))
+            A_iq_data.append(-1)
+        constraint_idx += 1
+
+    A_iq_51 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
+
+    return Constraint(A_iq=A_iq_51, b_iq=np.zeros(constraint_idx))
