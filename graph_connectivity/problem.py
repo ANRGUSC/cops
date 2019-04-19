@@ -120,10 +120,10 @@ class ConnectivityProblem(object):
                         binary=True)
         xvar = Variable(size=self.T * self.num_b * len(self.dict_tran),
                         start=ybvar.start + ybvar.size,
-                        binary=False)
+                        binary=True)
         xbarvar = Variable(size=(self.T+1) * self.num_b * len(self.dict_conn),
                            start=xvar.start + xvar.size,
-                           binary=False)
+                           binary=True)
 
         self.vars = {'z': zvar, 'e': evar, 'yb': ybvar, 'x': xvar, 'xbar': xbarvar}
         t0 = time.time()        
@@ -156,10 +156,10 @@ class ConnectivityProblem(object):
                         binary=True)
         xvar = Variable(size=self.T * self.num_b * len(self.dict_tran),
                         start=ybvar.start + ybvar.size,
-                        binary=False)
+                        binary=True)
         xbarvar = Variable(size=(self.T+1) * self.num_b * len(self.dict_conn),
                            start=xvar.start + xvar.size,
-                           binary=False)
+                           binary=True)
 
         self.vars = {'z': zvar, 'e': evar, 'yb': ybvar, 'x': xvar, 'xbar': xbarvar}
         t0 = time.time()        
