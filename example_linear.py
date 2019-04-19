@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from itertools import product
 
-from graph_connectivity.animate import *
+from graph_connectivity.animate2 import *
 from graph_connectivity.def_flow_ilp import *
 
 n = 11  # size of graph

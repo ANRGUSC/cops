@@ -1,142 +1,21 @@
 import time
+from dataclasses import dataclass
 
 import numpy as np
 import networkx as nx
 import scipy.sparse as sp
 
 from graph_connectivity.optimization_wrappers import solve_ilp, Constraint
-from networkx.drawing.nx_agraph import to_agraph
-from copy import deepcopy
+from graph_connectivity.graph import Graph
+
 from itertools import chain, combinations, product
+from networkx.drawing.nx_agraph import to_agraph
 
-#MultiDiGraph-------------------------------------------------------------------
-
-class Graph(nx.MultiDiGraph):
-
-    def __init__(self):
-        super(Graph, self).__init__()
-        self.agents = None
-
-    def plot_graph(self):
-
-        #copy graph to add plot attributes
-        graph_copy = deepcopy(self)
-
-        #set 'pos' attribute for accurate position in plot (use ! in end for accurate positioning)
-        for n in graph_copy:
-            graph_copy.nodes[n]['pos'] =  ",".join(map(str,[graph_copy.nodes[n]['x'],graph_copy.nodes[n]['y']])) + '!'
-
-        #Set general edge-attributes
-        graph_copy.graph['edge'] = {'arrowsize': '0.6', 'splines': 'curved'}
-
-        #Set individual attributes
-        for n in graph_copy:
-            if graph_copy.nodes[n]['number_of_agents']!=0:
-                graph_copy.nodes[n]['color'] = 'black'
-                graph_copy.nodes[n]['fillcolor'] = 'red'
-                graph_copy.nodes[n]['style'] = 'filled'
-            else:
-                graph_copy.nodes[n]['color'] = 'black'
-                graph_copy.nodes[n]['fillcolor'] = 'white'
-                graph_copy.nodes[n]['style'] = 'filled'
-            for nbr in self[n]:
-                for edge in graph_copy[n][nbr]:
-                    if graph_copy[n][nbr][edge]['type']=='connectivity':
-                        graph_copy[n][nbr][edge]['color']='grey'
-                        graph_copy[n][nbr][edge]['style']='dashed'
-                    else:
-                        graph_copy[n][nbr][edge]['color']='grey'
-                        graph_copy[n][nbr][edge]['style']='solid'
-
-        #Change node label to agents in node
-        for n in graph_copy:
-            graph_copy.nodes[n]['label'] = " ".join(map(str,(graph_copy.nodes[n]['agents'])))
-
-
-        #Plot/save graph
-        A = to_agraph(graph_copy)
-        A.layout()
-        A.draw('graph.png')
-
-    def add_transition_path(self, transition_list):
-        self.add_path(transition_list, type='transition')
-        self.add_path(transition_list[::-1], type='transition')
-        for n in transition_list:
-            if self.has_edge(n,n) == False:
-                self.add_edge( n,n , type='transition', self_loop = True)
-
-    def add_connectivity_path(self, connectivity_list):
-        self.add_path(connectivity_list, type='connectivity')
-        self.add_path(connectivity_list[::-1] , type='connectivity')
-        for n in connectivity_list:
-            if self.has_edge(n,n) == False:
-                self.add_edge( n,n, type='connectivity')
-
-    def set_node_positions(self, position_dictionary):
-        self.add_nodes_from(position_dictionary.keys())
-        for n, p in position_dictionary.items():
-            self.node[n]['x'] = p[0]
-            self.node[n]['y'] = p[1]
-
-    def conn_edges(self):
-        for (i, j, data) in self.edges(data=True):
-            if data['type'] == 'connectivity':
-                yield (i,j)
-
-    def tran_edges(self):
-        for (i, j, data) in self.edges(data=True):
-            if data['type'] == 'transition':
-                yield (i,j)
-
-    def conn_in_edges(self, k):
-        for (i, j, data) in self.in_edges(k, data=True):
-            if data['type'] == 'connectivity':
-                yield (i,j)
-
-    def tran_in_edges(self, k):
-        for (i, j, data) in self.in_edges(k, data=True):
-            if data['type'] == 'transition':
-                yield (i,j)
-
-    def conn_out_edges(self, k):
-        for (i, j, data) in self.out_edges(k, data=True):
-            if data['type'] == 'connectivity':
-                yield (i,j)
-
-    def tran_out_edges(self, k):
-        for (i, j, data) in self.out_edges(k, data=True):
-            if data['type'] == 'transition':
-                yield (i,j)
-
-    def init_agents(self, agent_position_dictionary):
-
-        for n in self:
-            self.node[n]['number_of_agents']=0
-
-        for agent in agent_position_dictionary:
-            self.node[agent_position_dictionary[agent]]['number_of_agents']+=1
-
-        self.agents = agent_position_dictionary
-        for n in self.nodes:
-            self.nodes[n]['agents'] = []
-        for agent in self.agents:
-            self.nodes[self.agents[agent]]['agents'].append(agent)
-
-    def transition_adjacency_matrix(self):
-        num_nodes = self.number_of_nodes()
-        adj = [[0 for i in range(num_nodes)] for j in range(num_nodes)]
-        for n in self:
-            for edge in self.tran_in_edges(n):
-                adj[edge[0]][edge[1]] = 1
-        return adj
-
-    def connectivity_adjacency_matrix(self):
-        num_nodes = self.number_of_nodes()
-        adj = [[0 for i in range(num_nodes)] for j in range(num_nodes)]
-        for n in self:
-            for edge in self.conn_in_edges(n):
-                adj[edge[0]][edge[1]] = 1
-        return adj
+@dataclass
+class Variable(object):
+    start: int
+    size: int
+    binary: bool = False
 
 #Dynamic constraints------------------------------------------------------------
 
@@ -262,7 +141,6 @@ def dynamic_constraint_50(problem):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_f_idx(b, v1, v2, t))
         A_iq_data.append(1)
-
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_e_idx(v1, v2, t))
         A_iq_data.append(-N)
@@ -332,6 +210,7 @@ def dynamic_constraint_ex(problem):
     return Constraint(A_eq=A_eq_ex, b_eq=np.ones(constraint_idx))
 
 def generate_dynamic_contraints(problem):
+    '''constraints on z, e, y'''
 
     #Define number of variables
     if problem.num_vars == None: problem.compute_num_var()
@@ -340,14 +219,11 @@ def generate_dynamic_contraints(problem):
     c_44 = dynamic_constraint_44(problem)
     c_45 = dynamic_constraint_45(problem)
     c_46 = dynamic_constraint_46(problem)
-    c_48 = dynamic_constraint_48(problem)
-    c_49 = dynamic_constraint_49(problem)
-    c_50 = dynamic_constraint_50(problem)
-    c_51 = dynamic_constraint_51(problem)
+    c_51 = dynamic_constraint_51(problem)           # helper variable for objective
     c_static = dynamic_constraint_static(problem)
     c_ex = dynamic_constraint_ex(problem)
 
-    return c_44 & c_45 & c_46 & c_48 & c_49 & c_50 & c_51 & c_static & c_ex
+    return c_44 & c_45 & c_46 & c_51 & c_static & c_ex
 
 #Flow constraints---------------------------------------------------------------
 
@@ -396,20 +272,19 @@ def generate_flow_constraint_52(problem):
     return Constraint(A_eq=A_eq_52, b_eq=b_eq_flow)
 
 def generate_flow_contraints(problem):
+    '''constraints on z, e, f, fbar'''
 
-    #Define number of variables
-    if problem.num_vars == None: problem.compute_num_var()
-
-    #Setup constraints
+    c_48 = dynamic_constraint_48(problem)
+    c_49 = dynamic_constraint_49(problem)
+    c_50 = dynamic_constraint_50(problem)
     c_52 = generate_flow_constraint_52(problem)
 
-    return c_52
+    return c_48 & c_49 & c_50 & c_52
 
 #Initial constraints------------------------------------------------------------
 
 def generate_initial_contraints(problem):
-
-    if problem.num_vars == None: problem.compute_num_var()
+    '''constraints on z'''
 
     # Constructing A_eq and b_eq for initial condition as sp.coo matrix
     A_init_row  = []
@@ -433,72 +308,64 @@ def generate_initial_contraints(problem):
 class ConnectivityProblem(object):
 
     def __init__(self):
+        # Problem definition
         self.graph = None                    #Graph
         self.T = None                        #Time horizon
         self.b = None                        #bases (agent positions)
         self.static_agents = None
-        self.num_b = None
-        self.num_r = None
-        self.num_v = None
-        self.num_z = None
-        self.num_e = None
-        self.num_y = None
-        self.num_x = None
-        self.num_xbar = None
-        self.num_vars = None
 
+        # ILP setup
         self.dict_tran = None
         self.dict_conn = None
-
+        self.vars = None
         self.constraint = Constraint()
 
+        # ILP solution
         self.solution = None
 
     ##INDEX HELPER FUNCTIONS##
 
-    def compute_num_var(self):
-        self.num_b = len(self.b)
-        self.num_r = len(self.graph.agents)
-        self.num_v = self.graph.number_of_nodes()
+    @property
+    def num_b(self):
+        return len(self.b)
 
+    @property
+    def num_r(self):
+        return len(self.graph.agents)
+
+    @property
+    def num_v(self):
+        return self.graph.number_of_nodes()
+
+    @property
+    def num_vars(self):
+        return sum(var.size for var in self.vars.values())
+
+    def generate_dicts(self):
         # Create dictionaries for (i,j)->k mapping for edges
         self.dict_tran = {(i,j): k for k, (i,j) in enumerate(self.graph.tran_edges())}
         self.dict_conn = {(i,j): k for k, (i,j) in enumerate(self.graph.conn_edges())}
 
-        self.num_z = (self.T+1) * self.num_r * self.num_v
-        self.num_e = self.T * len(self.dict_tran)
-        self.num_y = self.num_v
-        self.num_f = self.T * self.num_b * len(self.dict_tran)
-        self.num_fbar = (self.T+1) * self.num_b * len(self.dict_conn)
-
-        self.num_vars = self.num_z + self.num_e + self.num_y + self.num_f + self.num_fbar
-        print("Number of variables: {}".format(self.num_vars))
-
     def get_z_idx(self, r, v, t):
-        return np.ravel_multi_index((t,v,r), (self.T+1, self.num_v, self.num_r))
+        return self.vars['z'].start + np.ravel_multi_index((t,v,r), (self.T+1, self.num_v, self.num_r))
 
     def get_e_idx(self, i, j, t):
-        start = self.num_z
         k = self.dict_tran[(i, j)]
         idx = np.ravel_multi_index((t,k), (self.T, len(self.dict_tran)))
-        return start + idx
+        return self.vars['e'].start + idx
 
     def get_y_idx(self, v):
-        start = self.num_z + self.num_e
-        idx = v
-        return start + idx
+        return self.vars['y'].start + v
 
     def get_f_idx(self, b, i, j, t):
-        start = self.num_z + self.num_e + self.num_y
         k = self.dict_tran[(i, j)]
         idx = np.ravel_multi_index((t,b,k), (self.T, self.num_b, len(self.dict_tran)))
-        return start + idx
+        return self.vars['f'].start + idx
 
     def get_fbar_idx(self, b, i, j, t):
-        start = self.num_z + self.num_e + self.num_y + self.num_f
         k = self.dict_conn[(i, j)]       
         idx = np.ravel_multi_index((t,b,k), (self.T+1, self.num_b, len(self.dict_conn)))
-        return start + idx
+        return self.vars['fbar'].start + idx
 
     ##GRAPH HELPER FUNCTIONS##
 
@@ -554,7 +421,7 @@ class ConnectivityProblem(object):
 
             #Set individual attributes based on solution
             sol = self.solution
-            z = sol['x'][0 : self.num_z]
+            z = sol['x'][self.vars['z'].start : self.vars['z'].start + self.vars['z'].size]
 
             for r in self.graph.agents:
                 for v in self.graph.nodes:
@@ -608,15 +475,37 @@ class ConnectivityProblem(object):
 
     def solve(self, solver=None, output=False, integer=True):
 
-        #Initial Constraints
+        self.generate_dicts()
+
+        zvar = Variable(size=(self.T+1) * self.num_r * self.num_v,
+                        start=0,
+                        binary=True)
+        evar = Variable(size=self.T * len(self.dict_tran),
+                        start=zvar.start + zvar.size,
+                        binary=False)
+        yvar = Variable(size=self.num_v,
+                        start=evar.start + evar.size,
+                        binary=True)
+        fvar = Variable(size=self.T * self.num_b * len(self.dict_tran),
+                        start=yvar.start + yvar.size,
+                        binary=False)
+        fbarvar = Variable(size=(self.T+1) * self.num_b * len(self.dict_conn),
+                           start=fvar.start + fvar.size,
+                           binary=False)
+
+        self.vars = {'z': zvar, 'e': evar, 'y': yvar, 'f': fvar, 'fbar': fbarvar}
+
+        print("Number of variables: {}".format(self.num_vars))
+
+        # Initial Constraints on z
         self.constraint &= generate_initial_contraints(self)
 
-        #Set up Dynamic Constraints
+        # Dynamic Constraints on z, e, y
         dct0 = time.time()
         self.constraint &= generate_dynamic_contraints(self)
         print("Dynamic constraints setup time {:.2f}s".format(time.time() - dct0))
 
-        #Set up Flow contraint
+        # Flow constraints on z, e, f, fbar
         cct0 = time.time()
         self.constraint &= generate_flow_contraints(self)
         print("Flow constraints setup time {:.2f}s".format(time.time() - cct0))
@@ -629,16 +518,10 @@ class ConnectivityProblem(object):
         obj = np.zeros(self.num_vars)
 
         # Which variables are binary/integer
-        start = 0
-        J_bin = list(range(start, start + self.num_z))   # z binary
-        start += self.num_z
-        J_int = list(range(start, start + self.num_e))   # e integer
-        start += self.num_e
-        J_bin = list(range(start, start + self.num_y))   # y binary
-        start += self.num_y
-        J_int += list(range(start, start + self.num_f))  # f integer
-        start += self.num_f
-        J_int += list(range(start, start + self.num_fbar))  # fbar integer
+        J_int = sum([list(range(var.start, var.start + var.size)) 
+                    for var in self.vars.values() if not var.binary], [])
+        J_bin = sum([list(range(var.start, var.start + var.size))
+                    for var in self.vars.values() if var.binary], [])
 
         # Solve it
         self.solution = solve_ilp(obj, self.constraint, J_int, J_bin, solver, output)
