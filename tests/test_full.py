@@ -1,4 +1,4 @@
-from graph_connectivity.def_ilp import *
+from graph_connectivity.problem import *
 import numpy as np
 
 def test_horiz1():
@@ -27,7 +27,7 @@ def test_horiz1():
     cp.static_agents = [2]
 
     print('Solving')
-    cp.solve()
+    cp.solve_powerset()
 
     # positions of robot 0
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,0,0)], 1)
@@ -67,7 +67,7 @@ def test_horiz2():
     cp.static_agents = [0, 2]
 
     print('Solving')
-    cp.solve()
+    cp.solve_powerset()
 
     # positions of robot 0
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,0,0)], 1)

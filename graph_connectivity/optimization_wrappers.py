@@ -92,7 +92,7 @@ def solve_ilp(c, constraint, J_int=None, J_bin=None, solver=default_solver, outp
       'x': the primary solution
     """
     if solver is None:
-            solver = default_solver
+        solver = default_solver
 
     if J_int is None and J_bin is None:
         J_int = range(Aiq.shape[1])
@@ -104,6 +104,9 @@ def solve_ilp(c, constraint, J_int=None, J_bin=None, solver=default_solver, outp
 
     if len(set(J_bin) & set(J_int)):
         raise Exception('J_int and J_bin overlap')
+
+    if (len(J_bin) + len(J_int)) != len(c):
+        raise Exception('J_int and J_bin not fully specified')
 
     if constraint.has_eq and not constraint.has_iq:
         constraint.A_iq = sp.coo_matrix((0, constraint.A_eq.shape[1]))

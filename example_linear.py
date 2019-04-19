@@ -1,11 +1,4 @@
-import time
-import networkx as nx
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from itertools import product
-
-from graph_connectivity.animate2 import *
-from graph_connectivity.def_flow_ilp import *
+from graph_connectivity.problem import *
 
 n = 11  # size of graph
 
@@ -21,17 +14,15 @@ G.init_agents(agent_positions)
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 cp.graph = G                   # graph
-cp.T = 4                       # time
+cp.T = 5                       # time
 cp.b = agent_positions         # base:node
 cp.static_agents = []          # static agents
 
-#Solve (solve() or solve_adaptive())
-st0 = time.time()
-sol = cp.solve()
-print("solver time: {:.2f}s".format(time.time() - st0))
+#Solve
+sol = cp.solve_flow()
 
 #Plot Graph (saves image as graph.png)
 cp.plot_solution()
 
 #Animate solution
-animate_solution(cp)
+cp.animate_solution()
