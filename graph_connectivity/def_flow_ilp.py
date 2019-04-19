@@ -175,6 +175,7 @@ def dynamic_constraint_46(problem):
 
     return Constraint(A_iq=A_iq_46, b_iq=np.zeros(constraint_idx))
 
+# OBSOLETE
 def dynamic_constraint_47(problem):
     # Constructing A_eq and b_eq for equality (47) as sp.coo matrix
     A_eq_row  = []
@@ -204,16 +205,17 @@ def dynamic_constraint_48(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for t, b, v1, v2 in product(range(problem.T+1), problem.b,
-                                problem.graph.nodes, problem.graph.nodes):
-        A_iq_row.append(constraint_idx)
-        A_iq_col.append(problem.get_fbar_idx(b, v1, v2, t))
-        A_iq_data.append(1)
-        for r in range(len(problem.graph.agents)):
+    for t, b, (v1, v2, data) in product(range(problem.T+1), problem.b,
+                                problem.graph.edges(data=True)):
+        if data['type'] == 'connectivity':
             A_iq_row.append(constraint_idx)
-            A_iq_col.append(problem.get_z_idx(r, v1, t))
-            A_iq_data.append(-N)
-        constraint_idx += 1
+            A_iq_col.append(problem.get_fbar_idx(b, v1, v2, t))
+            A_iq_data.append(1)
+            for r in range(len(problem.graph.agents)):
+                A_iq_row.append(constraint_idx)
+                A_iq_col.append(problem.get_z_idx(r, v1, t))
+                A_iq_data.append(-N)
+            constraint_idx += 1
 
     A_iq_48 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
 
@@ -228,16 +230,17 @@ def dynamic_constraint_49(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for t, b, v1, v2 in product(range(problem.T+1), problem.b,
-                                problem.graph.nodes, problem.graph.nodes):
-        A_iq_row.append(constraint_idx)
-        A_iq_col.append(problem.get_fbar_idx(b, v1, v2, t))
-        A_iq_data.append(1)
-        for r in range(len(problem.graph.agents)):
+    for t, b, (v1, v2, data) in product(range(problem.T+1), problem.b,
+                                problem.graph.edges(data=True)):
+        if data['type'] == 'connectivity':
             A_iq_row.append(constraint_idx)
-            A_iq_col.append(problem.get_z_idx(r, v2, t))
-            A_iq_data.append(-N)
-        constraint_idx += 1
+            A_iq_col.append(problem.get_fbar_idx(b, v1, v2, t))
+            A_iq_data.append(1)
+            for r in range(len(problem.graph.agents)):
+                A_iq_row.append(constraint_idx)
+                A_iq_col.append(problem.get_z_idx(r, v2, t))
+                A_iq_data.append(-N)
+            constraint_idx += 1
 
     A_iq_49 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
 
@@ -252,16 +255,17 @@ def dynamic_constraint_50(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for t, b, v1, v2 in product(range(problem.T), problem.b,
-                                problem.graph.nodes, problem.graph.nodes):
-        A_iq_row.append(constraint_idx)
-        A_iq_col.append(problem.get_f_idx(b, v1, v2, t))
-        A_iq_data.append(1)
+    for t, b, (v1, v2, data) in product(range(problem.T), problem.b,
+                                        problem.graph.edges(data=True)):
+        if data['type'] == 'transition':
+            A_iq_row.append(constraint_idx)
+            A_iq_col.append(problem.get_f_idx(b, v1, v2, t))
+            A_iq_data.append(1)
 
-        A_iq_row.append(constraint_idx)
-        A_iq_col.append(problem.get_e_idx(v1, v2, t))
-        A_iq_data.append(-N)
-        constraint_idx += 1
+            A_iq_row.append(constraint_idx)
+            A_iq_col.append(problem.get_e_idx(v1, v2, t))
+            A_iq_data.append(-N)
+            constraint_idx += 1
 
     A_iq_50 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
 
@@ -338,7 +342,7 @@ def generate_dynamic_contraints(problem):
     c_44 = dynamic_constraint_44(problem)
     c_45 = dynamic_constraint_45(problem)
     c_46 = dynamic_constraint_46(problem)
-    c_47 = dynamic_constraint_47(problem)
+    # c_47 = dynamic_constraint_47(problem)
     c_48 = dynamic_constraint_48(problem)
     c_49 = dynamic_constraint_49(problem)
     c_50 = dynamic_constraint_50(problem)
@@ -346,7 +350,7 @@ def generate_dynamic_contraints(problem):
     c_static = dynamic_constraint_static(problem)
     c_ex = dynamic_constraint_ex(problem)
 
-    return c_44 & c_45 & c_46 & c_47 & c_48 & c_49 & c_50 & c_51 & c_static & c_ex
+    return c_44 & c_45 & c_46 & c_48 & c_49 & c_50 & c_51 & c_static & c_ex
 
 #Flow constraints---------------------------------------------------------------
 
@@ -448,6 +452,11 @@ class ConnectivityProblem(object):
         self.num_xbar = None
         self.num_vars = None
 
+        self.dict_tran = None
+        self.dict_conn = None
+        self.num_tran = None
+        self.num_conn = None
+
         self.constraint = Constraint()
 
         self.solution = None
@@ -459,11 +468,26 @@ class ConnectivityProblem(object):
         self.num_r = len(self.graph.agents)
         self.num_v = self.graph.number_of_nodes()
 
+        # Create dictionaries for (i,j)->k mapping for edges
+        self.dict_tran = {}
+        self.dict_conn = {}        
+        k_tran = 0
+        k_conn = 0
+        for (i, j, data) in self.graph.edges(data=True):
+            if data['type'] == 'connectivity':
+                self.dict_conn[(i,j)] = k_conn
+                k_conn += 1
+            if data['type'] == 'transition':
+                self.dict_tran[(i,j)] = k_tran
+                k_tran += 1
+        self.num_tran = k_tran
+        self.num_conn = k_conn
+
         self.num_z = (self.T+1) * self.num_r * self.num_v
-        self.num_e = self.T * self.num_v * self.num_v
+        self.num_e = self.T * self.num_tran
         self.num_y = self.num_v
-        self.num_f = self.T * self.num_b * self.num_v * self.num_v
-        self.num_fbar = (self.T+1) * self.num_b * self.num_v * self.num_v
+        self.num_f = self.T * self.num_b * self.num_tran
+        self.num_fbar = (self.T+1) * self.num_b * self.num_conn
 
         self.num_vars = self.num_z + self.num_e + self.num_y + self.num_f + self.num_fbar
         print("Number of variables: {}".format(self.num_vars))
@@ -473,7 +497,8 @@ class ConnectivityProblem(object):
 
     def get_e_idx(self, i, j, t):
         start = self.num_z
-        idx = np.ravel_multi_index((t,i,j), (self.T, self.num_v, self.num_v))
+        k = self.dict_tran[(i, j)]
+        idx = np.ravel_multi_index((t,k), (self.T, self.num_tran))
         return start + idx
 
     def get_y_idx(self, v):
@@ -483,12 +508,14 @@ class ConnectivityProblem(object):
 
     def get_f_idx(self, b, i, j, t):
         start = self.num_z + self.num_e + self.num_y
-        idx = np.ravel_multi_index((t,b,i,j), (self.T, self.num_b, self.num_v, self.num_v))
+        k = self.dict_tran[(i, j)]
+        idx = np.ravel_multi_index((t,b,k), (self.T, self.num_b, self.num_tran))
         return start + idx
 
     def get_fbar_idx(self, b, i, j, t):
         start = self.num_z + self.num_e + self.num_y + self.num_f
-        idx = np.ravel_multi_index((t,b,i,j), (self.T+1, self.num_b, self.num_v, self.num_v))
+        k = self.dict_conn[(i, j)]       
+        idx = np.ravel_multi_index((t,b,k), (self.T+1, self.num_b, self.num_conn))
         return start + idx
 
     ##GRAPH HELPER FUNCTIONS##
@@ -612,6 +639,7 @@ class ConnectivityProblem(object):
         self.constraint &= generate_flow_contraints(self)
         print("Flow constraints setup time {:.2f}s".format(time.time() - cct0))
 
+        print("Number of variables: {}".format(self.num_vars))
         print("Number of constraints: {}".format(self.constraint.A_eq.shape[1]+self.constraint.A_iq.shape[1]))
 
         self.solve_(solver=None, output=False, integer=True)

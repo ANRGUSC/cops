@@ -5,7 +5,7 @@ import matplotlib.animation as animation
 from itertools import product
 
 #animation
-from graph_connectivity.animate import *
+from graph_connectivity.animate2 import *
 
 #powerset ilp
 #from graph_connectivity.def_ilp import *
