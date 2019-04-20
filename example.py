@@ -7,11 +7,7 @@ from itertools import product
 #animation
 from graph_connectivity.animate2 import *
 
-#powerset ilp
-#from graph_connectivity.def_ilp import *
-
-#flow ilp
-from graph_connectivity.def_flow_ilp import *
+from graph_connectivity.problem import *
 
 # Define a connectivity graph
 G = Graph()
@@ -65,42 +61,10 @@ cp.b = agent_positions                  #base:node
 cp.static_agents = []                  #static agents
 
 #Solve (solve() or solve_adaptive())
-st0 = time.time()
-sol = cp.solve()
-print("solver time: {:.2f}s".format(time.time() - st0))
+sol = cp.solve_flow()
 
 #Plot Graph (saves image as graph.png)
 cp.plot_solution()
 
 #Animate solution
-animate_solution(cp)
-
-
-
-'''
-#Powerset
-z = cp.solution['x'][0 : cp.num_z]
-e = cp.solution['x'][cp.num_z : cp.num_z + cp.num_e]
-y = cp.solution['x'][cp.num_z + cp.num_e : cp.num_z + cp.num_e + cp.num_y]
-
-print("Finished")
-print("z:", len(z), '\n', np.reshape(z, (cp.T+1, cp.num_v * cp.num_r)))
-print("e:", len(e), '\n', np.reshape(e, (cp.T, cp.num_v**2)))
-print("y:", len(y), '\n', np.reshape(y, (cp.T+1, cp.num_v * len(cp.b))))
-'''
-
-
-'''
-#Flow
-z = cp.solution['x'][0 : cp.num_z]
-e = cp.solution['x'][cp.num_z : cp.num_z + cp.num_e]
-c = cp.solution['x'][cp.num_z + cp.num_e : cp.num_z + cp.num_e + cp.num_c]
-cbar = cp.solution['x'][cp.num_z + cp.num_e + cp.num_c: cp.num_z + cp.num_e + cp.num_c + cp.num_cbar]
-f = cp.solution['x'][cp.num_z + cp.num_e + cp.num_c +cp.num_cbar : cp.num_z + cp.num_e + cp.num_c +cp.num_cbar + cp.num_f]
-fbar = cp.solution['x'][cp.num_z + cp.num_e + cp.num_c +cp.num_cbar + cp.num_f : cp.num_z + cp.num_e + cp.num_c +cp.num_cbar + cp.num_f + cp.num_fbar]
-
-print("Finished")
-print("z:", len(z), '\n', np.reshape(z, (cp.T+1, cp.num_v * cp.num_r)))
-print("f:", len(f), '\n', np.reshape(f, (cp.T, cp.num_b*cp.num_v**2)))
-print("fbar:", len(fbar), '\n', np.reshape(fbar, (cp.T+1, cp.num_b*cp.num_v**2)))
-'''
+cp.animate_solution()

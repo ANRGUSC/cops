@@ -1,4 +1,4 @@
-from graph_connectivity.def_ilp import *
+from graph_connectivity.graph import *
 import numpy as np
 
 def test_pre_S():

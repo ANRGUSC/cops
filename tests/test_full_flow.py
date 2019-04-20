@@ -27,7 +27,7 @@ def test_horiz1():
     cp.static_agents = [2]
 
     print('Solving')
-    cp.solve_adaptive()
+    cp.solve_flow()
 
     # positions of robot 0
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,0,0)], 1)
@@ -67,7 +67,7 @@ def test_horiz2():
     cp.static_agents = [0, 2]
 
     print('Solving')
-    cp.solve_adaptive()
+    cp.solve_flow()
 
     # positions of robot 0
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,0,0)], 1)
