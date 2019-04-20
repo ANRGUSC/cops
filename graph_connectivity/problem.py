@@ -31,8 +31,8 @@ class ConnectivityProblem(object):
         self.graph = None                    #Graph
         self.T = None                        #Time horizon
         self.static_agents = None
-        self.sources = None
-        self.sinks = None
+        self.src = None
+        self.snk = None
         self.master = None
 
         # ILP setup
@@ -48,13 +48,21 @@ class ConnectivityProblem(object):
     ##PROPERTIES##
 
     @property
-    def b(self):
-        return self.sources if len(self.sources) <= len(self.sinks) else self.sinks
+    def num_src(self):
+        return len(self.src)
 
     @property
-    def num_b(self):
-        return min(len(self.sources), len(self.sinks))
+    def num_snk(self):
+        return len(self.snk)
 
+    @property
+    def min_src_snk(self):
+        return self.src if len(self.src) <= len(self.snk) else self.snk
+
+    @property
+    def num_min_src_snk(self):
+        return min(self.num_src, self.num_snk)
+    
     @property
     def num_r(self):
         return len(self.graph.agents)
@@ -70,15 +78,34 @@ class ConnectivityProblem(object):
     ##INDEX HELPER FUNCTIONS##
 
     def prepare_problem(self):
+
+        if self.graph is None:
+            raise Exception("Can not solve problem without 'graph'")
+
+        if self.T is None:
+            raise Exception("Can not solve problem without horizon 'T'")
+
+        if self.static_agents is None: # no static agents
+            self.static_agents = []
+
+        if self.src is None: # all-to-sinks connectivity if sources undefined
+            self.src = self.graph.agents.keys()
+
+        if self.snk is None: # sources-to-all connectivity if sinks undefined
+            self.snk = self.graph.agents.keys()
+
         # Create dictionaries for (i,j)->k mapping for edges
         self.dict_tran = {(i,j): k for k, (i,j) in enumerate(self.graph.tran_edges())}
         self.dict_conn = {(i,j): k for k, (i,j) in enumerate(self.graph.conn_edges())}
 
-        if self.sources is None:
-            self.sources = self.graph.agents.keys()
+        if not set(self.src) <= set(self.graph.agents.keys()):
+            raise Exception("Invalid sources")
 
-        if self.sinks is None:
-            self.sinks = self.graph.agents.keys()
+        if not set(self.snk) <= set(self.graph.agents.keys()):
+            raise Exception("Invalid sinks")
+
+        if not set(self.graph.agents.values()) <= set(self.graph.nodes()):
+            raise Exception("Invalid initial positions")
 
     def get_z_idx(self, r, v, t):
         return self.vars['z'].start + np.ravel_multi_index((t,v,r), (self.T+1, self.num_v, self.num_r))
@@ -92,37 +119,36 @@ class ConnectivityProblem(object):
         return self.vars['y'].start + v
 
     def get_yb_idx(self, b, v, t):
-        idx = np.ravel_multi_index((t,b,v), (self.T+1, self.num_b, self.num_v))
+        idx = np.ravel_multi_index((t,b,v), (self.T+1, self.num_src, self.num_v))
         return self.vars['yb'].start + idx
 
     def get_f_idx(self, b, i, j, t):
         k = self.dict_tran[(i, j)]
-        idx = np.ravel_multi_index((t,b,k), (self.T, self.num_b, len(self.dict_tran)))
+        idx = np.ravel_multi_index((t,b,k), (self.T, self.num_min_src_snk, len(self.dict_tran)))
         return self.vars['f'].start + idx
 
     def get_fbar_idx(self, b, i, j, t):
         k = self.dict_conn[(i, j)]
-        idx = np.ravel_multi_index((t,b,k), (self.T+1, self.num_b, len(self.dict_conn)))
+        idx = np.ravel_multi_index((t,b,k), (self.T+1, self.num_min_src_snk, len(self.dict_conn)))
         return self.vars['fbar'].start + idx
 
     def get_x_idx(self, b, i, j, t):
         k = self.dict_tran[(i, j)]
-        idx = np.ravel_multi_index((t,b,k), (self.T, self.num_b, len(self.dict_tran)))
+        idx = np.ravel_multi_index((t,b,k), (self.T, self.num_src, len(self.dict_tran)))
         return self.vars['x'].start + idx
 
     def get_xbar_idx(self, b, i, j, t):
         k = self.dict_conn[(i, j)]
-        idx = np.ravel_multi_index((t,b,k), (self.T+1, self.num_b, len(self.dict_conn)))
+        idx = np.ravel_multi_index((t,b,k), (self.T+1, self.num_src, len(self.dict_conn)))
         return self.vars['xbar'].start + idx
 
     ##SOLVER FUNCTIONS##
 
     def solve_powerset(self, solver=None, output=False, integer=True):
 
-        if self.sources is not None or self.sinks is not None:
-            print("WARNING: source/sink not implemented for solve_powerset, defaulting to full connectivity")
-            self.sources = None
-            self.sinks = None
+        if self.snk is not None:
+            print("WARNING: sinks not implemented for solve_powerset, defaulting to all sinks")
+            self.snk = None
 
         self.prepare_problem()
 
@@ -132,13 +158,13 @@ class ConnectivityProblem(object):
         evar = Variable(size=self.T * len(self.dict_tran),
                         start=zvar.start + zvar.size,
                         binary=False)
-        ybvar = Variable(size=(self.T+1) * self.num_b * self.num_v,
+        ybvar = Variable(size=(self.T+1) * self.num_src * self.num_v,
                         start=evar.start + evar.size,
                         binary=True)
-        xvar = Variable(size=self.T * self.num_b * len(self.dict_tran),
+        xvar = Variable(size=self.T * self.num_src * len(self.dict_tran),
                         start=ybvar.start + ybvar.size,
                         binary=True)
-        xbarvar = Variable(size=(self.T+1) * self.num_b * len(self.dict_conn),
+        xbarvar = Variable(size=(self.T+1) * self.num_src * len(self.dict_conn),
                            start=xvar.start + xvar.size,
                            binary=True)
 
@@ -160,11 +186,6 @@ class ConnectivityProblem(object):
 
     def solve_adaptive(self, solver=None, output=False, integer=True):
 
-        if self.sources is not None or self.sinks is not None:
-            print("WARNING: source/sink not implemented for solve_adaptive, defaulting to full connectivity")
-            self.sources = None
-            self.sinks = None
-
         self.prepare_problem()
 
         zvar = Variable(size=(self.T+1) * self.num_r * self.num_v,
@@ -173,13 +194,13 @@ class ConnectivityProblem(object):
         evar = Variable(size=self.T * len(self.dict_tran),
                         start=zvar.start + zvar.size,
                         binary=False)
-        ybvar = Variable(size=(self.T+1) * self.num_b * self.num_v,
+        ybvar = Variable(size=(self.T+1) * self.num_src * self.num_v,
                         start=evar.start + evar.size,
                         binary=True)
-        xvar = Variable(size=self.T * self.num_b * len(self.dict_tran),
+        xvar = Variable(size=self.T * self.num_src * len(self.dict_tran),
                         start=ybvar.start + ybvar.size,
                         binary=True)
-        xbarvar = Variable(size=(self.T+1) * self.num_b * len(self.dict_conn),
+        xbarvar = Variable(size=(self.T+1) * self.num_src * len(self.dict_conn),
                            start=xvar.start + xvar.size,
                            binary=True)
 
@@ -201,7 +222,7 @@ class ConnectivityProblem(object):
             if self.solution['status'] == 'infeasible':
                 break
             valid_solution, add_S = self.test_solution()
-            self.constraint &= generate_connectivity_constraint(self, self.b, add_S)
+            self.constraint &= generate_connectivity_constraint(self, range(self.num_src), add_S)
 
     def solve_flow(self, solver=None, output=False, integer=True):
 
@@ -216,10 +237,10 @@ class ConnectivityProblem(object):
         yvar = Variable(size=self.num_v,
                         start=evar.start + evar.size,
                         binary=True)
-        fvar = Variable(size=self.T * self.num_b * len(self.dict_tran),
+        fvar = Variable(size=self.T * self.num_min_src_snk * len(self.dict_tran),
                         start=yvar.start + yvar.size,
                         binary=False)
-        fbarvar = Variable(size=(self.T+1) * self.num_b * len(self.dict_conn),
+        fbarvar = Variable(size=(self.T+1) * self.num_min_src_snk * len(self.dict_conn),
                            start=fvar.start + fvar.size,
                            binary=False)
 
@@ -266,10 +287,6 @@ class ConnectivityProblem(object):
 
     ##GRAPH HELPER FUNCTIONS##
 
-    def set_sources_sinks(self, sources, sinks):
-        self.sources = sources
-        self.sinks = sinks
-
     def get_time_augmented_id(self, n, t):
         return np.ravel_multi_index((t,n), (self.T+1, self.num_v))
 
@@ -277,7 +294,7 @@ class ConnectivityProblem(object):
         t, n = np.unravel_index(id, (self.T+1, self.num_v))
         return n,t
 
-    def powerset_exclude_vertex(self, b):
+    def powerset_exclude_agent(self, b):
         time_augmented_nodes = []
         for t in range(self.T+1):
             for v in self.graph.nodes:
@@ -289,7 +306,7 @@ class ConnectivityProblem(object):
     def test_solution(self):
         solution = self.solution['x']
         add_S = []
-        for r in self.graph.agents:
+        for r in self.snk:
             S = []
             #Find end position of agent r and set as V
             for v in self.graph.nodes:
@@ -297,6 +314,7 @@ class ConnectivityProblem(object):
                 if solution[z_idx] == 1:
                     S.append((v, self.T))
 
+            # Backwards reachability
             idx = 0
             while idx < len(S):
                 pre_S_transition = self.graph.get_pre_S_transition([S[idx]])
@@ -319,17 +337,15 @@ class ConnectivityProblem(object):
                         S.append((v0, t))
                 idx +=1
 
-
             valid = True
-            for b in self.sources:
+            for b in self.src:
                 if (self.graph.agents[b],0) not in S:
                     valid = False
             if valid == False:
-                for b in self.sources:
+                for b in self.src:
                     if (self.graph.agents[b],0) in S:
                         S.remove((self.graph.agents[b],0))
                 add_S.append(S)
-
 
         if len(add_S) != 0:
             return False, add_S
@@ -474,7 +490,7 @@ class ConnectivityProblem(object):
             if 'fbar' in self.vars:
                 for i, (v1, v2) in enumerate(self.graph.conn_edges()):
                     coll_cedge[i].set_color('black')
-                    col_list = [colors[b_r] for b, b_r in enumerate(self.b)
+                    col_list = [colors[b_r] for b, b_r in enumerate(self.min_src_snk)
                                 if self.solution['x'][self.get_fbar_idx(b, v1, v2, min(self.T, t))] > 0.5]
                     if len(col_list):
                         coll_cedge[i].set_color(col_list[int(10 * alpha) % len(col_list)])

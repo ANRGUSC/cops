@@ -27,7 +27,7 @@ def _dynamic_constraint_48(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for t, b, (v1, v2) in product(range(problem.T+1), range(problem.num_b),
+    for t, b, (v1, v2) in product(range(problem.T+1), range(problem.num_min_src_snk),
                                   problem.graph.conn_edges()):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_fbar_idx(b, v1, v2, t))
@@ -51,7 +51,7 @@ def _dynamic_constraint_49(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for t, b, (v1, v2) in product(range(problem.T+1), range(problem.num_b),
+    for t, b, (v1, v2) in product(range(problem.T+1), range(problem.num_min_src_snk),
                                   problem.graph.conn_edges()):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_fbar_idx(b, v1, v2, t))
@@ -75,7 +75,7 @@ def _dynamic_constraint_50(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for t, b, (v1, v2) in product(range(problem.T), range(problem.num_b),
+    for t, b, (v1, v2) in product(range(problem.T), range(problem.num_min_src_snk),
                                   problem.graph.tran_edges()):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_f_idx(b, v1, v2, t))
@@ -97,7 +97,7 @@ def _generate_flow_constraint_52(problem):
 
     constraint_idx = 0
     for t, v, (b, b_r) in product(range(problem.T+1), problem.graph.nodes, 
-                                  enumerate(problem.b)):
+                                  enumerate(problem.min_src_snk)):
         if t > 0:
             for edge in problem.graph.tran_in_edges(v):
                 A_eq_row.append(constraint_idx)
@@ -120,28 +120,28 @@ def _generate_flow_constraint_52(problem):
             A_eq_col.append(problem.get_fbar_idx(b, edge[0], edge[1], t))
             A_eq_data.append(-1)
 
-        if len(problem.sources) <= len(problem.sinks):
+        if len(problem.src) <= len(problem.snk):
             # case (52)
             if t == 0:
                 A_eq_row.append(constraint_idx)
                 A_eq_col.append(problem.get_z_idx(b_r, v, t))
-                A_eq_data.append(len(problem.sinks))
+                A_eq_data.append(len(problem.snk))
             elif t == problem.T:
-                for r in problem.sinks:
+                for r in problem.snk:
                     A_eq_row.append(constraint_idx)
                     A_eq_col.append(problem.get_z_idx(r, v, t))
                     A_eq_data.append(-1)
         else:
             # case (53)
             if t == 0:
-                for r in problem.sources:
+                for r in problem.src:
                     A_eq_row.append(constraint_idx)
                     A_eq_col.append(problem.get_z_idx(r, v, t))
                     A_eq_data.append(1)
             elif t == problem.T:
                 A_eq_row.append(constraint_idx)
                 A_eq_col.append(problem.get_z_idx(b_r, v, t))
-                A_eq_data.append(-len(problem.sources))
+                A_eq_data.append(-len(problem.src))
 
         constraint_idx += 1
     A_eq_52 = sp.coo_matrix((A_eq_data, (A_eq_row, A_eq_col)), shape=(constraint_idx, problem.num_vars))
