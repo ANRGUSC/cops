@@ -4,9 +4,6 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from itertools import product
 
-#animation
-from graph_connectivity.animate2 import *
-
 from graph_connectivity.problem import *
 
 # Define a connectivity graph
@@ -57,8 +54,14 @@ G.plot_graph()
 cp = ConnectivityProblem()
 cp.graph = G                            #graph
 cp.T = 5                                #time
-cp.b = agent_positions                  #base:node
-cp.static_agents = []                  #static agents
+cp.master = 0                           #master_agent
+cp.static_agents = []                   #static agents
+
+#Define sources and sinks as subsets of agents
+sources = [0, 1, 2, 3]
+sinks = [0]
+#Set sources and sinks
+cp.set_sources_sinks(sources, sinks)
 
 #Solve (solve() or solve_adaptive())
 sol = cp.solve_flow()

@@ -30,12 +30,16 @@ class ConnectivityProblem(object):
         # Problem definition
         self.graph = None                    #Graph
         self.T = None                        #Time horizon
-        self.b = None                        #bases (agent positions)
+        self.b = None                        #base
         self.static_agents = None
+        self.sources = None
+        self.sinks = None
+        self.master = None
 
         # ILP setup
         self.dict_tran = None
         self.dict_conn = None
+        self.dict_b = None
         self.vars = None
         self.constraint = Constraint()
 
@@ -67,6 +71,7 @@ class ConnectivityProblem(object):
         # Create dictionaries for (i,j)->k mapping for edges
         self.dict_tran = {(i,j): k for k, (i,j) in enumerate(self.graph.tran_edges())}
         self.dict_conn = {(i,j): k for k, (i,j) in enumerate(self.graph.conn_edges())}
+        self.dict_b = {b: k for k, b in enumerate(self.b)}
 
     def get_z_idx(self, r, v, t):
         return self.vars['z'].start + np.ravel_multi_index((t,v,r), (self.T+1, self.num_v, self.num_r))
@@ -80,27 +85,32 @@ class ConnectivityProblem(object):
         return self.vars['y'].start + v
 
     def get_yb_idx(self, b, v, t):
-        idx = np.ravel_multi_index((t,b,v), (self.T+1, self.num_b, self.num_v))
+        k = self.dict_b[b]
+        idx = np.ravel_multi_index((t,k,v), (self.T+1, self.num_b, self.num_v))
         return self.vars['yb'].start + idx
 
     def get_f_idx(self, b, i, j, t):
         k = self.dict_tran[(i, j)]
-        idx = np.ravel_multi_index((t,b,k), (self.T, self.num_b, len(self.dict_tran)))
+        b_idx = self.dict_b[b]
+        idx = np.ravel_multi_index((t,b_idx,k), (self.T, self.num_b, len(self.dict_tran)))
         return self.vars['f'].start + idx
 
     def get_fbar_idx(self, b, i, j, t):
-        k = self.dict_conn[(i, j)]       
-        idx = np.ravel_multi_index((t,b,k), (self.T+1, self.num_b, len(self.dict_conn)))
+        k = self.dict_conn[(i, j)]
+        b_idx = self.dict_b[b]
+        idx = np.ravel_multi_index((t,b_idx,k), (self.T+1, self.num_b, len(self.dict_conn)))
         return self.vars['fbar'].start + idx
 
     def get_x_idx(self, b, i, j, t):
-        k = self.dict_tran[(i, j)]        
-        idx = np.ravel_multi_index((t,b,k), (self.T, self.num_b, len(self.dict_tran)))
+        k = self.dict_tran[(i, j)]
+        b_idx = self.dict_b[b]
+        idx = np.ravel_multi_index((t,b_idx,k), (self.T, self.num_b, len(self.dict_tran)))
         return self.vars['x'].start + idx
 
     def get_xbar_idx(self, b, i, j, t):
-        k = self.dict_conn[(i, j)]                
-        idx = np.ravel_multi_index((t,b,k), (self.T+1, self.num_b, len(self.dict_conn)))
+        k = self.dict_conn[(i, j)]
+        b_idx = self.dict_b[b]
+        idx = np.ravel_multi_index((t,b_idx,k), (self.T+1, self.num_b, len(self.dict_conn)))
         return self.vars['xbar'].start + idx
 
     ##SOLVER FUNCTIONS##
@@ -126,7 +136,7 @@ class ConnectivityProblem(object):
                            binary=True)
 
         self.vars = {'z': zvar, 'e': evar, 'yb': ybvar, 'x': xvar, 'xbar': xbarvar}
-        t0 = time.time()        
+        t0 = time.time()
 
         # Initial constraints on z
         self.constraint &= generate_initial_constraints(self)
@@ -136,7 +146,7 @@ class ConnectivityProblem(object):
         self.constraint &= generate_bridge_constraints(self)
         # Connectivity constraints on x, xbar, yb
         self.constraint &= generate_connectivity_constraint_all(self)
-        
+
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
         self._solve(solver=None, output=False, integer=True)
@@ -162,7 +172,7 @@ class ConnectivityProblem(object):
                            binary=True)
 
         self.vars = {'z': zvar, 'e': evar, 'yb': ybvar, 'x': xvar, 'xbar': xbarvar}
-        t0 = time.time()        
+        t0 = time.time()
 
         # Initial constraints on z
         self.constraint &= generate_initial_constraints(self)
@@ -202,7 +212,7 @@ class ConnectivityProblem(object):
                            binary=False)
 
         self.vars = {'z': zvar, 'e': evar, 'y': yvar, 'f': fvar, 'fbar': fbarvar}
-        t0 = time.time()        
+        t0 = time.time()
 
         # Initial Constraints on z
         self.constraint &= generate_initial_constraints(self)
@@ -220,16 +230,16 @@ class ConnectivityProblem(object):
     def _solve(self, solver=None, output=False, integer=True):
         obj = np.zeros(self.num_vars)
 
-        J_int = sum([list(range(var.start, var.start + var.size)) 
+        J_int = sum([list(range(var.start, var.start + var.size))
                     for var in self.vars.values() if not var.binary], [])
         J_bin = sum([list(range(var.start, var.start + var.size))
                     for var in self.vars.values() if var.binary], [])
-        
+
         print("Number of variables: {} ({} bin, {} int)".format(self.num_vars, len(J_bin), len(J_int)))
         print("Number of constraints: {}".format(self.constraint.A_eq.shape[0]+self.constraint.A_iq.shape[0]))
 
         # Solve it
-        t0 = time.time()        
+        t0 = time.time()
         self.solution = solve_ilp(obj, self.constraint, J_int, J_bin, solver, output)
         print("Solver time {:.2f}s".format(time.time() - t0))
 
@@ -243,6 +253,14 @@ class ConnectivityProblem(object):
                     self.trajectories[(r,t)] = v
 
     ##GRAPH HELPER FUNCTIONS##
+
+    def set_sources_sinks(self, sources, sinks):
+        self.sources = sources
+        self.sinks = sinks
+        if len(sources)<=len(sinks):
+            self.b = {k:v for k,v in self.graph.agents.items() if k in sources}
+        else:
+            self.b = {k:v for k,v in self.graph.agents.items() if k in sinks}
 
     def get_time_augmented_id(self, n, t):
         return np.ravel_multi_index((t,n), (self.T+1, self.num_v))
@@ -355,7 +373,7 @@ class ConnectivityProblem(object):
 
             #Set individual attributes based on solution
             for (r,t), v in self.trajectories.items():
-                G.nodes[self.get_time_augmented_id(v, t)]['agents'].append(r)                          
+                G.nodes[self.get_time_augmented_id(v, t)]['agents'].append(r)
 
             for v in G.nodes:
                 G.nodes[v]['number_of_agents'] = len(G.nodes[v]['agents'])
@@ -407,11 +425,11 @@ class ConnectivityProblem(object):
         dict_pos = {n: (self.graph.nodes[n]['x'], self.graph.nodes[n]['y']) for n in self.graph}
 
         # Build dictionary robot,time -> position
-        traj_x = {(r,t): np.array([self.graph.nodes[v]['x'], self.graph.nodes[v]['y']]) 
+        traj_x = {(r,t): np.array([self.graph.nodes[v]['x'], self.graph.nodes[v]['y']])
                   for (r,t), v in self.trajectories.items()}
 
         # FIXED STUFF
-        nx.draw_networkx_nodes(self.graph, dict_pos, ax=ax, 
+        nx.draw_networkx_nodes(self.graph, dict_pos, ax=ax,
                                node_color='white', edgecolors='black', linewidths=1.0)
         nx.draw_networkx_edges(self.graph, dict_pos, ax=ax, edgelist=list(self.graph.tran_edges()),
                                connectionstyle='arc', edge_color='black')
@@ -427,15 +445,15 @@ class ConnectivityProblem(object):
         # robot nodes
         pos = np.array([traj_x[(r, 0)] for r in self.graph.agents])
         colors = plt.cm.rainbow(np.linspace(0, 1, len(self.graph.agents)))
-        coll_rpos = ax.scatter(pos[:,0], pos[:,1], s=140, marker='o', 
+        coll_rpos = ax.scatter(pos[:,0], pos[:,1], s=140, marker='o',
                                c=colors, zorder=5, alpha=0.7,
                                linewidths=2, edgecolors='black')
 
         # robot labels
-        coll_text = [ax.text(pos[i,0], pos[i,1], str(r), 
-                             horizontalalignment='center', 
+        coll_text = [ax.text(pos[i,0], pos[i,1], str(r),
+                             horizontalalignment='center',
                              verticalalignment='center',
-                             zorder=10, size=8, color='k', 
+                             zorder=10, size=8, color='k',
                              family='sans-serif', weight='bold', alpha=1.0)
                      for i, r in enumerate(self.graph.agents)]
 
@@ -448,7 +466,7 @@ class ConnectivityProblem(object):
             if 'fbar' in self.vars:
                 for i, (v1, v2) in enumerate(self.graph.conn_edges()):
                     coll_cedge[i].set_color('black')
-                    col_list = [colors[b] for b in self.b 
+                    col_list = [colors[b] for b in self.b
                                 if self.solution['x'][self.get_fbar_idx(b, v1, v2, min(self.T, t))] > 0.5]
                     if len(col_list):
                         coll_cedge[i].set_color(col_list[int(10 * alpha) % len(col_list)])
@@ -456,7 +474,7 @@ class ConnectivityProblem(object):
             # Update robot node and label positions
             pos = (1-alpha) * np.array([traj_x[(r, min(self.T, t))] for r in self.graph.agents]) \
                   + alpha * np.array([traj_x[(r, min(self.T, t+1))] for r in self.graph.agents])
-            
+
             coll_rpos.set_offsets(pos)
             for i in range(len(self.graph.agents)):
                 coll_text[i].set_x(pos[i, 0])

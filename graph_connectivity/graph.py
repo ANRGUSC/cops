@@ -100,15 +100,15 @@ class Graph(nx.MultiDiGraph):
             if data['type'] == 'transition':
                 yield (i,j)
 
-    def init_agents(self, agent_position_dictionary):
+    def init_agents(self, agent_dictionary):
 
         for n in self:
             self.node[n]['number_of_agents']=0
 
-        for agent in agent_position_dictionary:
-            self.node[agent_position_dictionary[agent]]['number_of_agents']+=1
+        for agent in agent_dictionary:
+            self.node[agent_dictionary[agent]]['number_of_agents']+=1
 
-        self.agents = agent_position_dictionary
+        self.agents = agent_dictionary
         for n in self.nodes:
             self.nodes[n]['agents'] = []
         for agent in self.agents:
