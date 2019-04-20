@@ -15,7 +15,6 @@ G.init_agents(agent_positions)
 cp = ConnectivityProblem()
 cp.graph = G                   # graph
 cp.T = 5                       # time
-cp.b = agent_positions         # base:node
 cp.static_agents = []          # static agents
 
 #Solve

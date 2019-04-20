@@ -11,10 +11,7 @@ def generate_flow_constraints(problem):
     c_48 = _dynamic_constraint_48(problem)
     c_49 = _dynamic_constraint_49(problem)
     c_50 = _dynamic_constraint_50(problem)
-    if len(problem.sources) <= len(problem.sinks):
-        c_52_53 = _generate_flow_constraint_52(problem)
-    else:
-        c_52_53 = _generate_flow_constraint_53(problem)
+    c_52_53 = _generate_flow_constraint_52(problem)
 
     return c_48 & c_49 & c_50 & c_52_53
 
@@ -30,7 +27,7 @@ def _dynamic_constraint_48(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for t, b, (v1, v2) in product(range(problem.T+1), problem.b,
+    for t, b, (v1, v2) in product(range(problem.T+1), range(problem.num_b),
                                   problem.graph.conn_edges()):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_fbar_idx(b, v1, v2, t))
@@ -54,7 +51,7 @@ def _dynamic_constraint_49(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for t, b, (v1, v2) in product(range(problem.T+1), problem.b,
+    for t, b, (v1, v2) in product(range(problem.T+1), range(problem.num_b),
                                   problem.graph.conn_edges()):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_fbar_idx(b, v1, v2, t))
@@ -78,7 +75,7 @@ def _dynamic_constraint_50(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for t, b, (v1, v2) in product(range(problem.T), problem.b,
+    for t, b, (v1, v2) in product(range(problem.T), range(problem.num_b),
                                   problem.graph.tran_edges()):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_f_idx(b, v1, v2, t))
@@ -97,85 +94,56 @@ def _generate_flow_constraint_52(problem):
     A_eq_row  = []
     A_eq_col  = []
     A_eq_data = []
-    b_eq_flow = []
-
-    N = len(problem.sinks)
 
     constraint_idx = 0
-    for t, v, b in product(range(problem.T+1), problem.graph.nodes, problem.b):
-        for edge in problem.graph.in_edges(v, data = True):
-            if edge[2]['type'] == 'transition' and t > 0:
+    for t, v, (b, b_r) in product(range(problem.T+1), problem.graph.nodes, 
+                                  enumerate(problem.b)):
+        if t > 0:
+            for edge in problem.graph.tran_in_edges(v):
                 A_eq_row.append(constraint_idx)
                 A_eq_col.append(problem.get_f_idx(b, edge[0], edge[1], t-1))
                 A_eq_data.append(1)
-            elif edge[2]['type'] == 'connectivity':
+
+        for edge in problem.graph.conn_in_edges(v):
                 A_eq_row.append(constraint_idx)
                 A_eq_col.append(problem.get_fbar_idx(b, edge[0], edge[1], t))
                 A_eq_data.append(1)
-        for edge in problem.graph.out_edges(v, data = True):
-            if edge[2]['type'] == 'transition' and t < problem.T:
+
+        if t < problem.T:
+            for edge in problem.graph.tran_out_edges(v):
                 A_eq_row.append(constraint_idx)
                 A_eq_col.append(problem.get_f_idx(b, edge[0], edge[1], t))
                 A_eq_data.append(-1)
-            elif edge[2]['type'] == 'connectivity':
+
+        for edge in problem.graph.conn_out_edges(v):
+            A_eq_row.append(constraint_idx)
+            A_eq_col.append(problem.get_fbar_idx(b, edge[0], edge[1], t))
+            A_eq_data.append(-1)
+
+        if len(problem.sources) <= len(problem.sinks):
+            # case (52)
+            if t == 0:
                 A_eq_row.append(constraint_idx)
-                A_eq_col.append(problem.get_fbar_idx(b, edge[0], edge[1], t))
-                A_eq_data.append(-1)
-        if t == 0 and v == problem.b[b]:
-            b_eq_flow.append(-N)
-        elif t == problem.T:
-            for r in problem.sinks:
-                A_eq_row.append(constraint_idx)
-                A_eq_col.append(problem.get_z_idx(r, v, t))
-                A_eq_data.append(-1)
-            b_eq_flow.append(0)
+                A_eq_col.append(problem.get_z_idx(b_r, v, t))
+                A_eq_data.append(len(problem.sinks))
+            elif t == problem.T:
+                for r in problem.sinks:
+                    A_eq_row.append(constraint_idx)
+                    A_eq_col.append(problem.get_z_idx(r, v, t))
+                    A_eq_data.append(-1)
         else:
-            b_eq_flow.append(0)
+            # case (53)
+            if t == 0:
+                for r in problem.sources:
+                    A_eq_row.append(constraint_idx)
+                    A_eq_col.append(problem.get_z_idx(r, v, t))
+                    A_eq_data.append(1)
+            elif t == problem.T:
+                A_eq_row.append(constraint_idx)
+                A_eq_col.append(problem.get_z_idx(b_r, v, t))
+                A_eq_data.append(-len(problem.sources))
+
         constraint_idx += 1
     A_eq_52 = sp.coo_matrix((A_eq_data, (A_eq_row, A_eq_col)), shape=(constraint_idx, problem.num_vars))
 
-    return Constraint(A_eq=A_eq_52, b_eq=b_eq_flow)
-
-def _generate_flow_constraint_53(problem):
-    # Constructing A_eq and b_eq for equality (53) as sp.coo matrix
-    A_eq_row  = []
-    A_eq_col  = []
-    A_eq_data = []
-    b_eq_flow = []
-
-    N = len(problem.sources)
-
-    constraint_idx = 0
-    for t, v, b in product(range(problem.T+1), problem.graph.nodes, problem.b):
-        for edge in problem.graph.in_edges(v, data = True):
-            if edge[2]['type'] == 'transition' and t > 0:
-                A_eq_row.append(constraint_idx)
-                A_eq_col.append(problem.get_f_idx(b, edge[0], edge[1], t-1))
-                A_eq_data.append(1)
-            elif edge[2]['type'] == 'connectivity':
-                A_eq_row.append(constraint_idx)
-                A_eq_col.append(problem.get_fbar_idx(b, edge[0], edge[1], t))
-                A_eq_data.append(1)
-        for edge in problem.graph.out_edges(v, data = True):
-            if edge[2]['type'] == 'transition' and t < problem.T:
-                A_eq_row.append(constraint_idx)
-                A_eq_col.append(problem.get_f_idx(b, edge[0], edge[1], t))
-                A_eq_data.append(-1)
-            elif edge[2]['type'] == 'connectivity':
-                A_eq_row.append(constraint_idx)
-                A_eq_col.append(problem.get_fbar_idx(b, edge[0], edge[1], t))
-                A_eq_data.append(-1)
-        if t == 0:
-            for r in problem.sources:
-                A_eq_row.append(constraint_idx)
-                A_eq_col.append(problem.get_z_idx(r, v, t))
-                A_eq_data.append(1)
-            b_eq_flow.append(0)
-        elif t == problem.T and v == problem.b[b]:
-            b_eq_flow.append(N)
-        else:
-            b_eq_flow.append(0)
-        constraint_idx += 1
-    A_eq_52 = sp.coo_matrix((A_eq_data, (A_eq_row, A_eq_col)), shape=(constraint_idx, problem.num_vars))
-
-    return Constraint(A_eq=A_eq_52, b_eq=b_eq_flow)
+    return Constraint(A_eq=A_eq_52, b_eq=np.zeros(constraint_idx))
