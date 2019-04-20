@@ -25,17 +25,19 @@ def generate_connectivity_constraint_all(problem):
     ret = Constraint()
 
     # Iterator over all (v, t) subsets in the graph
-    for b in problem.b:
+    for b, b_r in enumerate(problem.src):
         #Convert each set in the iterator to (v,t) format
         add_S = map(lambda S: list(map(problem.get_time_augmented_n_t, S)),
-                    problem.powerset_exclude_vertex(b))
+                    problem.powerset_exclude_agent(b_r))
         ret &= generate_connectivity_constraint(problem, [b], add_S)
 
     return ret
 
 def generate_connectivity_constraint(problem, b_list, add_S):
     '''Generate connectivity constraints for the S subsets in add_S, for
-       all bases in b_list'''
+       all bases in b_list
+
+       NOTE: b_list are INDICES in problem.src, not robots'''
 
     # Constructing A_iq and b_iq for inequality (37) for all S in add_S as sp.coo matrix
     A_iq_row  = []
@@ -74,7 +76,7 @@ def _dynamic_constraint_30(problem):
     A_iq_data = []
 
     constraint_idx = 0
-    for t, b, (v1, v2) in product(range(problem.T), problem.b,
+    for t, b, (v1, v2) in product(range(problem.T), range(problem.num_src),
                                   problem.graph.tran_edges()):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_x_idx(b, v1, v2, t))
@@ -95,7 +97,7 @@ def _dynamic_constraint_33(problem):
     A_iq_data = []
 
     constraint_idx = 0
-    for t, (v1, v2), b in product(range(problem.T+1), problem.graph.conn_edges(), problem.b):
+    for t, (v1, v2), b in product(range(problem.T+1), problem.graph.conn_edges(), range(problem.num_src)):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_xbar_idx(b, v1, v2, t))
         A_iq_data.append(1)
@@ -116,7 +118,7 @@ def _dynamic_constraint_34(problem):
     A_iq_data = []
 
     constraint_idx = 0
-    for t, (v1, v2), b in product(range(problem.T+1), problem.graph.conn_edges(), problem.b):
+    for t, (v1, v2), b in product(range(problem.T+1), problem.graph.conn_edges(), range(problem.num_src)):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_xbar_idx(b, v1, v2, t))
         A_iq_data.append(1)
@@ -137,7 +139,7 @@ def _dynamic_constraint_35(problem):
     A_iq_data = []
 
     constraint_idx = 0
-    for t, v, b in product(range(problem.T+1), problem.graph.nodes, problem.b):
+    for t, v, b in product(range(problem.T+1), problem.graph.nodes, range(problem.num_src)):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_yb_idx(b, v, t))
         A_iq_data.append(1)
@@ -160,7 +162,7 @@ def _dynamic_constraint_36(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for v, b in product(problem.graph.nodes, problem.b):
+    for v, b in product(problem.graph.nodes, range(problem.num_src)):
         for r in problem.graph.agents:
             A_iq_row.append(constraint_idx)
             A_iq_col.append(problem.get_z_idx(r, v, problem.T))

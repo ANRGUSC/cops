@@ -21,8 +21,8 @@ def test_horiz1():
     cp.graph = G
     # Specify time horizon
     cp.T = 1
-    # Specify bases
-    cp.b = {0: 3}
+    # Specify sources
+    cp.src = [2]
 
     cp.static_agents = [2]
 
@@ -61,8 +61,8 @@ def test_horiz2():
     cp.graph = G
     # Specify time horizon
     cp.T = 2
-    # Specify bases
-    cp.b = {0: 3}
+    # Specify sources
+    cp.src = [2]
 
     cp.static_agents = [0, 2]
 
