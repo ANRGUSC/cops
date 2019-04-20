@@ -53,13 +53,13 @@ G.plot_graph()
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 cp.graph = G                            #graph
-cp.T = 4                                #time
+cp.T = 5                                #time
 cp.master = 0                           #master_agent
 cp.static_agents = []                   #static agents
 
 #Define sources and sinks as subsets of agents
-cp.src = [2, 3]
-cp.snk = [0, 1]
+cp.src = [1,2]
+cp.snk = [0,3]
 
 #Solve 
 sol = cp.solve_flow()
