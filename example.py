@@ -44,7 +44,7 @@ node_positions = {0: (0,0), 1: (0,1), 2: (-2,1), 3: (-2,2), 4: (-3,2), 5: (-3,1)
 G.set_node_positions(node_positions)
 
 #Set initial position of agents
-agent_positions = {0: 0, 1: 8, 2: 12, 3: 23}    #agent:position
+agent_positions = {0: 0, 1: 8, 2: 12, 3: 23, 4: 10, 5: 4}    #agent:position
 G.init_agents(agent_positions)
 
 #Plot Graph (saves image as graph.png)
@@ -53,12 +53,12 @@ G.plot_graph()
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 cp.graph = G                            #graph
-cp.T = 5                                #time
+cp.T = 3                                #time
 cp.master = 0                           #master_agent
 cp.static_agents = []                   #static agents
 
 #Define sources and sinks as subsets of agents
-sources = [0, 1, 2, 3]
+sources = [0, 1]
 sinks = [0]
 #Set sources and sinks
 cp.set_sources_sinks(sources, sinks)
