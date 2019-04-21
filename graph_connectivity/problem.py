@@ -271,8 +271,10 @@ class ConnectivityProblem(object):
         self.constraint &= generate_dynamic_constraints(self)
         # Constraints on y for optimization
         self.constraint &= generate_optim_constraints(self)
-        # Flow constraints on z, e, f, fbar
-        self.constraint &= generate_flow_constraints(self)
+        # Flow connectivity constraints on z, e, f, fbar
+        self.constraint &= generate_flow_connectivity_constraints(self)
+        # Flow master constraints on z, e, m, mbar
+        self.constraint &= generate_flow_master_constraints(self)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
@@ -457,7 +459,7 @@ class ConnectivityProblem(object):
             A.layout()
             A.draw('solution.png')
 
-    def animate_solution(self, ANIM_STEP=30, filename='animation.mp4'):
+    def animate_solution(self, ANIM_STEP=30, filename='animation.mp4', labels=False):
 
         # Initiate plot
         fig, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -475,6 +477,8 @@ class ConnectivityProblem(object):
                                node_color='white', edgecolors='black', linewidths=1.0)
         nx.draw_networkx_edges(self.graph, dict_pos, ax=ax, edgelist=list(self.graph.tran_edges()),
                                connectionstyle='arc', edge_color='black')
+        if labels:
+            nx.draw_networkx_labels(self.graph, dict_pos)
 
         # VARIABLE STUFF
         # connectivity edges
