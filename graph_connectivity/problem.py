@@ -62,7 +62,7 @@ class ConnectivityProblem(object):
     @property
     def num_min_src_snk(self):
         return min(self.num_src, self.num_snk)
-    
+
     @property
     def num_r(self):
         return len(self.graph.agents)

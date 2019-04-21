@@ -53,16 +53,21 @@ class Graph(nx.MultiDiGraph):
     def add_transition_path(self, transition_list):
         self.add_path(transition_list, type='transition')
         self.add_path(transition_list[::-1], type='transition')
-        for n in transition_list:
-            if self.has_edge(n,n) == False:
-                self.add_edge( n,n , type='transition', self_loop = True)
+        self.add_self_loops()
 
     def add_connectivity_path(self, connectivity_list):
         self.add_path(connectivity_list, type='connectivity')
         self.add_path(connectivity_list[::-1] , type='connectivity')
-        for n in connectivity_list:
-            if self.has_edge(n,n) == False:
-                self.add_edge( n,n, type='connectivity')
+
+    def add_self_loops(self):
+        for n in self:
+            add_transition = True
+            for edge in self.edges(n, data = True):
+                if edge[0] == edge[1]:
+                    if edge[2]['type'] == 'transition':
+                        add_transition = False
+            if add_transition:
+                self.add_edge(n, n, type='transition')
 
     def set_node_positions(self, position_dictionary):
         self.add_nodes_from(position_dictionary.keys())
