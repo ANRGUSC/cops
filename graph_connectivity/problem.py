@@ -142,6 +142,18 @@ class ConnectivityProblem(object):
         idx = np.ravel_multi_index((t,b,k), (self.T+1, self.num_src, len(self.dict_conn)))
         return self.vars['xbar'].start + idx
 
+    def get_m_idx(self, i, j, t):
+        k = self.dict_tran[(i, j)]
+        idx = np.ravel_multi_index((t,k), (self.T, len(self.dict_tran)))
+        return self.vars['m'].start + idx
+
+    def get_mbar_idx(self, i, j, t):
+        k = self.dict_conn[(i, j)]
+        idx = np.ravel_multi_index((t,k), (self.T+1, len(self.dict_conn)))
+        return self.vars['mbar'].start + idx
+
+
+
     ##SOLVER FUNCTIONS##
 
     def solve_powerset(self, solver=None, output=False, integer=True):
@@ -243,8 +255,14 @@ class ConnectivityProblem(object):
         fbarvar = Variable(size=(self.T+1) * self.num_min_src_snk * len(self.dict_conn),
                            start=fvar.start + fvar.size,
                            binary=False)
+        mvar = Variable(size=self.T * len(self.dict_tran),
+                        start=fbarvar.start + fbarvar.size,
+                        binary=False)
+        mbarvar = Variable(size=(self.T+1) * len(self.dict_conn),
+                           start=mvar.start + mvar.size,
+                           binary=False)
 
-        self.vars = {'z': zvar, 'e': evar, 'y': yvar, 'f': fvar, 'fbar': fbarvar}
+        self.vars = {'z': zvar, 'e': evar, 'y': yvar, 'f': fvar, 'fbar': fbarvar, 'm': mvar, 'mbar': mbarvar}
         t0 = time.time()
 
         # Initial Constraints on z

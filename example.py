@@ -53,7 +53,7 @@ G.plot_graph()
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 cp.graph = G                            #graph
-cp.T = 10                                #time
+cp.T = 3                                #time
 cp.master = 0                           #master_agent
 cp.static_agents = []                   #static agents
 

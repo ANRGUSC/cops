@@ -167,27 +167,27 @@ def _dynamic_constraint_55(problem):
         if t > 0:
             for edge in problem.graph.tran_in_edges(v0):
                 A_iq_row.append(constraint_idx)
-                A_iq_col.append(problem.get_f_idx(M, edge[0], edge[1], t-1))
+                A_iq_col.append(problem.get_m_idx(edge[0], edge[1], t-1))
                 A_iq_data.append(-1)
 
         for edge in problem.graph.conn_in_edges(v0):
             A_iq_row.append(constraint_idx)
-            A_iq_col.append(problem.get_fbar_idx(M, edge[0], edge[1], t))
+            A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], t))
             A_iq_data.append(-1)
 
         if t < problem.T:
             for edge in problem.graph.tran_out_edges(v0):
                 A_iq_row.append(constraint_idx)
-                A_iq_col.append(problem.get_f_idx(M, edge[0], edge[1], t))
+                A_iq_col.append(problem.get_m_idx(edge[0], edge[1], t))
                 A_iq_data.append(1)
 
         for edge in problem.graph.conn_out_edges(v0):
             A_iq_row.append(constraint_idx)
-            A_iq_col.append(problem.get_fbar_idx(M, edge[0], edge[1], t))
+            A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], t))
             A_iq_data.append(1)
 
         if t == 0 and v == v0:
-            b_iq_m.append(len(problem.snk))
+            b_iq_m.append(len(problem.graph.agents))
         else:
             b_iq_m.append(0)
         constraint_idx += 1
@@ -219,23 +219,23 @@ def _dynamic_constraint_56(problem):
                 if tau > 0:
                     for edge in problem.graph.tran_in_edges(v0):
                         A_iq_row.append(constraint_idx)
-                        A_iq_col.append(problem.get_f_idx(M, edge[0], edge[1], tau-1))
+                        A_iq_col.append(problem.get_m_idx(edge[0], edge[1], tau-1))
                         A_iq_data.append(-1)
 
                 for edge in problem.graph.conn_in_edges(v0):
                     A_iq_row.append(constraint_idx)
-                    A_iq_col.append(problem.get_fbar_idx(M, edge[0], edge[1], tau))
+                    A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], tau))
                     A_iq_data.append(-1)
 
                 if tau < problem.T:
                     for edge in problem.graph.tran_out_edges(v0):
                         A_iq_row.append(constraint_idx)
-                        A_iq_col.append(problem.get_f_idx(M, edge[0], edge[1], tau))
+                        A_iq_col.append(problem.get_m_idx(edge[0], edge[1], tau))
                         A_iq_data.append(1)
 
                 for edge in problem.graph.conn_out_edges(v0):
                     A_iq_row.append(constraint_idx)
-                    A_iq_col.append(problem.get_fbar_idx(M, edge[0], edge[1], tau))
+                    A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], tau))
                     A_iq_data.append(1)
 
             b_iq_m.append(-1)
