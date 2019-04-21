@@ -107,17 +107,15 @@ class Graph(nx.MultiDiGraph):
 
     def init_agents(self, agent_dictionary):
 
+        self.agents = agent_dictionary
+
         for n in self:
             self.node[n]['number_of_agents']=0
+            self.node[n]['agents'] = []
 
-        for agent in agent_dictionary:
-            self.node[agent_dictionary[agent]]['number_of_agents']+=1
-
-        self.agents = agent_dictionary
-        for n in self.nodes:
-            self.nodes[n]['agents'] = []
-        for agent in self.agents:
-            self.nodes[self.agents[agent]]['agents'].append(agent)
+        for agent, position in agent_dictionary.items():
+            self.node[position]['number_of_agents'] += 1
+            self.node[position]['agents'].append(agent)
 
     def transition_adjacency_matrix(self):
         num_nodes = self.number_of_nodes()
@@ -134,46 +132,20 @@ class Graph(nx.MultiDiGraph):
             for edge in self.conn_in_edges(n):
                 adj[edge[0]][edge[1]] = 1
         return adj
-        for agent in agent_position_dictionary:
-            self.node[agent_position_dictionary[agent]]['number_of_agents']+=1
-
-        self.agents = agent_position_dictionary
-        for n in self.nodes:
-            self.nodes[n]['agents'] = []
-        for agent in self.agents:
-            self.nodes[self.agents[agent]]['agents'].append(agent)
-
-    def transition_adjacency_matrix(self):
-        num_nodes = self.number_of_nodes()
-        adj = [[0 for i in range(num_nodes)] for j in range(num_nodes)]
-        for n in self:
-            for edge in self.in_edges(n, data = True):
-                if edge[2]['type'] == 'transition':
-                    adj[edge[0]][edge[1]] = 1
-        return adj
-
-    def connectivity_adjacency_matrix(self):
-        num_nodes = self.number_of_nodes()
-        adj = [[0 for i in range(num_nodes)] for j in range(num_nodes)]
-        for n in self:
-            for edge in self.in_edges(n, data = True):
-                if edge[2]['type'] == 'connectivity':
-                    adj[edge[0]][edge[1]] = 1
-        return adj
 
     def get_pre_S_transition(self, S_v_t):
         pre_S = set()
         for v, t in S_v_t:
             if t > 0:
-                for edge in self.in_edges(v, data = True):
-                    if edge[2]['type'] == 'transition' and (edge[0], t - 1) not in S_v_t:
+                for edge in self.tran_in_edges(v):
+                    if (edge[0], t - 1) not in S_v_t:
                         pre_S.add((edge[0], edge[1], t - 1))
         return pre_S
 
     def get_pre_S_connectivity(self, S_v_t):
         pre_S = set()
         for v, t in S_v_t:
-            for edge in self.in_edges(v, data = True):
-                if edge[2]['type'] == 'connectivity' and (edge[0], t) not in S_v_t:
+            for edge in self.conn_in_edges(v):
+                if (edge[0], t) not in S_v_t:
                     pre_S.add((edge[0], edge[1], t))
         return pre_S
