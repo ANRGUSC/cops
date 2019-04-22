@@ -135,10 +135,8 @@ class Graph(nx.MultiDiGraph):
             self.node[n]['agents'] = []
             self.node[n]['known'] = False
 
-        for n in self:
+        for r, n in self.agents.items():
             self.node[n]['known'] = True
-            for edge in self.tran_out_edges(n):
-                self.node[edge[1]]['known'] = True
 
         for agent, position in agent_dictionary.items():
             self.node[position]['number_of_agents'] += 1

@@ -87,7 +87,7 @@ def solve_ilp(c, constraint, J_int=None, J_bin=None, solver=default_solver, outp
     If `J_int` and `J_bin` are not given, all variables are treated as integers.
 
     Returns a dict sol with the fields
-      'status': solver status 
+      'status': solver status
       'rcode': return code (2: optimal, 3: infeasible, 5: dual infeasible, 1: unknown)
       'x': the primary solution
     """
@@ -117,12 +117,12 @@ def solve_ilp(c, constraint, J_int=None, J_bin=None, solver=default_solver, outp
         constraint.b_eq = np.array([])
 
     if solver == 'gurobi':
-        sol = _solve_gurobi(c, constraint.A_iq, constraint.b_iq, 
-                             constraint.A_eq, constraint.b_eq, 
+        sol = _solve_gurobi(c, constraint.A_iq, constraint.b_iq,
+                             constraint.A_eq, constraint.b_eq,
                              J_int, J_bin, output)
     elif solver == 'mosek':
-        sol = _solve_mosek(c, constraint.A_iq, constraint.b_iq, 
-                            constraint.A_eq, constraint.b_eq, 
+        sol = _solve_mosek(c, constraint.A_iq, constraint.b_iq,
+                            constraint.A_eq, constraint.b_eq,
                             J_int, J_bin, output)
 
     sol['status'] = return_codes[sol['rcode']]

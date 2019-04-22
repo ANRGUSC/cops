@@ -42,7 +42,7 @@ class ConnectivityProblem(object):
         self.dict_conn = None
         self.vars = None
         self.constraint = Constraint()
-        self.obj = None
+        self.obj = []
 
         # ILP solution
         self.solution = None
@@ -157,34 +157,36 @@ class ConnectivityProblem(object):
 
     ##OBJECTIVE FUNCTION##
 
-    def generate_objective(self):
+    def generate_objective(self, optimize):
 
         obj = np.zeros(self.num_vars)
 
-        # add user-defined rewards
-        for v, r in self.reward_dict.items():
-            obj[self.get_y_idx(v)] -= r
+        if optimize:
 
-        # add frontier rewards
-        for v in self.graph:
-            if self.graph.nodes[v]['frontiers'] != 0:
-                obj[self.get_y_idx(v)] -= self.std_frontier_reward
+            # add user-defined rewards
+            for v, r in self.reward_dict.items():
+                obj[self.get_y_idx(v)] -= r
 
-        # add transition weights
-        for e, t in product(self.graph.edges(data=True), range(self.T)):
-            if e[2]['type'] == 'transition':
-                obj[self.get_e_idx(e[0], e[1], t)] = (1.001**t) * e[2]['weight']
+            # add frontier rewards
+            for v in self.graph:
+                if self.graph.nodes[v]['frontiers'] != 0:
+                    obj[self.get_y_idx(v)] -= self.std_frontier_reward
 
-        # add connectivity weights
-        for b, e, t in product(self.min_src_snk, self.graph.edges(data=True), range(self.T+1)):
-            if e[2]['type'] == 'connectivity':
-                obj[self.get_fbar_idx(b, e[0], e[1], t)] = (1.001**t) * e[2]['weight']
+            # add transition weights
+            for e, t in product(self.graph.edges(data=True), range(self.T)):
+                if e[2]['type'] == 'transition':
+                    obj[self.get_e_idx(e[0], e[1], t)] = (1.001**t) * e[2]['weight']
+
+            #add connectivity weights
+            for b, e, t in product(self.min_src_snk, self.graph.edges(data=True), range(self.T+1)):
+                if e[2]['type'] == 'connectivity':
+                    obj[self.get_fbar_idx(b, e[0], e[1], t)] = (1.001**t) * e[2]['weight']
 
         return obj
 
     ##SOLVER FUNCTIONS##
 
-    def solve_powerset(self, solver=None, output=False, integer=True):
+    def solve_powerset(self, optimize = False, solver=None, output=False, integer=True):
 
         if self.snk is not None:
             print("WARNING: sinks not implemented for solve_powerset, defaulting to all sinks")
@@ -219,12 +221,14 @@ class ConnectivityProblem(object):
         self.constraint &= generate_bridge_constraints(self)
         # Connectivity constraints on x, xbar, yb
         self.constraint &= generate_connectivity_constraint_all(self)
+        #Objective
+        self.obj = self.generate_objective(optimize)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
         self._solve(solver=None, output=False, integer=True)
 
-    def solve_adaptive(self, solver=None, output=False, integer=True):
+    def solve_adaptive(self, optimize = False, solver=None, output=False, integer=True):
 
         self.prepare_problem()
 
@@ -253,6 +257,8 @@ class ConnectivityProblem(object):
         self.constraint &= generate_dynamic_constraints(self)
         # Bridge z, e to x, xbar, yb
         self.constraint &= generate_bridge_constraints(self)
+        #Objective
+        self.obj = self.generate_objective(optimize)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
@@ -264,7 +270,7 @@ class ConnectivityProblem(object):
             valid_solution, add_S = self.test_solution()
             self.constraint &= generate_connectivity_constraint(self, range(self.num_src), add_S)
 
-    def solve_flow(self, solver=None, output=False, integer=True):
+    def solve_flow(self, master = False, connectivity = True, optimize = False, solver=None, output=False, integer=True):
 
         self.prepare_problem()
 
@@ -300,17 +306,21 @@ class ConnectivityProblem(object):
         # Constraints on y for optimization
         self.constraint &= generate_optim_constraints(self)
         # Flow connectivity constraints on z, e, f, fbar
-        self.constraint &= generate_flow_connectivity_constraints(self)
+        if connectivity:
+            self.constraint &= generate_flow_connectivity_constraints(self)
         # Flow master constraints on z, e, m, mbar
-        #self.constraint &= generate_flow_master_constraints(self)
+        if master:
+            self.constraint &= generate_flow_master_constraints(self)
         # Flow objective
-        self.obj = self.generate_objective()
+
+        self.obj = self.generate_objective(optimize)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
         self._solve(solver=None, output=False, integer=True)
 
     def _solve(self, solver=None, output=False, integer=True):
+
         obj = self.obj
 
         J_int = sum([list(range(var.start, var.start + var.size))
@@ -489,11 +499,36 @@ class ConnectivityProblem(object):
             A.layout()
             A.draw('solution.png')
 
-    def animate_solution(self, ANIM_STEP=30, filename='animation.mp4', labels=False):
+    def animate_solution(self, full_graph = None, ANIM_STEP=30, filename='animation.mp4', labels=False):
 
         # Initiate plot
         fig, ax = plt.subplots(1, 1, figsize=(10, 10))
         ax.axis('off')
+
+        #if we have full graph, plot it in background
+        if full_graph:
+                #Setup position dictionary for node positions
+                dict_pos = {n: (full_graph.nodes[n]['x'], full_graph.nodes[n]['y']) for n in full_graph}
+
+                # FIXED STUFF
+                nx.draw_networkx_nodes(full_graph, dict_pos, ax=ax,
+                                       node_color='white', edgecolors='grey', linewidths=1.0)
+                nx.draw_networkx_edges(full_graph, dict_pos, ax=ax, edgelist=list(full_graph.tran_edges()),
+                                       connectionstyle='arc', edge_color='grey')
+
+                if labels:
+                    nx.draw_networkx_labels(full_graph, dict_pos, font_color='grey')
+
+                # VARIABLE STUFF
+                # connectivity edges
+                coll_cedge = nx.draw_networkx_edges(full_graph, dict_pos, ax=ax, edgelist=list(full_graph.conn_edges()),
+                                                    edge_color='grey')
+                if coll_cedge is not None:
+                    for cedge in coll_cedge:
+                        cedge.set_connectionstyle("arc3,rad=0.25")
+                        cedge.set_linestyle('dashed')
+
+        #Plot IRM
 
         #Setup position dictionary for node positions
         dict_pos = {n: (self.graph.nodes[n]['x'], self.graph.nodes[n]['y']) for n in self.graph}
@@ -508,7 +543,10 @@ class ConnectivityProblem(object):
         nx.draw_networkx_edges(self.graph, dict_pos, ax=ax, edgelist=list(self.graph.tran_edges()),
                                connectionstyle='arc', edge_color='black')
 
-        frontiers = [v for v in self.graph if self.graph.nodes[v]['frontiers'] != 0]
+        if 'frontiers' in self.graph.nodes[0]:
+            frontiers = [v for v in self.graph if self.graph.nodes[v]['frontiers'] != 0]
+        else:
+            frontiers = []
         reward_nodes = [v for v in self.reward_dict]
         nx.draw_networkx_nodes(self.graph, dict_pos, ax=ax, nodelist = list(set(frontiers) | set(reward_nodes)),
                                node_color='green', edgecolors='black', linewidths=1.0)
@@ -520,9 +558,10 @@ class ConnectivityProblem(object):
         # connectivity edges
         coll_cedge = nx.draw_networkx_edges(self.graph, dict_pos, ax=ax, edgelist=list(self.graph.conn_edges()),
                                             edge_color='black')
-        for cedge in coll_cedge:
-            cedge.set_connectionstyle("arc3,rad=0.25")
-            cedge.set_linestyle('dashed')
+        if coll_cedge is not None:
+            for cedge in coll_cedge:
+                cedge.set_connectionstyle("arc3,rad=0.25")
+                cedge.set_linestyle('dashed')
 
         # robot nodes
         pos = np.array([traj_x[(r, 0)] for r in self.graph.agents])

@@ -58,7 +58,7 @@ G.plot_graph()
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 cp.graph = G                            #graph
-cp.T = 4                                #time
+cp.T = 5                                #time
 cp.master = 0                           #master_agent
 cp.static_agents = [0]                   #static agents
 
@@ -68,7 +68,7 @@ cp.snk = [0]
 
 
 #Solve
-sol = cp.solve_flow()
+sol = cp.solve_flow(optimize = True)
 
 #Plot Graph (saves image as graph.png)
 cp.plot_solution()

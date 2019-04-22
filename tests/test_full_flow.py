@@ -13,7 +13,7 @@ def test_horiz1():
     agent_positions = {0: 0, 1: 1, 2: 3}    #agent:position
     #Init agents in graphs
     G.init_agents(agent_positions)
-    
+
     # Set up the connectivity problem
     cp = ConnectivityProblem()
 
@@ -32,11 +32,11 @@ def test_horiz1():
     # positions of robot 0
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,0,0)], 1)
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,1,1)], 1)
-            
+
     # positions of robot 1
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(1,1,0)], 1)
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(1,2,1)], 1)
-            
+
     # positions of robot 2 (fixed)
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(2,3,0)], 1)
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(2,3,1)], 1)
@@ -53,7 +53,7 @@ def test_horiz2():
     agent_positions = {0: 0, 1: 1, 2: 3}    #agent:position
     #Init agents in graphs
     G.init_agents(agent_positions)
-    
+
     # Set up the connectivity problem
     cp = ConnectivityProblem()
 
@@ -73,13 +73,13 @@ def test_horiz2():
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,0,0)], 1)
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,0,1)], 1)
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(0,0,2)], 1)
-            
+
     # positions of robot 1
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(1,1,0)], 1)
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(1,2,1)], 1)
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(1,1,2)], 1)
-            
+
     # positions of robot 2 (fixed)
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(2,3,0)], 1)
     np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(2,3,1)], 1)
-    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(2,3,2)], 1)            
+    np.testing.assert_equal(cp.solution['x'][cp.get_z_idx(2,3,2)], 1)

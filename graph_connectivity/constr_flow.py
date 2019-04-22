@@ -20,7 +20,6 @@ def generate_flow_master_constraints(problem):
     c_48 = _dynamic_constraint_48_m(problem)
     c_49 = _dynamic_constraint_49_m(problem)
     c_50 = _dynamic_constraint_50_m(problem)
-
     c_55 = _dynamic_constraint_55(problem)
     c_56 = _dynamic_constraint_56(problem)
 
