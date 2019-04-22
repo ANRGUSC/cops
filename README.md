@@ -10,6 +10,9 @@ Contributors: Filip Klaesson, Petter Nilsson
 
 ---------------------------------------------------------------------
 
-Packages: Gurobi Optimizer
+Packages:
+
+Gurobi Optimizer
+Networkx
 
 ---------------------------------------------------------------------
