@@ -13,7 +13,7 @@ def generate_flow_connectivity_constraints(problem):
     c_50 = _dynamic_constraint_50(problem)
     c_53 = _dynamic_constraint_53(problem)
 
-    return c_48 & c_49 & c_50 & c_53 
+    return c_48 & c_49 & c_50 & c_53
 
 def generate_flow_master_constraints(problem):
     '''constraints on z, e, m, mbar'''

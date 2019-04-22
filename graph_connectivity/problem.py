@@ -173,7 +173,13 @@ class ConnectivityProblem(object):
         # add transition weights
         for e, t in product(self.graph.edges(data=True), range(self.T)):
             if e[2]['type'] == 'transition':
-                obj[self.get_e_idx(e[0], e[1], t)] = 1.01**t * e[2]['weight']
+                obj[self.get_e_idx(e[0], e[1], t)] = (1.001**t) * e[2]['weight']
+
+        # add connectivity weights
+        for b, e, t in product(self.min_src_snk, self.graph.edges(data=True), range(self.T+1)):
+            if e[2]['type'] == 'connectivity':
+                obj[self.get_fbar_idx(b, e[0], e[1], t)] = (1.001**t) * e[2]['weight']
+
         return obj
 
     ##SOLVER FUNCTIONS##
@@ -296,7 +302,7 @@ class ConnectivityProblem(object):
         # Flow connectivity constraints on z, e, f, fbar
         self.constraint &= generate_flow_connectivity_constraints(self)
         # Flow master constraints on z, e, m, mbar
-        self.constraint &= generate_flow_master_constraints(self)
+        #self.constraint &= generate_flow_master_constraints(self)
         # Flow objective
         self.obj = self.generate_objective()
 

@@ -9,7 +9,7 @@ class Graph(nx.MultiDiGraph):
         super(Graph, self).__init__()
         self.agents = None
         self.std_tran_weight = 1
-        self.std_con_weight = 0.1
+        self.std_con_weight = 0.01
 
     def plot_graph(self):
 
