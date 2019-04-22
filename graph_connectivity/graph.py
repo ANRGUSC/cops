@@ -8,6 +8,8 @@ class Graph(nx.MultiDiGraph):
     def __init__(self):
         super(Graph, self).__init__()
         self.agents = None
+        self.std_tran_weight = 1
+        self.std_con_weight = 0.1
 
     def plot_graph(self):
 
@@ -50,14 +52,18 @@ class Graph(nx.MultiDiGraph):
         A.layout()
         A.draw('graph.png')
 
-    def add_transition_path(self, transition_list):
-        self.add_path(transition_list, type='transition')
-        self.add_path(transition_list[::-1], type='transition')
+    def add_transition_path(self, transition_list, w = None):
+        if w == None:
+            w = self.std_tran_weight
+        self.add_path(transition_list, type = 'transition', weight = w)
+        self.add_path(transition_list[::-1], type='transition', weight = w)
         self.add_self_loops()
 
-    def add_connectivity_path(self, connectivity_list):
-        self.add_path(connectivity_list, type='connectivity')
-        self.add_path(connectivity_list[::-1] , type='connectivity')
+    def add_connectivity_path(self, connectivity_list, w = None):
+        if w == None:
+            w = self.std_con_weight
+        self.add_path(connectivity_list, type='connectivity', weight = w)
+        self.add_path(connectivity_list[::-1] , type='connectivity', weight = w)
 
     def add_self_loops(self):
         for n in self:
@@ -67,7 +73,22 @@ class Graph(nx.MultiDiGraph):
                     if edge[2]['type'] == 'transition':
                         add_transition = False
             if add_transition:
-                self.add_edge(n, n, type='transition')
+                self.add_edge(n, n, type='transition', weight = 0)
+
+    def set_frontiers(self, frontiers):
+        for v in self:
+            if v in frontiers:
+                self.nodes[v]['frontiers'] = frontiers[v]
+            else:
+                self.nodes[v]['frontiers'] = 0
+
+    def is_frontier(self, v):
+        frontier = False
+        if self.node[v]['known']:
+            for edge in self.tran_out_edges(v):
+                if not self.node[edge[1]]['known']:
+                    frontier = True
+        return frontier
 
     def set_node_positions(self, position_dictionary):
         self.add_nodes_from(position_dictionary.keys())
@@ -112,6 +133,12 @@ class Graph(nx.MultiDiGraph):
         for n in self:
             self.node[n]['number_of_agents']=0
             self.node[n]['agents'] = []
+            self.node[n]['known'] = False
+
+        for n in self:
+            self.node[n]['known'] = True
+            for edge in self.tran_out_edges(n):
+                self.node[edge[1]]['known'] = True
 
         for agent, position in agent_dictionary.items():
             self.node[position]['number_of_agents'] += 1

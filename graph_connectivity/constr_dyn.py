@@ -6,7 +6,6 @@ import scipy.sparse as sp
 from graph_connectivity.optimization_wrappers import Constraint
 
 def generate_dynamic_constraints(problem):
-    '''constraints on z, e'''
 
     #Define number of variables
     if problem.num_vars == None: problem.compute_num_var()
@@ -155,13 +154,13 @@ def _dynamic_constraint_51(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for t, v in product(range(problem.T+1), problem.graph.nodes):
+    for v in problem.graph.nodes:
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_y_idx(v))
         A_iq_data.append(1)
         for r in range(len(problem.graph.agents)):
             A_iq_row.append(constraint_idx)
-            A_iq_col.append(problem.get_z_idx(r, v, t))
+            A_iq_col.append(problem.get_z_idx(r, v, problem.T))
             A_iq_data.append(-1)
         constraint_idx += 1
 

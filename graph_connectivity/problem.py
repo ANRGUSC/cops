@@ -34,12 +34,15 @@ class ConnectivityProblem(object):
         self.src = None
         self.snk = None
         self.master = None
+        self.std_frontier_reward = 10
+        self.reward_dict = {}
 
         # ILP setup
         self.dict_tran = None
         self.dict_conn = None
         self.vars = None
         self.constraint = Constraint()
+        self.obj = None
 
         # ILP solution
         self.solution = None
@@ -152,7 +155,26 @@ class ConnectivityProblem(object):
         idx = np.ravel_multi_index((t,k), (self.T+1, len(self.dict_conn)))
         return self.vars['mbar'].start + idx
 
+    ##OBJECTIVE FUNCTION##
 
+    def generate_objective(self):
+
+        obj = np.zeros(self.num_vars)
+
+        # add user-defined rewards
+        for v, r in self.reward_dict.items():
+            obj[self.get_y_idx(v)] -= r
+
+        # add frontier rewards
+        for v in self.graph:
+            if self.graph.nodes[v]['frontiers'] != 0:
+                obj[self.get_y_idx(v)] -= self.std_frontier_reward
+
+        # add transition weights
+        for e, t in product(self.graph.edges(data=True), range(self.T)):
+            if e[2]['type'] == 'transition':
+                obj[self.get_e_idx(e[0], e[1], t)] = 1.01**t * e[2]['weight']
+        return obj
 
     ##SOLVER FUNCTIONS##
 
@@ -275,13 +297,15 @@ class ConnectivityProblem(object):
         self.constraint &= generate_flow_connectivity_constraints(self)
         # Flow master constraints on z, e, m, mbar
         self.constraint &= generate_flow_master_constraints(self)
+        # Flow objective
+        self.obj = self.generate_objective()
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
         self._solve(solver=None, output=False, integer=True)
 
     def _solve(self, solver=None, output=False, integer=True):
-        obj = np.zeros(self.num_vars)
+        obj = self.obj
 
         J_int = sum([list(range(var.start, var.start + var.size))
                     for var in self.vars.values() if not var.binary], [])
@@ -477,6 +501,12 @@ class ConnectivityProblem(object):
                                node_color='white', edgecolors='black', linewidths=1.0)
         nx.draw_networkx_edges(self.graph, dict_pos, ax=ax, edgelist=list(self.graph.tran_edges()),
                                connectionstyle='arc', edge_color='black')
+
+        frontiers = [v for v in self.graph if self.graph.nodes[v]['frontiers'] != 0]
+        reward_nodes = [v for v in self.reward_dict]
+        nx.draw_networkx_nodes(self.graph, dict_pos, ax=ax, nodelist = list(set(frontiers) | set(reward_nodes)),
+                               node_color='green', edgecolors='black', linewidths=1.0)
+
         if labels:
             nx.draw_networkx_labels(self.graph, dict_pos)
 
