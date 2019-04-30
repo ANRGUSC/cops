@@ -210,10 +210,10 @@ def _dynamic_constraint_56(problem):
     b_iq_m = []
 
     constraint_idx = 0
+    m_v0 = problem.graph.agents[problem.master]
     for t, r in product(range(problem.T+1), problem.graph.agents):
-        if r != problem.master:
-            v0 = problem.graph.agents[r]
-
+        v0 = problem.graph.agents[r]
+        if r != problem.master and v0 != m_v0:
             A_iq_row.append(constraint_idx)
             A_iq_col.append(problem.get_z_idx(r, v0, t))
             A_iq_data.append(-1)

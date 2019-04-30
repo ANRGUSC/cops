@@ -34,14 +34,16 @@ class ConnectivityProblem(object):
         self.src = None
         self.snk = None
         self.master = None
-        self.std_frontier_reward = 10
-        self.reward_dict = {}
+        self.std_frontier_reward = 100
+        self.reward_dict = None
 
         # ILP setup
         self.dict_tran = None
         self.dict_conn = None
+        self.dict_node = None
+        self.dict_src_snk = None
         self.vars = None
-        self.constraint = Constraint()
+        self.constraint = None
         self.obj = []
 
         # ILP solution
@@ -82,6 +84,9 @@ class ConnectivityProblem(object):
 
     def prepare_problem(self):
 
+        #reset contraints
+        self.constraint = Constraint()
+
         if self.graph is None:
             raise Exception("Can not solve problem without 'graph'")
 
@@ -100,6 +105,9 @@ class ConnectivityProblem(object):
         # Create dictionaries for (i,j)->k mapping for edges
         self.dict_tran = {(i,j): k for k, (i,j) in enumerate(self.graph.tran_edges())}
         self.dict_conn = {(i,j): k for k, (i,j) in enumerate(self.graph.conn_edges())}
+        # Create dictionary for v -> k mapping for nodes
+        self.dict_node = {v: k for k, v in enumerate(self.graph.nodes)}
+        # Create src/snk dictionary
 
         if not set(self.src) <= set(self.graph.agents.keys()):
             raise Exception("Invalid sources")
@@ -111,7 +119,8 @@ class ConnectivityProblem(object):
             raise Exception("Invalid initial positions")
 
     def get_z_idx(self, r, v, t):
-        return self.vars['z'].start + np.ravel_multi_index((t,v,r), (self.T+1, self.num_v, self.num_r))
+        k = self.dict_node[v]
+        return self.vars['z'].start + np.ravel_multi_index((t,k,r), (self.T+1, self.num_v, self.num_r))
 
     def get_e_idx(self, i, j, t):
         k = self.dict_tran[(i, j)]
@@ -119,7 +128,8 @@ class ConnectivityProblem(object):
         return self.vars['e'].start + idx
 
     def get_y_idx(self, v):
-        return self.vars['y'].start + v
+        k = self.dict_node[v]
+        return self.vars['y'].start + k
 
     def get_yb_idx(self, b, v, t):
         idx = np.ravel_multi_index((t,b,v), (self.T+1, self.num_src, self.num_v))
@@ -157,36 +167,62 @@ class ConnectivityProblem(object):
 
     ##OBJECTIVE FUNCTION##
 
-    def generate_objective(self, optimize):
+    def generate_objective(self, optimal):
 
         obj = np.zeros(self.num_vars)
 
-        if optimize:
+        if optimal:
 
             # add user-defined rewards
-            for v, r in self.reward_dict.items():
-                obj[self.get_y_idx(v)] -= r
+            if self.reward_dict != None:
+                print(self.reward_dict)
+                for v, r in self.reward_dict.items():
+                    obj[self.get_y_idx(v)] -= r
 
             # add frontier rewards
-            for v in self.graph:
+            for v in self.graph.nodes:
                 if self.graph.nodes[v]['frontiers'] != 0:
                     obj[self.get_y_idx(v)] -= self.std_frontier_reward
 
             # add transition weights
             for e, t in product(self.graph.edges(data=True), range(self.T)):
                 if e[2]['type'] == 'transition':
-                    obj[self.get_e_idx(e[0], e[1], t)] = (1.001**t) * e[2]['weight']
+                    obj[self.get_e_idx(e[0], e[1], t)] = (1.01**t) * e[2]['weight']
 
             #add connectivity weights
-            for b, e, t in product(self.min_src_snk, self.graph.edges(data=True), range(self.T+1)):
-                if e[2]['type'] == 'connectivity':
-                    obj[self.get_fbar_idx(b, e[0], e[1], t)] = (1.001**t) * e[2]['weight']
+            if 'fbar' in self.vars:
+                for b, e, t in product(range(len(self.min_src_snk)), self.graph.edges(data=True), range(self.T+1)):
+                    if e[2]['type'] == 'connectivity':
+                        obj[self.get_fbar_idx(b, e[0], e[1], t)] = (1.01**t) * e[2]['weight']
+
+            #add master connectivity weights (prevents unnecessary passing of masterplan)
+            if 'mbar' in self.vars:
+                for e, t in product(self.graph.edges(data=True), range(self.T+1)):
+                    if e[2]['type'] == 'connectivity':
+                        obj[self.get_mbar_idx(e[0], e[1], t)] = (1.01**t) * e[2]['weight']
 
         return obj
 
     ##SOLVER FUNCTIONS##
 
-    def solve_powerset(self, optimize = False, solver=None, output=False, integer=True):
+    def cut_solution(self):
+        t = self.T
+        cut = True
+        while cut and t>0:
+            for r in self.graph.agents:
+                if self.trajectories[(r, t)] != self.trajectories[(r, t - 1)]:
+                    cut = False
+            if cut:
+                t -= 1
+
+        self.T = t
+
+        self.trajectories = {}
+        for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T+1)):
+            if self.solution['x'][self.get_z_idx(r, v, t)] > 0.5:
+                self.trajectories[(r,t)] = v
+
+    def solve_powerset(self, optimal = False, solver=None, output=False, integer=True):
 
         if self.snk is not None:
             print("WARNING: sinks not implemented for solve_powerset, defaulting to all sinks")
@@ -222,13 +258,13 @@ class ConnectivityProblem(object):
         # Connectivity constraints on x, xbar, yb
         self.constraint &= generate_connectivity_constraint_all(self)
         #Objective
-        self.obj = self.generate_objective(optimize)
+        self.obj = self.generate_objective(optimal)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
         self._solve(solver=None, output=False, integer=True)
 
-    def solve_adaptive(self, optimize = False, solver=None, output=False, integer=True):
+    def solve_adaptive(self, optimal = False, solver=None, output=False, integer=True):
 
         self.prepare_problem()
 
@@ -258,7 +294,7 @@ class ConnectivityProblem(object):
         # Bridge z, e to x, xbar, yb
         self.constraint &= generate_bridge_constraints(self)
         #Objective
-        self.obj = self.generate_objective(optimize)
+        self.obj = self.generate_objective(optimal)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
@@ -270,7 +306,7 @@ class ConnectivityProblem(object):
             valid_solution, add_S = self.test_solution()
             self.constraint &= generate_connectivity_constraint(self, range(self.num_src), add_S)
 
-    def solve_flow(self, master = False, connectivity = True, optimize = False, solver=None, output=False, integer=True):
+    def solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True):
 
         self.prepare_problem()
 
@@ -312,12 +348,44 @@ class ConnectivityProblem(object):
         if master:
             self.constraint &= generate_flow_master_constraints(self)
         # Flow objective
-
-        self.obj = self.generate_objective(optimize)
+        self.obj = self.generate_objective(optimal)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
         self._solve(solver=None, output=False, integer=True)
+
+    def diameter_solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True):
+
+        T = nx.diameter(self.graph)
+        feasible_solution = False
+        while not feasible_solution:
+            self.T = T
+
+            #Solve
+            self.solve_flow(master, connectivity, optimal, solver, output, integer)
+
+            if self.solution['status'] is not 'infeasible':
+                feasible_solution = True
+
+            T += 1
+
+        self.cut_solution()
+
+    def linear_search_solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True):
+
+        T = 0
+        feasible_solution = False
+        while not feasible_solution:
+
+            self.T = T
+
+            #Solve
+            self.solve_flow(master, connectivity, optimal, solver, output, integer)
+
+            if self.solution['status'] is not 'infeasible':
+                feasible_solution = True
+
+            T += 1
 
     def _solve(self, solver=None, output=False, integer=True):
 
@@ -547,7 +615,10 @@ class ConnectivityProblem(object):
             frontiers = [v for v in self.graph if self.graph.nodes[v]['frontiers'] != 0]
         else:
             frontiers = []
-        reward_nodes = [v for v in self.reward_dict]
+        if self.reward_dict != None:
+            reward_nodes = [v for v in self.reward_dict]
+        else:
+            reward_nodes = []
         nx.draw_networkx_nodes(self.graph, dict_pos, ax=ax, nodelist = list(set(frontiers) | set(reward_nodes)),
                                node_color='green', edgecolors='black', linewidths=1.0)
 

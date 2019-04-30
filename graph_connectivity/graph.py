@@ -90,6 +90,18 @@ class Graph(nx.MultiDiGraph):
                     frontier = True
         return frontier
 
+    def is_local_frontier(self, v):
+        if self.node[v]['frontiers'] != 0:
+            return True
+        return False
+
+    def is_known(self):
+        for v in self:
+            if not self.node[v]['known']:
+                return False
+        return True
+
+
     def set_node_positions(self, position_dictionary):
         self.add_nodes_from(position_dictionary.keys())
         for n, p in position_dictionary.items():

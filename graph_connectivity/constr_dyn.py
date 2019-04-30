@@ -16,8 +16,9 @@ def generate_dynamic_constraints(problem):
     c_46 = _dynamic_constraint_46(problem)
     c_static = _dynamic_constraint_static(problem)
     c_ex = _dynamic_constraint_ex(problem)
+    c_57 = _dynamic_constraint_57(problem)
 
-    return c_44 & c_45 & c_46 & c_static & c_ex
+    return c_44 & c_45 & c_46 & c_static & c_ex & c_57
 
 def generate_initial_constraints(problem):
     '''constraints on z'''
@@ -67,6 +68,34 @@ def _dynamic_constraint_44(problem):
     A_eq_44 = sp.coo_matrix((A_eq_data, (A_eq_row, A_eq_col)), shape=(constraint_idx, problem.num_vars))
 
     return Constraint(A_eq=A_eq_44, b_eq=np.zeros(constraint_idx))
+
+def _dynamic_constraint_57(problem):
+    A_iq_row  = []
+    A_iq_col  = []
+    A_iq_data = []
+    b_iq_57 = []
+
+    constraint_idx = 0
+    for t, r in product(range(problem.T), problem.graph.agents):
+        for edge in problem.graph.tran_edges():
+            A_iq_row.append(constraint_idx)
+            A_iq_col.append(problem.get_e_idx(edge[0], edge[1], t))
+            A_iq_data.append(-1)
+
+            A_iq_row.append(constraint_idx)
+            A_iq_col.append(problem.get_z_idx(r, edge[0], t))
+            A_iq_data.append(1)
+
+            A_iq_row.append(constraint_idx)
+            A_iq_col.append(problem.get_z_idx(r, edge[1], t+1))
+            A_iq_data.append(1)
+
+            b_iq_57.append(1)
+
+            constraint_idx += 1
+    A_iq_57 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
+
+    return Constraint(A_iq=A_iq_57, b_iq=b_iq_57)
 
 def _dynamic_constraint_45(problem):
     A_eq_row  = []
@@ -158,7 +187,7 @@ def _dynamic_constraint_51(problem):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_y_idx(v))
         A_iq_data.append(1)
-        for r in range(len(problem.graph.agents)):
+        for r in problem.graph.agents:
             A_iq_row.append(constraint_idx)
             A_iq_col.append(problem.get_z_idx(r, v, problem.T))
             A_iq_data.append(-1)
