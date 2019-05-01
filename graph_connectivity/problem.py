@@ -109,6 +109,8 @@ class ConnectivityProblem(object):
         self.dict_node = {v: k for k, v in enumerate(self.graph.nodes)}
         # Create src/snk dictionary
 
+
+
         if not set(self.src) <= set(self.graph.agents.keys()):
             raise Exception("Invalid sources")
 
@@ -155,6 +157,11 @@ class ConnectivityProblem(object):
         idx = np.ravel_multi_index((t,b,k), (self.T+1, self.num_src, len(self.dict_conn)))
         return self.vars['xbar'].start + idx
 
+    def get_xf_idx(self, r, i, j, t):
+        k = self.dict_tran[(i, j)]
+        idx = np.ravel_multi_index((t,r,k), (self.T, len(self.graph.agents), len(self.dict_tran)))
+        return self.vars['xf'].start + idx
+
     def get_m_idx(self, i, j, t):
         k = self.dict_tran[(i, j)]
         idx = np.ravel_multi_index((t,k), (self.T, len(self.dict_tran)))
@@ -167,7 +174,7 @@ class ConnectivityProblem(object):
 
     ##OBJECTIVE FUNCTION##
 
-    def generate_objective(self, optimal):
+    def generate_powerset_objective(self, optimal):
 
         obj = np.zeros(self.num_vars)
 
@@ -188,6 +195,30 @@ class ConnectivityProblem(object):
             for e, t in product(self.graph.edges(data=True), range(self.T)):
                 if e[2]['type'] == 'transition':
                     obj[self.get_e_idx(e[0], e[1], t)] = (1.01**t) * e[2]['weight']
+
+        return obj
+
+    def generate_flow_objective(self, optimal):
+
+        obj = np.zeros(self.num_vars)
+
+        if optimal:
+
+            # add user-defined rewards
+            if self.reward_dict != None:
+                print(self.reward_dict)
+                for v, r in self.reward_dict.items():
+                    obj[self.get_y_idx(v)] -= r
+
+            # add frontier rewards
+            for v in self.graph.nodes:
+                if self.graph.nodes[v]['frontiers'] != 0:
+                    obj[self.get_y_idx(v)] -= self.std_frontier_reward
+
+            # add transition weights
+            for e, t, r in product(self.graph.edges(data=True), range(self.T), self.graph.agents):
+                if e[2]['type'] == 'transition':
+                    obj[self.get_xf_idx(r, e[0], e[1], t)] = (1.01**t) * e[2]['weight']
 
             #add connectivity weights
             if 'fbar' in self.vars:
@@ -252,13 +283,13 @@ class ConnectivityProblem(object):
         # Initial constraints on z
         self.constraint &= generate_initial_constraints(self)
         # Dynamic constraints on z, e
-        self.constraint &= generate_dynamic_constraints(self)
+        self.constraint &= generate_powerset_dynamic_constraints(self)
         # Bridge z, e to x, xbar, yb
-        self.constraint &= generate_bridge_constraints(self)
+        self.constraint &= generate_powerset_bridge_constraints(self)
         # Connectivity constraints on x, xbar, yb
         self.constraint &= generate_connectivity_constraint_all(self)
         #Objective
-        self.obj = self.generate_objective(optimal)
+        self.obj = self.generate_powerset_objective(optimal)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
@@ -290,11 +321,11 @@ class ConnectivityProblem(object):
         # Initial constraints on z
         self.constraint &= generate_initial_constraints(self)
         # Dynamic constraints on z, e
-        self.constraint &= generate_dynamic_constraints(self)
+        self.constraint &= generate_powerset_dynamic_constraints(self)
         # Bridge z, e to x, xbar, yb
-        self.constraint &= generate_bridge_constraints(self)
+        self.constraint &= generate_powerset_bridge_constraints(self)
         #Objective
-        self.obj = self.generate_objective(optimal)
+        self.obj = self.generate_powerset_objective(optimal)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
@@ -313,11 +344,11 @@ class ConnectivityProblem(object):
         zvar = Variable(size=(self.T+1) * self.num_r * self.num_v,
                         start=0,
                         binary=True)
-        evar = Variable(size=self.T * len(self.dict_tran),
+        xfvar = Variable(size=self.T * len(self.graph.agents) * len(self.dict_tran),
                         start=zvar.start + zvar.size,
-                        binary=False)
+                        binary=True)
         yvar = Variable(size=self.num_v,
-                        start=evar.start + evar.size,
+                        start=xfvar.start + xfvar.size,
                         binary=True)
         fvar = Variable(size=self.T * self.num_min_src_snk * len(self.dict_tran),
                         start=yvar.start + yvar.size,
@@ -332,15 +363,15 @@ class ConnectivityProblem(object):
                            start=mvar.start + mvar.size,
                            binary=False)
 
-        self.vars = {'z': zvar, 'e': evar, 'y': yvar, 'f': fvar, 'fbar': fbarvar, 'm': mvar, 'mbar': mbarvar}
+        self.vars = {'z': zvar, 'xf': xfvar, 'y': yvar, 'f': fvar, 'fbar': fbarvar, 'm': mvar, 'mbar': mbarvar}
         t0 = time.time()
 
         # Initial Constraints on z
         self.constraint &= generate_initial_constraints(self)
         # Dynamic Constraints on z, e
-        self.constraint &= generate_dynamic_constraints(self)
-        # Constraints on y for optimization
-        self.constraint &= generate_optim_constraints(self)
+        self.constraint &= generate_flow_dynamic_constraints(self)
+        # Bridge z, f, fbar to x, xbar, yb
+        self.constraint &= generate_flow_bridge_constraints(self)
         # Flow connectivity constraints on z, e, f, fbar
         if connectivity:
             self.constraint &= generate_flow_connectivity_constraints(self)
@@ -348,7 +379,7 @@ class ConnectivityProblem(object):
         if master:
             self.constraint &= generate_flow_master_constraints(self)
         # Flow objective
-        self.obj = self.generate_objective(optimal)
+        self.obj = self.generate_flow_objective(optimal)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 

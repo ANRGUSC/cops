@@ -5,7 +5,7 @@ import scipy.sparse as sp
 
 from graph_connectivity.optimization_wrappers import Constraint
 
-def generate_bridge_constraints(problem):
+def generate_powerset_bridge_constraints(problem):
     '''constraints on z, e, x, xbar, yb'''
 
     c_30 = _dynamic_constraint_30(problem)
@@ -39,7 +39,7 @@ def generate_connectivity_constraint(problem, b_list, add_S):
 
        NOTE: b_list are INDICES in problem.src, not robots'''
 
-    # Constructing A_iq and b_iq for inequality (37) for all S in add_S as sp.coo matrix
+    # Constructing A_iq and b_iq for inequality (38) for all S in add_S as sp.coo matrix
     A_iq_row  = []
     A_iq_col  = []
     A_iq_data = []
@@ -63,9 +63,9 @@ def generate_connectivity_constraint(problem, b_list, add_S):
                 A_iq_col.append(problem.get_xbar_idx(b, v0, v1, t1))
                 A_iq_data.append(-1)
             constraint_idx += 1
-    A_iq_37 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
+    A_iq_38 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
 
-    return Constraint(A_iq=A_iq_37, b_iq=np.zeros(constraint_idx))
+    return Constraint(A_iq=A_iq_38, b_iq=np.zeros(constraint_idx))
 
 ##########################################################
 ##########################################################
