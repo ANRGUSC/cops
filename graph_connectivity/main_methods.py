@@ -170,8 +170,8 @@ def animate_problem_sequence(graph, problem_list, ANIM_STEP=30, filename='animat
                 for i, (v1, v2) in enumerate(g.conn_edges()):
                     if g.nodes[v1]['known'] == True and g.nodes[v2]['known'] == True:
                         coll_cedge[i].set_color('black')
-                    col_list = [colors[b_r] for b, b_r in enumerate(problem.frontier_robot_dict)
-                                if problem.fbar[problem.get_fbar_idx(b, v1, v2, min(problem.T, t))] > 0.5]
+                    col_list = [colors[r] for fr, r in problem.frontier_robot_dict.items()
+                                if problem.fbar[problem.get_fbar_idx(fr, v1, v2, min(problem.T, t))] > 0.5]
                     if len(col_list):
                         coll_cedge[i].set_color(col_list[int(10 * alpha) % len(col_list)])
 
