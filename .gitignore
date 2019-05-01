@@ -9,3 +9,5 @@
 *.egg-info
 
 *.sublime-*
+
+*.DS_STORE
