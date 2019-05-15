@@ -5,7 +5,7 @@ import matplotlib.animation as animation
 from itertools import product
 
 from graph_connectivity.problem import *
-'''
+
 # Define a connectivity graph
 G = Graph()
 
@@ -41,19 +41,6 @@ node_positions = {0: (0,0), 1: (0,1), 2: (-2,1), 3: (-2,2), 4: (-3,2), 5: (-3,1)
                 11: (-1.6,4), 12: (0,4), 13: (0,5), 14: (1,3), 15: (1,4),
                 16: (1.5,1), 17: (2.5,1.3), 18: (4,1.3), 19: (5,1.3), 20: (5,2),
                 21: (4,3), 22: (5,3), 23: (5,4), 24: (3.5,4)}
-'''
-
-# Define a connectivity graph
-G = Graph()
-
-#Add edges to graph
-connectivity_edges = [0, 1, 2]
-transition_edges = [0, 1, 2]
-G.add_transition_path(transition_edges)
-G.add_connectivity_path(connectivity_edges)
-
-#Set node positions
-node_positions = {0: (0,0), 1: (0,1), 2: (0,3)}
 
 G.set_node_positions(node_positions)
 
