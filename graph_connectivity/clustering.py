@@ -55,8 +55,6 @@ def spectral_clustering(G, k):
     sc = SpectralClustering(k, affinity='precomputed')
     sc.fit(adj)
 
-    print(sc.labels_)
-
     clusters = {}
     c_group = []
 
@@ -69,7 +67,119 @@ def spectral_clustering(G, k):
 
     return clusters
 
-def inflate_subgraphs(G, clusters):
+def expand_cluster(G, c, agent_clusters, node_clusters, free_nodes):
+    G_tran = deepcopy(G)
+    G_tran.remove_edges_from(list(G.conn_edges()))
+
+    agent_cluster = agent_clusters[c]
+    node_cluster = node_clusters[c]
+
+    agent_nodes = [G.agents[r] for r in agent_cluster]
+    closest_node = None
+    closest_distance = None
+    for n in node_cluster:
+        for nbr in nx.neighbors(G_tran, n):
+            if nbr in free_nodes:
+                dist, path = nx.multi_source_dijkstra(G_tran, sources = agent_nodes, target=nbr)
+                add_path = True
+                for v in path[1:-1]:
+                    if v in G.agents.values():
+                        add_path = False
+                if add_path:
+                    if closest_node == None:
+                        closest_node = nbr
+                        closest_distance = dist
+                    elif dist < closest_distance:
+                        closest_node = nbr
+                        closest_distance = dist
+            elif nbr in G.agents.values() and nbr not in node_cluster:
+                add_nbr = True
+                for cluster in node_clusters:
+                    if nbr in node_clusters[cluster]:
+                        for v in node_cluster:
+                            if v in node_clusters[cluster]:
+                                add_nbr = False
+                if add_nbr:
+                    dist, path = nx.multi_source_dijkstra(G_tran, sources = agent_nodes, target=nbr)
+                    add_path = True
+                    for v in path[1:-1]:
+                        if v in G.agents.values():
+                            add_path = False
+                    if add_path:
+                        if closest_node == None:
+                            closest_node = nbr
+                            closest_distance = dist
+                        elif dist < closest_distance:
+                            closest_node = nbr
+                            closest_distance = dist
+
+
+    return closest_node
+
+def create_cluster_priority_list(G, master_node, node_clusters):
+    G_tran = deepcopy(G)
+    G_tran.remove_edges_from(list(G.conn_edges()))
+
+    priority_list = []
+    for c in node_clusters:
+        dist, path = nx.multi_source_dijkstra(G_tran, sources = node_clusters[c], target=master_node)
+        priority_list.append((c,dist))
+    sorted_priority_list = sorted(priority_list, key=lambda x: x[1])
+    priority_list = [c[0] for c in sorted_priority_list]
+    return priority_list
+
+def inflate_clusters(G, agent_clusters, master):
+
+    #create node_clusters corresponding to agent clusters
+    node_clusters = {}
+    for c in agent_clusters:
+        node_clusters[c] = []
+        for r in agent_clusters[c]:
+            node_clusters[c].append(G.agents[r])
+
+    #list of nodes available to be added into a cluster
+    free_nodes = [n for n in G.nodes if n not in G.agents.values()]
+
+    #assign priority to clusters
+    priority_list = create_cluster_priority_list(G, G.agents[master], node_clusters)
+
+    for c in priority_list:
+        cluster_full = False
+        while not cluster_full:
+            expand_node = expand_cluster(G, c, agent_clusters, node_clusters, free_nodes)
+            if expand_node == None:
+                cluster_full = True
+            else:
+                node_clusters[c].append(expand_node)
+                if expand_node in free_nodes:
+                    free_nodes.remove(expand_node)
+
+    #dictionary mappeing cluster to submaster
+    submasters = create_submaster_dictionary(G, node_clusters, priority_list, master)
+
+    return node_clusters, submasters
+
+def create_submaster_dictionary(G, subgraphs, priority_list, master):
+    submasters = {priority_list[0]: master}
+    for sub1 in range(len(priority_list)):
+        for sub2 in range(sub1 + 1, len(priority_list)):
+            n = list(set(subgraphs[priority_list[sub1]]) & set(subgraphs[priority_list[sub2]]))
+            if n:
+                for r in G.agents:
+                    if G.agents[r] in n:
+                        submasters[priority_list[sub2]] = r
+    return submasters
+
+
+def create_clusters(G,k):
+    master = 0
+
+    agent_clusters = spectral_clustering(G,k)
+    print("Agent clusters: {}".format(agent_clusters))
+
+    subgraphs, submasters = inflate_clusters(G, agent_clusters, master)
+    print("Subgraphs: {}".format(subgraphs))
+    print("Submasters: {}".format(submasters))
 
 
 
@@ -122,5 +232,5 @@ G.init_agents(agent_positions)
 #Plot Graph (saves image as graph.png)
 G.plot_graph()
 
-clusters = spectral_clustering(G,4)
-print(clusters)
+
+create_clusters(G,4)
