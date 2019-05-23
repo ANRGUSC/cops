@@ -41,7 +41,7 @@ class ConnectivityProblem(object):
         self.dict_tran = None
         self.dict_conn = None
         self.dict_node = None
-        self.dict_src_snk = None
+        self.dict_agent = None
         self.vars = None
         self.constraint = None
         self.obj = []
@@ -107,9 +107,8 @@ class ConnectivityProblem(object):
         self.dict_conn = {(i,j): k for k, (i,j) in enumerate(self.graph.conn_edges())}
         # Create dictionary for v -> k mapping for nodes
         self.dict_node = {v: k for k, v in enumerate(self.graph.nodes)}
-        # Create src/snk dictionary
-
-
+        # Create agent dictionary
+        self.dict_agent = {r: k for k, r in enumerate(self.graph.agents)}
 
         if not set(self.src) <= set(self.graph.agents.keys()):
             raise Exception("Invalid sources")
@@ -121,8 +120,9 @@ class ConnectivityProblem(object):
             raise Exception("Invalid initial positions")
 
     def get_z_idx(self, r, v, t):
+        R = self.dict_agent[r]
         k = self.dict_node[v]
-        return self.vars['z'].start + np.ravel_multi_index((t,k,r), (self.T+1, self.num_v, self.num_r))
+        return self.vars['z'].start + np.ravel_multi_index((t,k,R), (self.T+1, self.num_v, self.num_r))
 
     def get_e_idx(self, i, j, t):
         k = self.dict_tran[(i, j)]
@@ -158,8 +158,9 @@ class ConnectivityProblem(object):
         return self.vars['xbar'].start + idx
 
     def get_xf_idx(self, r, i, j, t):
+        R = self.dict_agent[r]
         k = self.dict_tran[(i, j)]
-        idx = np.ravel_multi_index((t,r,k), (self.T, len(self.graph.agents), len(self.dict_tran)))
+        idx = np.ravel_multi_index((t,R,k), (self.T, len(self.graph.agents), len(self.dict_tran)))
         return self.vars['xf'].start + idx
 
     def get_m_idx(self, i, j, t):

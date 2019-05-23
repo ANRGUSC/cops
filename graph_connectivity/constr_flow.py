@@ -45,7 +45,7 @@ def _dynamic_constraint_48(problem):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_fbar_idx(b, v1, v2, t))
         A_iq_data.append(1)
-        for r in range(len(problem.graph.agents)):
+        for r in problem.graph.agents:
             A_iq_row.append(constraint_idx)
             A_iq_col.append(problem.get_z_idx(r, v1, t))
             A_iq_data.append(-N)
@@ -56,7 +56,7 @@ def _dynamic_constraint_48(problem):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_fbar_idx(b, v1, v2, t))
         A_iq_data.append(1)
-        for r in range(len(problem.graph.agents)):
+        for r in problem.graph.agents:
             A_iq_row.append(constraint_idx)
             A_iq_col.append(problem.get_z_idx(r, v2, t))
             A_iq_data.append(-N)
@@ -79,7 +79,7 @@ def _dynamic_constraint_48_m(problem):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_mbar_idx(v1, v2, t))
         A_iq_data.append(1)
-        for r in range(len(problem.graph.agents)):
+        for r in problem.graph.agents:
             A_iq_row.append(constraint_idx)
             A_iq_col.append(problem.get_z_idx(r, v1, t))
             A_iq_data.append(-N)
@@ -89,7 +89,7 @@ def _dynamic_constraint_48_m(problem):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_mbar_idx(v1, v2, t))
         A_iq_data.append(1)
-        for r in range(len(problem.graph.agents)):
+        for r in problem.graph.agents:
             A_iq_row.append(constraint_idx)
             A_iq_col.append(problem.get_z_idx(r, v2, t))
             A_iq_data.append(-N)
@@ -113,7 +113,7 @@ def _dynamic_constraint_49(problem):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_f_idx(b, v1, v2, t))
         A_iq_data.append(1)
-        for r in range(len(problem.graph.agents)):
+        for r in problem.graph.agents:
             A_iq_row.append(constraint_idx)
             A_iq_col.append(problem.get_xf_idx(r, v1, v2, t))
             A_iq_data.append(-N)
@@ -136,7 +136,7 @@ def _dynamic_constraint_49_m(problem):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_m_idx(v1, v2, t))
         A_iq_data.append(1)
-        for r in range(len(problem.graph.agents)):
+        for r in problem.graph.agents:
             A_iq_row.append(constraint_idx)
             A_iq_col.append(problem.get_xf_idx(r, v1, v2, t))
             A_iq_data.append(-N)
