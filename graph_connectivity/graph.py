@@ -101,7 +101,6 @@ class Graph(nx.MultiDiGraph):
                 return False
         return True
 
-
     def set_node_positions(self, position_dictionary):
         self.add_nodes_from(position_dictionary.keys())
         for n, p in position_dictionary.items():
