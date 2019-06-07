@@ -41,18 +41,22 @@ frontiers = {8: 1, 13: 1, 24: 1}
 G.set_frontiers(frontiers)
 
 #Set initial position of agents
-agent_positions = {0: 0, 1: 1, 2: 4, 3: 7, 4: 12, 5: 14, 6: 19, 7: 23}
+agent_positions = {0: 0, 1: 1, 2: 6, 3: 8, 4: 13, 5: 15, 6: 22, 7: 24}
 G.init_agents(agent_positions)
+
+master = 0
+static_agents = [0]
 
 #Plot Graph (saves image as graph.png)
 G.plot_graph()
 
 #CLUSTERING
 k = 4
-master = 0
-static_agents = [0]
-cp = ClusterProblem(G, k, master, static_agents)
-
+cp = ClusterProblem()
+cp.graph = G
+#cp.k = k #uncomment for automatic choice of number of clusters
+cp.master = master
+cp.static_agents = static_agents
 cp.create_subgraphs()
 
 '''
@@ -64,5 +68,8 @@ print("Hier-Ascend: {}".format(cp.hier_ascend))
 print("Hier-Descend: {}".format(cp.hier_descend))
 '''
 
-cp.solve_to_frontier_problem()
+cp.solve_to_base_problem()
 cp.animate_solution()
+
+for i in range(cp.T):
+    print(cp.trajectories[(1,i)])

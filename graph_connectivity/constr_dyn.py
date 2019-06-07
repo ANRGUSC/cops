@@ -198,6 +198,7 @@ def _dynamic_constraint_static(problem):
     b_stat = []
 
     constraint_idx = 0
+    #Enforce static agents to be static
     for t, r, v in product(range(problem.T+1), problem.static_agents,
                            problem.graph.nodes):
         A_stat_row.append(constraint_idx)
@@ -205,6 +206,15 @@ def _dynamic_constraint_static(problem):
         A_stat_data.append(1)
         b_stat.append(1 if problem.graph.agents[r] == v else 0)
         constraint_idx += 1
+
+    if problem.final_position:
+        #Enforce final position for agents
+        for r, v in problem.final_position.items():
+            A_stat_row.append(constraint_idx)
+            A_stat_col.append(problem.get_z_idx(r, v, problem.T))
+            A_stat_data.append(1)
+            b_stat.append(1)
+            constraint_idx += 1
     A_stat = sp.coo_matrix((A_stat_data, (A_stat_row, A_stat_col)), shape=(constraint_idx, problem.num_vars))#.toarray(
 
     return Constraint(A_eq=A_stat, b_eq=b_stat)

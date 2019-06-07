@@ -6,20 +6,20 @@ import matplotlib.animation as animation
 from copy import deepcopy
 from itertools import product
 from sklearn.cluster import SpectralClustering
-from sklearn import metrics
 
 from graph_connectivity.problem import *
 
 class ClusterProblem(object):
 
-    def __init__(self, graph, k, master, static_agents):
+    def __init__(self):
         # Problem definition
-        self.graph = graph                   #Graph
-        self.graph_tran = None               #Transition-only graph
-        self.k = k                       #number of clusters
-        self.master = master
-        self.static_agents = static_agents
+        self.graph = None                   #Graph
+        self.graph_tran = None              #Transition-only graph
+        self.k = None                       #number of clusters
+        self.master = None
+        self.static_agents = None
         self.T = None
+        self.max_problem_size = 70
         self.agent_clusters = None
         self.subgraphs = None
         self.submasters = None
@@ -30,6 +30,13 @@ class ClusterProblem(object):
         self.hier_descend = None
         self.problems = {}
         self.trajectories = {}
+        self.conn = {}
+        self.com_in = {}
+        self.com_out = {}
+        self.start_time = {}
+        self.end_time = {}
+
+    #===GRAPH HELPER FUNCTIONS==================================================
 
     def create_graph_tran(self):
 
@@ -67,6 +74,8 @@ class ClusterProblem(object):
             g.edges[edge]['weight'] = 1/g.edges[edge]['weight']
 
         return g
+
+    #===CLUSTER FUNCTIONS=======================================================
 
     def spectral_clustering(self):
 
@@ -138,8 +147,6 @@ class ClusterProblem(object):
 
     def create_cluster_priority_list(self):
         master_node = self.graph.agents[self.master]
-        graph_tran = deepcopy(self.graph)
-        graph_tran.remove_edges_from(list(self.graph.conn_edges()))
 
         self.priority_list = []
         for c in self.subgraphs:
@@ -150,20 +157,199 @@ class ClusterProblem(object):
 
     def create_clusters(self):
 
+        #nodes free to add to a subgraph
+        self.free_nodes = [n for n in self.graph.nodes]
+
+        while len(self.free_nodes)>0:
+
+            #nodes free to add to a subgraph
+            self.free_nodes = [n for n in self.graph.nodes]
+
+            #create subgraphs corresponding to agent clusters
+            self.subgraphs = {}
+            for c in self.agent_clusters:
+                self.subgraphs[c] = []
+                for r in self.agent_clusters[c]:
+                    v = self.graph.agents[r]
+                    if v not in self.subgraphs[c]:
+                        self.subgraphs[c].append(v)
+                        if v in self.free_nodes:
+                            self.free_nodes.remove(v)
+
+            #assign priority to clusters
+            self.create_cluster_priority_list()
+
+            active = [self.priority_list[0]]   #subgraphs that expands each iteration
+            connected_components = True        #indicates if subgraphs are connected
+
+            while len(active) > 0 and connected_components:
+
+                for c in reversed(active):
+
+                    #test if subgraph c is connected
+                    g = deepcopy(self.graph_tran).to_undirected()
+                    for C in self.priority_list:
+                        if C == c:
+                            print('hej')
+                            disconnected_subgraphs = []
+                            components = nx.connected_components(g)
+                            agent_components = {}
+                            for i, comp in enumerate(components):
+                                print(comp)
+                                for r in self.agent_clusters[c]:
+                                    if self.graph.agents[r] in comp:
+                                        if i in agent_components:
+                                            agent_components[i].append(r)
+                                        else:
+                                            agent_components[i] = [r]
+                            print(agent_components)
+                            #split agent cluster if disconnected
+                            if len(agent_components.keys()) > 1:
+                                del self.agent_clusters[c]
+                                for i in agent_components.keys():
+                                    self.agent_clusters[c + '_' + str(i)] = agent_components[i]
+                                connected_components = False
+                                print(c + ' not connected!!!')
+                            else:
+                                connected_components = True
+
+                                #add agent-pairwise path to subgraph
+                                for r1, r2 in product(self.agent_clusters[c],self.agent_clusters[c]):
+                                    path = nx.shortest_path(g, source=self.graph.agents[r1], target=self.graph.agents[r2], weight='weight', method='dijkstra')
+                                    for v in path:
+                                        if v not in self.subgraphs[c] and v in self.free_nodes:
+                                            self.subgraphs[c].append(v)
+                                            self.free_nodes.remove(v)
+                                #inflate subgraphs using a free node
+                                expand_node = self.expand_cluster(c)
+                                if expand_node == None:
+                                    active.remove(c)
+                                else:
+                                    self.subgraphs[c].append(expand_node)
+                                    if expand_node in self.free_nodes:
+                                        self.free_nodes.remove(expand_node)
+                                    for c_act in self.subgraphs:
+                                        if expand_node in self.subgraphs[c_act] and c_act not in active:
+                                            active.append(c_act)
+
+                        else:
+                            #remove nodes in subgraph except agent nodes
+                            remove_nodes = []
+                            for v in self.subgraphs[C]:
+                                remove_nodes.append(v)
+                            g.remove_nodes_from(remove_nodes)
+
+                    if not connected_components:
+                        break
+
+    def create_clusters_2(self):
+
+        connected_components = False
+        while not connected_components:
+
+            #create subgraphs corresponding to agent clusters
+            self.subgraphs = {}
+            for c in self.agent_clusters:
+                self.subgraphs[c] = []
+                for r in self.agent_clusters[c]:
+                    v = self.graph.agents[r]
+                    if v not in self.subgraphs[c]:
+                        self.subgraphs[c].append(v)
+
+            #assign priority to clusters
+            self.create_cluster_priority_list()
+
+
+            #inflate subgraphs corresponding to agent clusters
+            g = deepcopy(self.graph_tran).to_undirected()
+            for c in self.priority_list:
+
+                #test if subgraphs are connected
+                disconnected_subgraphs = []
+                g = deepcopy(self.graph_tran).to_undirected()
+                components = nx.connected_components(g)
+                agent_components = {}
+                for i, comp in enumerate(components):
+                    for r in self.agent_clusters[c]:
+                        if self.graph.agents[r] in comp:
+                            if i in agent_components:
+                                agent_components[i].append(r)
+                            else:
+                                agent_components[i] = [r]
+
+                if len(agent_components.keys()) > 1:
+                    del self.agent_clusters[c]
+                    for i in agent_components.keys():
+                        self.agent_clusters[c + '_' + str(i)] = agent_components[i]
+                    connected_components = False
+                else:
+                    connected_components = True
+
+                    g.remove_nodes_from(self.subgraphs[c])
+                    for r1, r2 in product(self.agent_clusters[c],self.agent_clusters[c]):
+                        path = nx.shortest_path(g, source=self.graph.agents[r1], target=self.graph.agents[r2], weight='weight', method='dijkstra')
+                        for v in path:
+                            if v not in self.subgraphs[c]:
+                                add = True
+                                for C in self.priority_list:
+                                    if v not in self.subgraphs[C]:
+                                        add = False
+                                if add:
+                                    self.subgraphs[c].append(v)
+                    g.remove_nodes_from(self.subgraphs[c])
+
+
+        '''
+        #list of nodes available to be added into a cluster
+        self.free_nodes = [n for n in self.graph.nodes if n not in self.graph.agents.values()]
+
+        #inflate subgraphs using free nodes
+        for c in self.priority_list:
+            cluster_full = False
+            while not cluster_full:
+                expand_node = self.expand_cluster(c)
+                if expand_node == None:
+                    cluster_full = True
+                else:
+                    self.subgraphs[c].append(expand_node)
+                    if expand_node in self.free_nodes:
+                        self.free_nodes.remove(expand_node)
+        '''
+
+
         #create subgraphs corresponding to agent clusters
         self.subgraphs = {}
         for c in self.agent_clusters:
             self.subgraphs[c] = []
             for r in self.agent_clusters[c]:
-                self.subgraphs[c].append(self.graph.agents[r])
-
-        #list of nodes available to be added into a cluster
-        self.free_nodes = [n for n in self.graph.nodes if n not in self.graph.agents.values()]
+                v = self.graph.agents[r]
+                if v not in self.subgraphs[c]:
+                    self.subgraphs[c].append(v)
 
         #assign priority to clusters
         self.create_cluster_priority_list()
 
+        #inflate subgraphs corresponding to agent clusters
+        g = deepcopy(self.graph_tran).to_undirected()
         for c in self.priority_list:
+            for r1, r2 in product(self.agent_clusters[c],self.agent_clusters[c]):
+                path = nx.shortest_path(g, source=self.graph.agents[r1], target=self.graph.agents[r2], weight='weight', method='dijkstra')
+                for v in path:
+                    if v not in self.subgraphs[c]:
+                        add = True
+                        for C in self.priority_list:
+                            if v not in self.subgraphs[C]:
+                                add = False
+                        if add:
+                            self.subgraphs[c].append(v)
+            g.remove_nodes_from(self.subgraphs[c])
+
+
+        #list of nodes available to be added into a cluster
+        self.free_nodes = [n for n in self.graph.nodes if n not in self.graph.agents.values()]
+
+        for c in self.priority_list:
+
             cluster_full = False
             while not cluster_full:
                 expand_node = self.expand_cluster(c)
@@ -209,11 +395,49 @@ class ClusterProblem(object):
         #create transition-only graph
         self.create_graph_tran()
 
-        #detect agent clusters
-        self.spectral_clustering()
+        if self.k == None:
+            small_problem_size = False
+            self.k = 1
+            while not small_problem_size:
 
-        #dictionary mapping cluster to nodes
-        self.create_clusters()
+                #detect agent clusters
+                self.spectral_clustering()
+
+                #dictionary mapping cluster to nodes
+                self.create_clusters()
+                '''
+                print(self.k)
+                print(self.graph.agents)
+                print(self.agent_clusters)
+                print(self.subgraphs)
+                '''
+
+                #dictionary mapping cluster to submaster, subsinks
+                self.create_submaster_subsinks_dictionary()
+
+                small_problem_size = True
+                for c in self.subgraphs:
+                    g = deepcopy(self.graph)
+                    out_of_cluster_nodes = set(self.graph.nodes) - set(self.subgraphs[c])
+                    g.remove_nodes_from(out_of_cluster_nodes)
+                    if c in self.subsinks:
+                        size = (len(self.subgraphs[c])-len(self.subsinks[c])) * nx.diameter(g)
+                    else:
+                        size = len(self.subgraphs[c]) * nx.diameter(g)
+                    if size > self.max_problem_size:
+                        small_problem_size = False
+                        self.k += 1
+                        break
+
+                if len(self.agent_clusters) == len(self.graph.agents):
+                    raise Exception("Too large graph, add more agents!")
+
+        else:
+            #detect agent clusters
+            self.spectral_clustering()
+
+            #dictionary mapping cluster to nodes
+            self.create_clusters()
 
         #dictionary mapping cluster to submaster, subsinks
         self.create_submaster_subsinks_dictionary()
@@ -224,7 +448,7 @@ class ClusterProblem(object):
     def frontiers_in_cluster(self, c):
         cluster_frontiers = []
         for v in self.graph.nodes:
-            if self.graph.nodes[v]['frontiers'] != 0 and v in self.subgraphs[c] and v!=self.subsinks[c]:
+            if self.graph.nodes[v]['frontiers'] != 0 and v in self.subgraphs[c] and v != self.subsinks[c]:
                 cluster_frontiers.append(v)
         return cluster_frontiers
 
@@ -243,32 +467,200 @@ class ClusterProblem(object):
                         active_subgraphs.append(c)
         return active_subgraphs
 
-    def augment_solutions(self, order = 'ascend'):
+    #===SOLVE FUNCTIONS=========================================================
 
-        self.trajectories = {}
+    def augment_solutions(self):
 
-        if order == 'ascend':
-            priority_list = self.priority_list
-        else:
-            priority_list = reversed(self.priority_list)
+        #Construct communication dictionaries
+        for c in self.priority_list:
+            if c in self.problems:
+                for t, (b, br), (v1, v2) in product(range(self.problems[c].T+1), enumerate(self.problems[c].min_src_snk), self.problems[c].graph.conn_edges()):
+                    if self.problems[c].solution['x'][self.problems[c].get_fbar_idx(b, v1, v2, t)] > 0.5:
+                        for r in self.problems[c].graph.agents:
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
+                                r_out = r
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
+                                r_in = r
+                        self.com_out[r_out,t] = (r_in, v2, br)
+                        self.com_in[r_in,t] = (r_out, v1, br)
+                        self.conn[(br, v1, v2, t)] = 1
 
-        t_start = 0
+                for t, (v1, v2) in product(range(self.problems[c].T+1), self.problems[c].graph.conn_edges()):
+                    if self.problems[c].solution['x'][self.problems[c].get_mbar_idx(v1, v2, t)] > 0.5:
+                        for r in self.problems[c].graph.agents:
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
+                                r_out = r
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
+                                r_in = r
+                        self.com_out[r_out,t] = (r_in, v2, self.problems[c].master)
+                        self.com_in[r_in,t] = (r_out, v1, self.problems[c].master)
+                        self.conn[(self.problems[c].master, v1, v2, t)] = 1
+
+        #Find start time for each cluster
+        for c in self.priority_list:
+            if c in self.problems:
+                if self.problems[c].master == self.master:
+                    self.start_time[c] = 0
+                if c in self.hier_ascend:
+                    for c_asc in self.hier_ascend[c]:
+                        submaster = self.submasters[c_asc]
+                        #find time when submaster in upper subgraph is no longer updated
+                        t = self.problems[c].T
+                        cut = True
+                        while cut and t>0:
+                            if (self.problems[c].trajectories[(submaster, t)] != self.problems[c].trajectories[(submaster, t - 1)]
+                            or (submaster, t) in self.com_in or (submaster, t) in self.com_out):
+                                cut = False
+                            if cut:
+                                t -= 1
+                        self.start_time[c_asc] = t
+
+        #Re-construct communication dictionaries with new starting times
+        self.com_out = {}
+        self.com_in = {}
+        self.conn = {}
+        for c in self.priority_list:
+            if c in self.problems:
+                for t, (b, br), (v1, v2) in product(range(self.problems[c].T+1), enumerate(self.problems[c].min_src_snk), self.problems[c].graph.conn_edges()):
+                    if self.problems[c].solution['x'][self.problems[c].get_fbar_idx(b, v1, v2, t)] > 0.5:
+                        for r in self.problems[c].graph.agents:
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
+                                r_out = r
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
+                                r_in = r
+                        self.com_out[r_out,t+self.start_time[c]] = (r_in, v2, br)
+                        self.com_in[r_in,t+self.start_time[c]] = (r_out, v1, br)
+                        self.conn[(br, v1, v2, t+self.start_time[c])] = 1
+
+                for t, (v1, v2) in product(range(self.problems[c].T+1), self.problems[c].graph.conn_edges()):
+                    if self.problems[c].solution['x'][self.problems[c].get_mbar_idx(v1, v2, t)] > 0.5:
+                        for r in self.problems[c].graph.agents:
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
+                                r_out = r
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
+                                r_in = r
+                        self.com_out[r_out,t+self.start_time[c]] = (r_in, v2, self.problems[c].master)
+                        self.com_in[r_in,t+self.start_time[c]] = (r_out, v1, self.problems[c].master)
+                        self.conn[(self.problems[c].master, v1, v2, t+self.start_time[c])] = 1
+
+
+        #Construct trajectories
+        self.T = 0
         for r, v in self.graph.agents.items():
             self.trajectories[(r,0)] = v
+        for c in self.priority_list:
+            if c in self.problems:
+                for r, v, t in product(self.agent_clusters[c], self.problems[c].graph.nodes, range(self.problems[c].T + 1)):
+                    if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v, t)] > 0.5:
+                        self.trajectories[(r,t + self.start_time[c])] = v
+                        if t + self.start_time[c] > self.T:
+                            self.T = t + self.start_time[c]
 
-        for c in priority_list:
-            for r, v, t in product(self.problems[c].graph.agents, self.problems[c].graph.nodes, range(self.problems[c].T + 1)):
-                if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v, t)] > 0.5:
-                    self.trajectories[(r,t + t_start)] = v
-            t_start+=self.problems[c].T + 1
-
-        for r, v, t in product(self.graph.agents, self.graph.nodes, range(t_start)):
+        #Fill out trajectories
+        for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T + 1)):
             if (r,t) not in self.trajectories:
                 self.trajectories[(r,t)] = self.trajectories[(r,t-1)]
 
-        self.T = t_start - 1
+    def augment_solutions_reversed(self):
+
+        #Construct communication dictionaries
+        for c in self.priority_list:
+            if c in self.problems:
+                for t, (b, br), (v1, v2) in product(range(self.problems[c].T+1), enumerate(self.problems[c].min_src_snk), self.problems[c].graph.conn_edges()):
+                    if self.problems[c].solution['x'][self.problems[c].get_fbar_idx(b, v1, v2, t)] > 0.5:
+                        for r in self.problems[c].graph.agents:
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
+                                r_out = r
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
+                                r_in = r
+                        self.com_out[r_out,t] = (r_in, v2, br)
+                        self.com_in[r_in,t] = (r_out, v1, br)
+                        self.conn[(br, v1, v2, t)] = 1
+
+                for t, (v1, v2) in product(range(self.problems[c].T+1), self.problems[c].graph.conn_edges()):
+                    if self.problems[c].solution['x'][self.problems[c].get_mbar_idx(v1, v2, t)] > 0.5:
+                        for r in self.problems[c].graph.agents:
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
+                                r_out = r
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
+                                r_in = r
+                        self.com_out[r_out,t] = (r_in, v2, self.problems[c].master)
+                        self.com_in[r_in,t] = (r_out, v1, self.problems[c].master)
+                        self.conn[(self.problems[c].master, v1, v2, t)] = 1
+
+        #Find end time for each cluster
+        min_time = None
+        for c in self.priority_list:
+            if min_time == None:
+                min_time = self.problems[c].T
+            if c in self.problems:
+                if self.problems[c].master == self.master:
+                    self.end_time[c] = self.problems[c].T
+                if c in self.hier_ascend:
+                    for c_asc in self.hier_ascend[c]:
+                        submaster = self.submasters[c_asc]
+                        #find time when submaster in upper subgraph no longer updated
+                        t = self.problems[c].T
+                        cut = True
+                        while cut and t>0:
+                            if (self.problems[c].trajectories[(submaster, t)] != self.problems[c].trajectories[(submaster, t - 1)]
+                            or (submaster, t) in self.com_in or (submaster, t) in self.com_out):
+                                cut = False
+                            if cut:
+                                t -= 1
+                        self.end_time[c_asc] = t
+                        if t < min_time:
+                            min_time = t
+
+
+        #Re-construct communication dictionaries with new starting times
+        self.com_out = {}
+        self.com_in = {}
+        self.conn = {}
+        for c in self.priority_list:
+            if c in self.problems:
+                for t, (b, br), (v1, v2) in product(range(self.problems[c].T+1), enumerate(self.problems[c].min_src_snk), self.problems[c].graph.conn_edges()):
+                    if self.problems[c].solution['x'][self.problems[c].get_fbar_idx(b, v1, v2, t)] > 0.5:
+                        for r in self.problems[c].graph.agents:
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
+                                r_out = r
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
+                                r_in = r
+                        self.com_out[r_out,self.end_time[c] - (self.problems[c].T - t)] = (r_in, v2, br)
+                        self.com_in[r_in,self.end_time[c] - (self.problems[c].T - t)] = (r_out, v1, br)
+                        self.conn[(br, v1, v2, self.end_time[c] - (self.problems[c].T - t))] = 1
+
+                for t, (v1, v2) in product(range(self.problems[c].T+1), self.problems[c].graph.conn_edges()):
+                    if self.problems[c].solution['x'][self.problems[c].get_mbar_idx(v1, v2, t)] > 0.5:
+                        for r in self.problems[c].graph.agents:
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
+                                r_out = r
+                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
+                                r_in = r
+                        self.com_out[r_out,self.end_time[c] - (self.problems[c].T - t)] = (r_in, v2, self.problems[c].master)
+                        self.com_in[r_in,self.end_time[c] - (self.problems[c].T - t)] = (r_out, v1, self.problems[c].master)
+                        self.conn[(self.problems[c].master, v1, v2, self.end_time[c] - (self.problems[c].T - t))] = 1
+
+        #Construct trajectories
+        self.T = 0
+        for r, v in self.graph.agents.items():
+            self.trajectories[(r,0)] = v
+        for c in self.priority_list:
+            if c in self.problems:
+                for r, v, t in product(self.agent_clusters[c], self.problems[c].graph.nodes, range(self.problems[c].T + 1)):
+                    if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v, t)] > 0.5:
+                        self.trajectories[(r, self.end_time[c] - (self.problems[c].T - t))] = v
+                        if self.end_time[c] - (self.problems[c].T - t) > self.T:
+                            self.T = self.end_time[c] - (self.problems[c].T - t)
+
+        #Fill out trajectories
+        for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T + 1)):
+            if (r,t) not in self.trajectories:
+                self.trajectories[(r,t)] = self.trajectories[(r,t-1)]
 
     def solve_to_frontier_problem(self):
+
+        self.create_subgraphs()
 
         active_subgraphs = self.active_subgraphs()
 
@@ -311,9 +703,61 @@ class ClusterProblem(object):
             cp.diameter_solve_flow(master = True, connectivity = True, optimal = True)
             self.problems[c] = cp
 
-        self.augment_solutions(order = 'ascend')
+        self.augment_solutions()
 
+    def solve_to_base_problem(self):
 
+        self.create_subgraphs()
+
+        active_subgraphs = self.active_subgraphs()
+
+        for c in active_subgraphs:
+
+            #Setup connectivity problem
+            cp = ConnectivityProblem()
+
+            #Master is submaster of cluster
+            cp.master = self.submasters[c]
+
+            #Setup agents and static agents in subgraph
+            agents = {}
+            static_agents = []
+            sources = []
+            for r in self.agent_clusters[c]:
+                agents[r] = self.graph.agents[r]
+                if r in self.static_agents:
+                    static_agents.append(r)
+                if self.graph.nodes[self.graph.agents[r]]['frontiers'] != 0:
+                    sources.append(r)
+            if c in self.hier_ascend:
+                for C in self.hier_ascend[c]:
+                    agents[self.submasters[C]] = self.graph.agents[self.submasters[C]]
+                    static_agents.append(self.submasters[C])
+                    if C in active_subgraphs:
+                        sources.append(self.submasters[C])
+            sources = list(set(sources))
+
+            cp.static_agents = static_agents
+
+            g = deepcopy(self.graph)
+            nodes_not_in_subset = [v for v in self.graph.nodes if v not in self.subgraphs[c]]
+            g.remove_nodes_from(nodes_not_in_subset)
+            g.init_agents(agents)
+            cp.graph = g
+
+            cp.final_position = {r: v for r,v in self.graph.agents.items() if r == self.submasters[c]}
+
+            #Sources are submaster in active higger ranked subgraphs
+            cp.src = sources
+            #Submaster is sink
+            cp.snk = [self.submasters[c]]
+
+            cp.diameter_solve_flow(master = False, connectivity = True, optimal = True, frontier_reward = False)
+            self.problems[c] = cp
+
+        self.augment_solutions_reversed()
+
+    #===ANIMATE=====================================================================
 
     def animate_solution(self, ANIM_STEP=30, filename='cluster_animation.mp4', labels=False):
 
@@ -368,6 +812,7 @@ class ClusterProblem(object):
             nx.draw_networkx_labels(self.graph, dict_pos)
 
         # VARIABLE STUFF
+        # connectivity edges
         coll_cedge = nx.draw_networkx_edges(self.graph, dict_pos, ax=ax, edgelist=list(self.graph.conn_edges()),
                                             edge_color='black')
         if coll_cedge is not None:
@@ -394,6 +839,14 @@ class ClusterProblem(object):
             t = int(i / ANIM_STEP)
             anim_idx = i % ANIM_STEP
             alpha = anim_idx / ANIM_STEP
+
+            # Update connectivity edge colors if there is flow information
+            for i, (v1, v2) in enumerate(self.graph.conn_edges()):
+                coll_cedge[i].set_color('black')
+                col_list = [colors[b_r] for b, b_r in enumerate(self.graph.agents)
+                            if (b_r, v1, v2, t) in self.conn]
+                if len(col_list):
+                    coll_cedge[i].set_color(col_list[int(10 * alpha) % len(col_list)])
 
             # Update robot node and label positions
             pos = (1-alpha) * np.array([traj_x[(r, min(self.T, t))] for r in self.graph.agents]) \

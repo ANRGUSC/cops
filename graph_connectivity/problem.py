@@ -31,6 +31,7 @@ class ConnectivityProblem(object):
         self.graph = None                    #Graph
         self.T = None                        #Time horizon
         self.static_agents = None
+        self.final_position = None
         self.src = None
         self.snk = None
         self.master = None
@@ -110,10 +111,13 @@ class ConnectivityProblem(object):
         # Create agent dictionary
         self.dict_agent = {r: k for k, r in enumerate(self.graph.agents)}
 
+
         if not set(self.src) <= set(self.graph.agents.keys()):
+            print((self.src,self.graph.agents.keys()))
             raise Exception("Invalid sources")
 
         if not set(self.snk) <= set(self.graph.agents.keys()):
+            print((self.snk,self.graph.agents.keys()))
             raise Exception("Invalid sinks")
 
         if not set(self.graph.agents.values()) <= set(self.graph.nodes()):
@@ -199,7 +203,7 @@ class ConnectivityProblem(object):
 
         return obj
 
-    def generate_flow_objective(self, optimal):
+    def generate_flow_objective(self, optimal, frontier_reward = True):
 
         obj = np.zeros(self.num_vars)
 
@@ -212,9 +216,10 @@ class ConnectivityProblem(object):
                     obj[self.get_y_idx(v)] -= r
 
             # add frontier rewards
-            for v in self.graph.nodes:
-                if self.graph.nodes[v]['frontiers'] != 0:
-                    obj[self.get_y_idx(v)] -= self.std_frontier_reward
+            if frontier_reward:
+                for v in self.graph.nodes:
+                    if self.graph.nodes[v]['frontiers'] != 0:
+                        obj[self.get_y_idx(v)] -= self.std_frontier_reward
 
             # add transition weights
             for e, t, r in product(self.graph.edges(data=True), range(self.T), self.graph.agents):
@@ -338,7 +343,7 @@ class ConnectivityProblem(object):
             valid_solution, add_S = self.test_solution()
             self.constraint &= generate_connectivity_constraint(self, range(self.num_src), add_S)
 
-    def solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True):
+    def solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True, frontier_reward = True):
 
         self.prepare_problem()
 
@@ -380,13 +385,13 @@ class ConnectivityProblem(object):
         if master:
             self.constraint &= generate_flow_master_constraints(self)
         # Flow objective
-        self.obj = self.generate_flow_objective(optimal)
+        self.obj = self.generate_flow_objective(optimal, frontier_reward)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
         self._solve(solver=None, output=False, integer=True)
 
-    def diameter_solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True):
+    def diameter_solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True, frontier_reward = True):
 
         T = nx.diameter(self.graph)
         feasible_solution = False
@@ -394,7 +399,7 @@ class ConnectivityProblem(object):
             self.T = T
 
             #Solve
-            self.solve_flow(master, connectivity, optimal, solver, output, integer)
+            self.solve_flow(master, connectivity, optimal, solver, output, integer, frontier_reward)
 
             if self.solution['status'] is not 'infeasible':
                 feasible_solution = True
@@ -403,7 +408,7 @@ class ConnectivityProblem(object):
 
         self.cut_solution()
 
-    def linear_search_solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True):
+    def linear_search_solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True, frontier_reward = True):
 
         T = 0
         feasible_solution = False
@@ -412,7 +417,7 @@ class ConnectivityProblem(object):
             self.T = T
 
             #Solve
-            self.solve_flow(master, connectivity, optimal, solver, output, integer)
+            self.solve_flow(master, connectivity, optimal, solver, output, integer, frontier_reward)
 
             if self.solution['status'] is not 'infeasible':
                 feasible_solution = True

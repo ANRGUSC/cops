@@ -45,11 +45,11 @@ node_positions = {0: (0,0), 1: (0,1), 2: (-2,1), 3: (-2,2), 4: (-3,2), 5: (-3,1)
 G.set_node_positions(node_positions)
 
 
-frontiers = {1: 1, 2: 1}
+frontiers = {8: 1, 13: 1, 24: 1}
 G.set_frontiers(frontiers)
 
 #Set initial position of agents
-agent_positions = {0: 0, 1: 0, 2: 0}    #agent:position
+agent_positions = {0: 0, 1: 1, 2: 4, 3: 7, 4: 12, 5: 14, 6: 19, 7: 23}    #agent:position
 G.init_agents(agent_positions)
 
 #Plot Graph (saves image as graph.png)
@@ -58,7 +58,7 @@ G.plot_graph()
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 cp.graph = G                            #graph
-cp.T = 4                                #time
+cp.T = 12                                #time
 cp.master = 0                           #master_agent
 cp.static_agents = [0]                   #static agents
 
@@ -68,7 +68,7 @@ cp.snk = []
 
 
 #Solve
-cp.solve_flow(master = True, connectivity = False, optimal = True)
+cp.diameter_solve_flow(master = True, connectivity = False, optimal = True)
 
 #print(cp.solution['primal objective'])
 #print(cp.solution['x'][cp.get_e_idx(0,1,3)])
