@@ -360,6 +360,98 @@ class ClusterProblem(object):
                     if expand_node in self.free_nodes:
                         self.free_nodes.remove(expand_node)
 
+    def create_clusters_3(self):
+
+        # node clusters with agent positions
+        clusters = {c : set(self.graph.agents[r] for r in r_list)  
+                    for c, r_list in self.agent_clusters.items()}
+        agent_node_clusters = {c : [self.graph.agents[r] for r in r_list]  
+                               for c, r_list in self.agent_clusters.items()}
+
+        child_clusters = {c : [] for c in self.agent_clusters.keys()}
+        parent_clusters = {c : [] for c in self.agent_clusters.keys()}
+
+        # start with master cluster active 
+        active_clusters = [c for c, r_list in self.agent_clusters.items() 
+                           if self.master in r_list]
+
+        # nodes free to add to a subgraph
+        free_nodes = set(self.graph.nodes) \
+                     - set.union(*[set(v) for v in clusters.values()])
+
+        while len(free_nodes) > 0:
+
+            # make sure clusters are connected via transitions, if not split
+            for c, v_set in clusters.items():
+                c_subg = self.graph_tran.subgraph(v_set | free_nodes).to_undirected()
+                
+                comps = nx.connected_components(c_subg)
+                comp_dict = { i: [r for r in self.agent_clusters[c] 
+                                  if self.graph.agents[r] in comp] 
+                              for i, comp in enumerate(comps)}
+
+                comp_dict = {i:l for i,l in comp_dict.items() if len(l) > 0}
+
+                if len(comp_dict) > 1:
+                    # split and restart
+                    del self.agent_clusters[c]
+                    for i, r_list in comp_dict.items():
+                        self.agent_clusters["{}_{}".format(c, i+1)] = r_list
+                    return self.create_clusters_3()
+
+
+            # find neighbors as candidate new nodes
+            neighbors = [n for v in self.graph.nodes
+                         for n in nx.neighbors(self.graph_tran, v) 
+                         if n in free_nodes and v not in free_nodes]
+
+            # find closest neighbor to any cluster
+            new_cluster, new_node, min_dist = -1, -1, 99999
+            for c in active_clusters:
+                c_neighbors = set(n for v in clusters[c]
+                                  for n in nx.neighbors(self.graph_tran, v) 
+                                  if n not in clusters[c])
+
+                for n in neighbors:
+                    if n in c_neighbors:
+                        dist = nx.multi_source_dijkstra(self.graph_tran, 
+                                                   sources=agent_node_clusters[c], 
+                                                   target=n)[0] 
+                        if dist < min_dist:
+                            min_dist, new_node, new_cluster = dist, n, c
+
+            clusters[new_cluster].add(new_node)
+            free_nodes.remove(new_node)
+
+            cv_list = self.check(new_node, new_cluster, clusters, active_clusters)
+
+            while len(cv_list) > 0:
+                v0, c0, v1, c1 = cv_list.pop(0)
+                active_clusters.append(c1)
+
+                child_clusters[c0].append((c1, v1))
+                parent_clusters[c1].append((c0, v0))
+
+                cv_list += self.check(v1, c1, clusters, active_clusters)
+                
+        return clusters, child_clusters, parent_clusters
+
+
+    def check(self, new_node, new_cluster, clusters, active_clusters):
+
+        ret = []
+
+        # check if new node adjacent to non-active cluster
+        for c in clusters.keys():
+            if c not in active_clusters:
+
+                for v, edge in product(clusters[c], 
+                                       self.graph.out_edges(new_node, data=True)):
+                    if edge[1] == v:
+                        ret.append((new_node, new_cluster, v, c))
+                        break
+        return ret
+
     def create_submaster_subsinks_dictionary(self):
         self.submasters = {self.priority_list[0]: self.master}
         self.subsinks = {}
@@ -404,7 +496,7 @@ class ClusterProblem(object):
                 self.spectral_clustering()
 
                 #dictionary mapping cluster to nodes
-                self.create_clusters()
+                self.create_clusters_3()
                 '''
                 print(self.k)
                 print(self.graph.agents)
@@ -437,7 +529,11 @@ class ClusterProblem(object):
             self.spectral_clustering()
 
             #dictionary mapping cluster to nodes
-            self.create_clusters()
+            clusters, parents, children = self.create_clusters_3()
+
+            print(clusters)
+            print(parents)
+            print(children)
 
         #dictionary mapping cluster to submaster, subsinks
         self.create_submaster_subsinks_dictionary()
