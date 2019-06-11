@@ -70,6 +70,3 @@ print("Hier-Descend: {}".format(cp.hier_descend))
 
 cp.solve_to_base_problem()
 cp.animate_solution()
-
-for i in range(cp.T):
-    print(cp.trajectories[(1,i)])

@@ -43,8 +43,8 @@ class Graph(nx.MultiDiGraph):
                         graph_copy[n][nbr][edge]['style']='solid'
 
         #Change node label to agents in node
-        for n in graph_copy:
-            graph_copy.nodes[n]['label'] = " ".join(map(str,(graph_copy.nodes[n]['agents'])))
+        #for n in graph_copy:
+        #    graph_copy.nodes[n]['label'] = " ".join(map(str,(graph_copy.nodes[n]['agents'])))
 
 
         #Plot/save graph
