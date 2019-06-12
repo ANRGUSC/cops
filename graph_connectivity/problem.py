@@ -187,9 +187,8 @@ class ConnectivityProblem(object):
 
             # add user-defined rewards
             if self.reward_dict != None:
-                print(self.reward_dict)
                 for v, r in self.reward_dict.items():
-                    obj[self.get_y_idx(v)] -= r
+                    obj[self.get_y_idx(v)] = -r
 
             # add frontier rewards
             for v in self.graph.nodes:
@@ -211,7 +210,6 @@ class ConnectivityProblem(object):
 
             # add user-defined rewards
             if self.reward_dict != None:
-                print(self.reward_dict)
                 for v, r in self.reward_dict.items():
                     obj[self.get_y_idx(v)] -= r
 
@@ -393,8 +391,17 @@ class ConnectivityProblem(object):
 
     def diameter_solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True, frontier_reward = True):
 
-        T = nx.diameter(self.graph)
+        D = nx.diameter(self.graph)
+        Rp = len(set(v for r, v in self.graph.agents.items()))
+        V = self.graph.number_of_nodes()
+
+        T = int(max(D/2, D - Rp))
+
         feasible_solution = False
+
+        print("Solving flow with T={}, V={}, E={}, R={}".format(T, self.graph.number_of_nodes(), self.graph.number_of_edges(), len(self.graph.agents)))
+        print('Agent initial positions:', self.graph.agents)
+        print('Static Agents:', self.static_agents)
         while not feasible_solution:
             self.T = T
 

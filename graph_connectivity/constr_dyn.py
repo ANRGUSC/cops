@@ -47,7 +47,6 @@ def generate_initial_constraints(problem):
         b_init.append(1 if problem.graph.agents[r] == v else 0)
         constraint_idx += 1
     A_init = sp.coo_matrix((A_init_data, (A_init_row, A_init_col)), shape=(constraint_idx, problem.num_vars))
-    print("Constraint init: {}".format(A_init.shape[0]))
     return Constraint(A_eq=A_init, b_eq=b_init)
 
 #Powerset#################################################
@@ -146,7 +145,6 @@ def _dynamic_constraint_45(problem):
             A_eq_data.append(1)
         constraint_idx += 1
     A_eq_45 = sp.coo_matrix((A_eq_data, (A_eq_row, A_eq_col)), shape=(constraint_idx, problem.num_vars))
-    print("Constraint 45: {}".format(A_eq_45.shape[0]))
     return Constraint(A_eq=A_eq_45, b_eq=np.ones(constraint_idx))
 
 def _dynamic_constraint_46(problem):
@@ -155,7 +153,6 @@ def _dynamic_constraint_46(problem):
     A_eq_data = []
 
     constraint_idx = 0
-    print((problem.T, len(problem.graph.nodes), len(problem.graph.agents)))
     for t, v, r in product(range(problem.T), problem.graph.nodes, problem.graph.agents):
         A_eq_row.append(constraint_idx)
         A_eq_col.append(problem.get_z_idx(r, v, t+1))
@@ -166,7 +163,6 @@ def _dynamic_constraint_46(problem):
             A_eq_data.append(-1)
         constraint_idx += 1
     A_eq_46 = sp.coo_matrix((A_eq_data, (A_eq_row, A_eq_col)), shape=(constraint_idx, problem.num_vars))
-    print("Constraint 46: {}".format(A_eq_46.shape[0]))
     return Constraint(A_eq=A_eq_46, b_eq=np.zeros(constraint_idx))
 
 def _dynamic_constraint_47(problem):
@@ -185,7 +181,6 @@ def _dynamic_constraint_47(problem):
             A_eq_data.append(-1)
         constraint_idx += 1
     A_eq_47 = sp.coo_matrix((A_eq_data, (A_eq_row, A_eq_col)), shape=(constraint_idx, problem.num_vars))
-    print("Constraint 47: {}".format(A_eq_47.shape[0]))
     return Constraint(A_eq=A_eq_47, b_eq=np.zeros(constraint_idx))
 
 #Features#################################################
@@ -217,5 +212,4 @@ def _dynamic_constraint_static(problem):
             b_stat.append(1)
             constraint_idx += 1
     A_stat = sp.coo_matrix((A_stat_data, (A_stat_row, A_stat_col)), shape=(constraint_idx, problem.num_vars))#.toarray(
-    print("Constraint static: {}".format(A_stat.shape[0]))
     return Constraint(A_eq=A_stat, b_eq=b_stat)

@@ -270,8 +270,6 @@ def animate_cluster_problem_sequence(graph, problem_list, ANIM_STEP=30, filename
                 break
         i = time_idx - start_time * ANIM_STEP
         t = int(i / ANIM_STEP)
-        print(problem)
-        print(t)
         anim_idx = i % ANIM_STEP
         alpha = anim_idx / ANIM_STEP
 
@@ -291,7 +289,6 @@ def animate_cluster_problem_sequence(graph, problem_list, ANIM_STEP=30, filename
             else:
                 reward_nodes = []
 
-            print(problem.agent_clusters)
             for i, n in enumerate(graph.nodes):
                 if n in problem.graph.nodes:
                     for j, c in enumerate(problem.subgraphs):
