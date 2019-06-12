@@ -117,6 +117,20 @@ class Graph(nx.MultiDiGraph):
             if data['type'] == 'transition':
                 yield (i,j)
 
+    def number_of_conn_edges(self, node_list=None):
+        '''return number of connectivity edges in subgraph induced by node_list'''
+        if node_list is None:
+            return sum(1 for e1, e2 in self.conn_edges())
+        return sum(1 for e1, e2 in self.conn_edges() 
+                   if e1 in set(node_list) and e2 in set(node_list))
+
+    def number_of_tran_edges(self, node_list=None):
+        '''return number of transition edges in subgraph induced by node_list'''
+        if node_list is None:
+            return sum(1 for e1, e2 in self.tran_edges())        
+        return sum(1 for e1, e2 in self.tran_edges() 
+                   if e1 in set(node_list) and e2 in set(node_list))
+
     def conn_in_edges(self, k):
         for (i, j, data) in self.in_edges(k, data=True):
             if data['type'] == 'connectivity':
@@ -136,6 +150,40 @@ class Graph(nx.MultiDiGraph):
         for (i, j, data) in self.out_edges(k, data=True):
             if data['type'] == 'transition':
                 yield (i,j)
+
+    def has_tran_edge(self, n0, n1):
+        '''check if transition edge exists from n0 to n1''' 
+        if (self.has_edge(n0, n1)):
+            return any(data['type'] == 'transition' 
+                       for data in self.get_edge_data(n0, n1).values())
+        return False
+
+    def has_conn_edge(self, n0, n1):
+        '''check if connectivity edge exists from n0 to n1'''         
+        if (self.has_edge(n0, n1)):
+            return any(data['type'] == 'connectivity' 
+                       for data in self.get_edge_data(n0, n1).values())
+        return False
+
+    def post_tran(self, S):
+        '''return outgoing transition neighbors from S'''
+        return set(v for vs in S for v in self.successors(vs) 
+                   if self.has_tran_edge(vs, v))
+
+    def pre_tran(self, S):
+        '''return incoming transition neighbors from S'''
+        return set(v for vs in S for v in self.predecessors(vs)
+                   if self.has_tran_edge(v, vs))
+
+    def post_conn(self, S):
+        '''return outgoing transition neighbors from S'''
+        return set(v for vs in S for v in self.successors(vs) 
+                   if self.has_conn_edge(vs, v))
+
+    def pre_conn(self, S):
+        '''return incoming transition neighbors from S'''
+        return set(v for vs in S for v in self.predecessors(vs)
+                   if self.has_conn_edge(v, vs))
 
     def init_agents(self, agent_dictionary):
 
@@ -169,7 +217,7 @@ class Graph(nx.MultiDiGraph):
                 adj[edge[0]][edge[1]] = 1
         return adj
 
-    def get_pre_S_transition(self, S_v_t):
+    def pre_tran_vt(self, S_v_t):
         pre_S = set()
         for v, t in S_v_t:
             if t > 0:
@@ -178,7 +226,7 @@ class Graph(nx.MultiDiGraph):
                         pre_S.add((edge[0], edge[1], t - 1))
         return pre_S
 
-    def get_pre_S_connectivity(self, S_v_t):
+    def pre_conn_vt(self, S_v_t):
         pre_S = set()
         for v, t in S_v_t:
             for edge in self.conn_in_edges(v):

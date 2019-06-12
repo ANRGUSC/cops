@@ -1,4 +1,5 @@
 from graph_connectivity.problem import *
+from graph_connectivity.problem_animate import *
 
 n = 7  # size of graph
 
@@ -22,7 +23,7 @@ cp.src = [1]
 sol = cp.solve_adaptive()
 
 #Plot Graph (saves image as graph.png)
-cp.plot_solution()
+plot_solution(cp)
 
 #Animate solution
-cp.animate_solution()
+animate_solution(cp)

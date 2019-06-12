@@ -1,4 +1,5 @@
 from graph_connectivity.clustering import *
+from graph_connectivity.clustering_animate import *
 
 
 # Define a connectivity graph
@@ -54,7 +55,7 @@ G.plot_graph()
 k = 4
 cp = ClusterProblem()
 cp.graph = G
-#cp.k = k #uncomment for automatic choice of number of clusters
+cp.k = k #uncomment for automatic choice of number of clusters
 cp.master = master
 cp.static_agents = static_agents
 cp.create_subgraphs()
@@ -69,4 +70,4 @@ print("Hier-Descend: {}".format(cp.hier_descend))
 '''
 
 cp.solve_to_base_problem()
-cp.animate_solution()
+animate_solution(cp)
