@@ -2,11 +2,10 @@ import networkx as nx
 from networkx.algorithms.community.asyn_fluid import asyn_fluidc
 from networkx.algorithms.centrality import betweenness_centrality
 import time
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 from copy import deepcopy
 from itertools import product
 from sklearn.cluster import SpectralClustering
+from colorama import Fore, Style
 
 from graph_connectivity.problem import *
 
@@ -79,29 +78,34 @@ class ClusterProblem(object):
 
     #===CLUSTER FUNCTIONS=======================================================
 
-    def problem_size(self):
+    def problem_size(self, verbose=False):
 
         cluster_size = {}
         for c in self.subgraphs:
 
+            # number of robots
             R  = len(set(self.agent_clusters[c]) - set(self.static_agents))
+            # number of nodes
             V = len(self.subgraphs[c])
-            Rp = dynamic_agent_nodes = len(set(v for r, v in self.graph.agents.items()
-                                               if r in self.agent_clusters[c]))
-
-            g = deepcopy(self.graph)
-            nodes_not_in_subset = [v for v in self.graph.nodes if v not in self.subgraphs[c]]
-            g.remove_nodes_from(nodes_not_in_subset)
-
-            E = g.number_of_edges()/2
-            D = nx.diameter(g)
+            # number of occupied nodes
+            Rp = len(set(v for r, v in self.graph.agents.items()
+                         if r in self.agent_clusters[c]))
+            # number of transition edges
+            Et = self.graph.number_of_tran_edges(self.subgraphs[c])
+            # number of connectivity edges
+            Ec = self.graph.number_of_conn_edges(self.subgraphs[c])            
+            # graph diameter
+            D = nx.diameter(nx.subgraph(self.graph, self.subgraphs[c]))
 
             T = int(max(D/2, D - Rp))
 
-            size4 = R * E * T
-            print("Calculating size with R={}, E={}, D={}, Rp={}, size={}".format(R, E, D, Rp, size4 ))
+            size = R * Et * T
 
-            cluster_size[c] = size4
+            if verbose:
+                print("{} size={} [R={}, V={}, Et={}, Ec={}, D={}, Rp={}]"\
+                      .format(c, size, R, V, Et, Ec, D, Rp))
+
+            cluster_size[c] = size
 
         return cluster_size
 
@@ -139,12 +143,21 @@ class ClusterProblem(object):
                             added = True
 
     def create_clusters(self):
+        '''
+        Requires: self.graph
+                  self.agent_clusters { 'c' : [r0, r1] ...}
+                  self.master
+
+        Produces: clusters, child_clusters, parent_clusters
+
+        '''
+
+        if self.graph_tran is None:
+            self.create_graph_tran()
 
         # node clusters with agent positions
         clusters = {c : set(self.graph.agents[r] for r in r_list)
                     for c, r_list in self.agent_clusters.items()}
-        agent_node_clusters = {c : [self.graph.agents[r] for r in r_list]
-                               for c, r_list in self.agent_clusters.items()}
 
         child_clusters = {c : [] for c in self.agent_clusters.keys()}
         parent_clusters = {c : [] for c in self.agent_clusters.keys()}
@@ -153,26 +166,25 @@ class ClusterProblem(object):
         active_clusters = [c for c, r_list in self.agent_clusters.items()
                            if self.master in r_list]
 
-        # check if master cluster can activate other clusters straight away
-        master_cluster_nodes = []
-        for c, r_list in self.agent_clusters.items():
-            if self.master in r_list:
-                for r in r_list:
-                    master_cluster_nodes.append(self.graph.agents[r])
-        for v in master_cluster_nodes:
-            cv_list = self.check(v, active_clusters[0], clusters, active_clusters)
-            while len(cv_list) > 0:
-                v0, c0, v1, c1 = cv_list.pop(0)
-                active_clusters.append(c1)
-                child_clusters[c0].append((c1, v1))
-                parent_clusters[c1].append((c0, v0))
-                cv_list += self.check(v1, c1, clusters, active_clusters)
+        while True:
 
-        # nodes free to add to a subgraph
-        free_nodes = set(self.graph.nodes) \
-                     - set.union(*[set(v) for v in clusters.values()])
+            # check if active cluster can activate other clusters directly
+            found_new = True
+            while (found_new):
+                found_new = False
+                for c0, c1 in product(active_clusters, clusters.keys()):
+                    if c0 == c1 or c1 in active_clusters:
+                        continue
+                    for v0, v1 in product(clusters[c0], clusters[c1]):
+                        if self.graph.has_conn_edge(v0, v1):
+                            active_clusters.append(c1)
+                            child_clusters[c0].append((c1, v1))
+                            parent_clusters[c1].append((c0, v0))
+                            found_new = True
 
-        while len(free_nodes) > 0:
+            # all active nodes
+            active_nodes = set.union(*[clusters[c] for c in active_clusters])
+            free_nodes = set(self.graph.nodes) - set.union(*clusters.values())
 
             # make sure clusters are connected via transitions, if not split
             for c, v_set in clusters.items():
@@ -192,81 +204,33 @@ class ClusterProblem(object):
                         self.agent_clusters["{}_{}".format(c, i+1)] = r_list
                     return self.create_clusters()
 
-            active_nodes = []
-            for c in active_clusters:
-                for v in clusters[c]:
-                    active_nodes.append(v)
-            # find neighbors as candidate new nodes
-            neighbors = set(n for v in self.graph.nodes
-                         for n in nx.neighbors(self.graph_tran, v)
-                         if n in free_nodes and v in active_nodes)
+            # find closest neighbor and activate it
+            neighbors = self.graph.post_tran(active_nodes) - active_nodes
 
-            # find closest neighbor to any cluster
+            if (len(neighbors) == 0):
+                break  # nothing more to do
+
             new_cluster, new_node, min_dist = -1, -1, 99999
             for c in active_clusters:
-                c_neighbors = set(n for v in clusters[c]
-                                  for n in nx.neighbors(self.graph_tran, v)
-                                  if n not in clusters[c])
+                c_neighbors = self.graph.post_tran(clusters[c])
 
-                for n in neighbors:
-                    if n in c_neighbors:
-                        dist = nx.multi_source_dijkstra(self.graph_tran,
-                                                   sources=agent_node_clusters[c],
-                                                   target=n)[0]
-                        if dist < min_dist:
-                            min_dist, new_node, new_cluster = dist, n, c
+                agent_positions = [self.graph.agents[r] for r in self.agent_clusters[c]]
+
+                for n in neighbors & c_neighbors:
+
+                    dist = nx.multi_source_dijkstra(self.graph_tran,
+                                                    sources=agent_positions,
+                                                    target=n)[0]
+                    if dist < min_dist:
+                        min_dist, new_node, new_cluster = dist, n, c
 
             clusters[new_cluster].add(new_node)
-            free_nodes.remove(new_node)
-
-            cv_list = self.check(new_node, new_cluster, clusters, active_clusters)
-
-            while len(cv_list) > 0:
-                v0, c0, v1, c1 = cv_list.pop(0)
-                active_clusters.append(c1)
-
-                child_clusters[c0].append((c1, v1))
-                parent_clusters[c1].append((c0, v0))
-
-
-                cv_list += self.check(v1, c1, clusters, active_clusters)
-
-
-            # check if active cluster can activate other clusters directly
-            for c in active_clusters:
-                cluster_nodes = []
-                for v in clusters[c]:
-                    cluster_nodes.append(v)
-                for v in cluster_nodes:
-                    cv_list = self.check(v, c, clusters, active_clusters)
-                    while len(cv_list) > 0:
-                        v0, c0, v1, c1 = cv_list.pop(0)
-                        active_clusters.append(c1)
-                        child_clusters[c0].append((c1, v1))
-                        parent_clusters[c1].append((c0, v0))
-                        cv_list += self.check(v1, c1, clusters, active_clusters)
-
 
         return clusters, child_clusters, parent_clusters
 
-    def check(self, new_node, new_cluster, clusters, active_clusters):
-
-        ret = []
-
-        # check if new node adjacent to non-active cluster
-        for c in clusters.keys():
-            if c not in active_clusters:
-
-                for v, edge in product(clusters[c],
-                                       self.graph.out_edges(new_node, data=True)):
-                    if edge[1] == v:
-                        ret.append((new_node, new_cluster, v, c))
-                        break
-        return ret
-
     def create_sub_dict(self):
 
-        # create dictionaries mappeing clusters to sub-master/sub-sinks
+        # create dictionaries mapping clusters to sub-master/sub-sinks
         self.subsinks = {}
         for c in self.subgraphs:
             self.subsinks[c] = []
@@ -287,9 +251,8 @@ class ClusterProblem(object):
         self.subsinks = {c : [r for r in self.subsinks[c]] for c in self.subsinks
                         if len(self.subsinks[c])>0}
 
-    def create_subgraphs(self):
+    def create_subgraphs(self, verbose=False):
 
-        print("Entering create_subgraphs")
         small_problem_size = False
 
         # create transition-only graph
@@ -302,16 +265,13 @@ class ClusterProblem(object):
             self.agent_clusters = {'cluster0': [r for r in self.graph.agents]}
             self.subgraphs, self.child_clusters, self.parent_clusters = self.create_clusters()
             self.create_sub_dict()
-
             small_problem_size = max(self.problem_size().values()) < self.max_problem_size
-
-            print("Initial problem size is {}".format(self.problem_size()))
 
             # Strategy 1: cluster
             while not small_problem_size and len(dynamic_agent_graph) > 1:
                 self.k += 1
 
-                print('Solving create_subgraphs for k={}'.format(self.k))
+                print('Strategy 1: clustering with k={}'.format(self.k))
                 #detect agent clusters
                 self.spectral_clustering(dynamic_agent_graph)
                 #dictionary mapping cluster to nodes
@@ -319,11 +279,12 @@ class ClusterProblem(object):
                 #dictionary mapping cluster to submaster, subsinks
                 self.create_sub_dict()
 
-                small_problem_size = max(self.problem_size().values()) < self.max_problem_size
+                small_problem_size = max(self.problem_size(verbose=verbose).values()) < self.max_problem_size
 
             # Strategy 2: deactivate agents problem
             while not small_problem_size:
-                print("Trying strategy 2: Making robots static")
+                print("Strategy 2: Make robot static")
+
                 #find agent populated nodes and corresponding agents
                 cluster_size = self.problem_size()
                 for c, val in cluster_size.items():
@@ -338,13 +299,12 @@ class ClusterProblem(object):
                                 self.static_agents.append(r)
                                 break
 
-                print('static_agents:', self.static_agents)
-                small_problem_size = max(self.problem_size().values()) < self.max_problem_size
+                small_problem_size = max(self.problem_size(verbose=verbose).values()) < self.max_problem_size
 
             print("Finished create_subgraphs with clusters", self.subgraphs, "and agent clusters", self.agent_clusters)
         else:
             #detect agent clusters
-            self.spectral_clustering()
+            self.spectral_clustering(dynamic_agent_graph)
 
             #dictionary mapping cluster to nodes
             self.subgraphs, self.child_clusters, self.parent_clusters = self.create_clusters()
@@ -579,9 +539,9 @@ class ClusterProblem(object):
             if (r,t) not in self.trajectories:
                 self.trajectories[(r,t)] = self.trajectories[(r,t-1)]
 
-    def solve_to_frontier_problem(self):
+    def solve_to_frontier_problem(self, verbose=False):
 
-        self.create_subgraphs()
+        self.create_subgraphs(verbose=verbose)
 
         active_subgraphs = self.active_clusters()
 
@@ -629,14 +589,15 @@ class ClusterProblem(object):
             #Sinks are submaster in active higger ranked subgraphs
             cp.snk = sinks
 
-            cp.diameter_solve_flow(master = True, connectivity = True, optimal = True)
+            cp.diameter_solve_flow(master = True, connectivity = True, 
+                                   optimal = True, verbose = verbose)
             self.problems[c] = cp
 
         self.augment_solutions()
 
-    def solve_to_base_problem(self):
+    def solve_to_base_problem(self, verbose=False):
 
-        self.create_subgraphs()
+        self.create_subgraphs(verbose=verbose)
 
         active_subgraphs = self.active_clusters()
 
@@ -688,113 +649,10 @@ class ClusterProblem(object):
             #Submaster is sink
             cp.snk = [self.submasters[c]]
 
-            cp.diameter_solve_flow(master = False, connectivity = True, optimal = True, frontier_reward = False)
+            cp.diameter_solve_flow(master = False, connectivity = True, 
+                                   optimal = True, frontier_reward = False,
+                                   verbose = verbose)
             self.problems[c] = cp
 
 
         self.augment_solutions_reversed()
-
-    #===ANIMATE=====================================================================
-
-    def animate_solution(self, ANIM_STEP=30, filename='animation.mp4', labels=False):
-
-        # Initiate plot
-        fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-        ax.axis('off')
-
-        #Setup position dictionary for node positions
-        dict_pos = {n: (self.graph.nodes[n]['x'], self.graph.nodes[n]['y']) for n in self.graph}
-
-        # Build dictionary robot,time -> position
-        traj_x = {(r,t): np.array([self.graph.nodes[v]['x'], self.graph.nodes[v]['y']])
-                  for (r,t), v in self.trajectories.items()}
-
-        # FIXED STUFF
-        cluster_colors = plt.cm.gist_rainbow(np.linspace(0, 1, len(self.subgraphs)))
-        cluster_color_dict = {c : cluster_colors[i] for i, c in enumerate(self.subgraphs)}
-
-        frontier_colors = {}
-        if 'frontiers' in self.graph.nodes[0]:
-            frontiers = [v for v in self.graph if self.graph.nodes[v]['frontiers'] != 0]
-            for v in frontiers:
-                for c in self.subgraphs:
-                    if v in self.subgraphs[c]:
-                        frontier_colors[v] = cluster_color_dict[c]
-            fcolors = []
-            for v in frontiers:
-                fcolors.append(frontier_colors[v])
-        else:
-            frontiers = []
-        nx.draw_networkx_nodes(self.graph, dict_pos, ax=ax, nodelist = frontiers,
-                               node_shape = "D", node_color = fcolors, edgecolors='black',
-                               linewidths=1.0, alpha=0.5)
-
-        nodes = []
-        node_colors = {}
-        for c in self.subgraphs:
-            for v in self.subgraphs[c]:
-                if v not in frontiers:
-                    nodes.append(v)
-                    node_colors[v] = cluster_color_dict[c]
-        colors = []
-        for v in nodes:
-            colors.append(node_colors[v])
-
-        nx.draw_networkx_nodes(self.graph, dict_pos, ax=ax, nodelist = nodes,
-                               node_color=colors, edgecolors='black', linewidths=1.0, alpha=0.5)
-        nx.draw_networkx_edges(self.graph, dict_pos, ax=ax, edgelist=list(self.graph.tran_edges()),
-                               connectionstyle='arc', edge_color='black')
-
-        if labels:
-            nx.draw_networkx_labels(self.graph, dict_pos)
-
-        # VARIABLE STUFF
-        # connectivity edges
-        coll_cedge = nx.draw_networkx_edges(self.graph, dict_pos, ax=ax, edgelist=list(self.graph.conn_edges()),
-                                            edge_color='black')
-        if coll_cedge is not None:
-            for cedge in coll_cedge:
-                cedge.set_connectionstyle("arc3,rad=0.25")
-                cedge.set_linestyle('dashed')
-
-        # robot nodes
-        pos = np.array([traj_x[(r, 0)] for r in self.graph.agents])
-        colors = plt.cm.rainbow(np.linspace(0, 1, len(self.graph.agents)))
-        coll_rpos = ax.scatter(pos[:,0], pos[:,1], s=140, marker='o',
-                               c=colors, zorder=5, alpha=0.7,
-                               linewidths=2, edgecolors='black')
-
-        # robot labels
-        coll_text = [ax.text(pos[i,0], pos[i,1], str(r),
-                             horizontalalignment='center',
-                             verticalalignment='center',
-                             zorder=10, size=8, color='k',
-                             family='sans-serif', weight='bold', alpha=1.0)
-                     for i, r in enumerate(self.graph.agents)]
-
-        def animate(i):
-            t = int(i / ANIM_STEP)
-            anim_idx = i % ANIM_STEP
-            alpha = anim_idx / ANIM_STEP
-
-            # Update connectivity edge colors if there is flow information
-            for i, (v1, v2) in enumerate(self.graph.conn_edges()):
-                coll_cedge[i].set_color('black')
-                col_list = [colors[b_r] for b, b_r in enumerate(self.graph.agents)
-                            if (b_r, v1, v2, t) in self.conn]
-                if len(col_list):
-                    coll_cedge[i].set_color(col_list[int(10 * alpha) % len(col_list)])
-
-            # Update robot node and label positions
-            pos = (1-alpha) * np.array([traj_x[(r, min(self.T, t))] for r in self.graph.agents]) \
-                  + alpha * np.array([traj_x[(r, min(self.T, t+1))] for r in self.graph.agents])
-
-            coll_rpos.set_offsets(pos)
-            for i in range(len(self.graph.agents)):
-                coll_text[i].set_x(pos[i, 0])
-                coll_text[i].set_y(pos[i, 1])
-
-        ani = animation.FuncAnimation(fig, animate, range((self.T+2) * ANIM_STEP), blit=False)
-
-        writer = animation.writers['ffmpeg'](fps = 0.5*ANIM_STEP)
-        ani.save(filename, writer=writer,dpi=100)

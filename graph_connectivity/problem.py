@@ -5,6 +5,8 @@ import numpy as np
 import networkx as nx
 import scipy.sparse as sp
 
+from colorama import Fore, Style
+
 from graph_connectivity.optimization_wrappers import solve_ilp, Constraint
 from graph_connectivity.graph import Graph
 
@@ -12,11 +14,8 @@ from graph_connectivity.constr_dyn import *
 from graph_connectivity.constr_flow import *
 from graph_connectivity.constr_powerset import *
 
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 
 from itertools import chain, combinations, product
-from networkx.drawing.nx_agraph import to_agraph
 
 @dataclass
 class Variable(object):
@@ -341,7 +340,9 @@ class ConnectivityProblem(object):
             valid_solution, add_S = self.test_solution()
             self.constraint &= generate_connectivity_constraint(self, range(self.num_src), add_S)
 
-    def solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True, frontier_reward = True):
+    def solve_flow(self, master = False, connectivity = True, optimal = False, 
+                   solver=None, output=False, integer=True, 
+                   frontier_reward = True, verbose=False):
 
         self.prepare_problem()
 
@@ -385,11 +386,15 @@ class ConnectivityProblem(object):
         # Flow objective
         self.obj = self.generate_flow_objective(optimal, frontier_reward)
 
-        print("Constraints setup time {:.2f}s".format(time.time() - t0))
+        if verbose:
+            print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
-        self._solve(solver=None, output=False, integer=True)
+        self._solve(solver=None, output=False, integer=True, verbose=verbose)
 
-    def diameter_solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True, frontier_reward = True):
+    def diameter_solve_flow(self, master = False, connectivity = True, 
+                            optimal = False, solver=None, output=False, 
+                            integer=True, frontier_reward = True,
+                            verbose=False):
 
         D = nx.diameter(self.graph)
         Rp = len(set(v for r, v in self.graph.agents.items()))
@@ -399,14 +404,26 @@ class ConnectivityProblem(object):
 
         feasible_solution = False
 
-        print("Solving flow with T={}, V={}, E={}, R={}".format(T, self.graph.number_of_nodes(), self.graph.number_of_edges(), len(self.graph.agents)))
-        print('Agent initial positions:', self.graph.agents)
-        print('Static Agents:', self.static_agents)
+        if verbose:
+            print(Fore.GREEN + "Solving flow [R={}, V={}, Et={}, Ec={}, static={}]"
+                  .format(len(self.graph.agents), 
+                          self.graph.number_of_nodes(),
+                          self.graph.number_of_tran_edges(),
+                          self.graph.number_of_conn_edges(),                          
+                          self.static_agents) 
+                  + Style.RESET_ALL )
+
         while not feasible_solution:
             self.T = T
 
+            if verbose:
+                print("Trying" + Style.BRIGHT + " T={}".format(self.T) 
+                      + Style.RESET_ALL)
+
             #Solve
-            self.solve_flow(master, connectivity, optimal, solver, output, integer, frontier_reward)
+            self.solve_flow(master, connectivity, optimal, solver, 
+                            output, integer, frontier_reward,
+                            verbose=verbose)
 
             if self.solution['status'] is not 'infeasible':
                 feasible_solution = True
@@ -431,7 +448,7 @@ class ConnectivityProblem(object):
 
             T += 1
 
-    def _solve(self, solver=None, output=False, integer=True):
+    def _solve(self, solver=None, output=False, integer=True, verbose=False):
 
         obj = self.obj
 
@@ -440,18 +457,24 @@ class ConnectivityProblem(object):
         J_bin = sum([list(range(var.start, var.start + var.size))
                     for var in self.vars.values() if var.binary], [])
 
-        print("Number of variables: {} ({} bin, {} int)".format(self.num_vars, len(J_bin), len(J_int)))
-        print("Number of constraints: {}".format(self.constraint.A_eq.shape[0]+self.constraint.A_iq.shape[0]))
+        if verbose:
+            print("NumConst: {} ({} bin, {} int), NumVar: {}"
+                  .format(self.num_vars, len(J_bin), len(J_int),
+                         self.constraint.A_eq.shape[0]+self.constraint.A_iq.shape[0])
+                  )
 
         # Solve it
         t0 = time.time()
         self.solution = solve_ilp(obj, self.constraint, J_int, J_bin, solver, output)
-        print("Solver time {:.2f}s".format(time.time() - t0))
+        
+        if verbose:
+            print("Solver time {:.2f}s".format(time.time() - t0))
 
         self.trajectories = {}
 
         if self.solution['status'] == 'infeasible':
-            print("Problem infeasible")
+            if verbose:
+                print("Problem infeasible")
         else:
             for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T+1)):
                 if self.solution['x'][self.get_z_idx(r, v, t)] > 0.5:
@@ -489,9 +512,9 @@ class ConnectivityProblem(object):
             # Backwards reachability
             idx = 0
             while idx < len(S):
-                pre_S_transition = self.graph.get_pre_S_transition([S[idx]])
-                pre_S_connectivity = self.graph.get_pre_S_connectivity([S[idx]])
-                for v0, v1, t in pre_S_transition:
+                pre_Svt_transition = self.graph.pre_tran_vt([S[idx]])
+                pre_Svt_connectivity = self.graph.pre_conn_vt([S[idx]])
+                for v0, v1, t in pre_Svt_transition:
                     occupied = False
                     for robot in self.graph.agents:
                         z_idx = self.get_z_idx(robot, v0, t)
@@ -499,7 +522,7 @@ class ConnectivityProblem(object):
                             occupied = True
                     if occupied == True and (v0, t) not in S:
                         S.append((v0, t))
-                for v0, v1, t in pre_S_connectivity:
+                for v0, v1, t in pre_Svt_connectivity:
                     occupied = False
                     for robot in self.graph.agents:
                         z_idx = self.get_z_idx(robot, v0, t)
@@ -524,199 +547,3 @@ class ConnectivityProblem(object):
         else:
             return True, add_S
 
-    ##VISUALIZATION FUNCTIONS##
-
-    def plot_solution(self):
-        if self.solution is None:
-            print("No solution found: call solve() to obtain solution")
-        else:
-            g = self.graph
-            #create time-augmented graph G
-            G = Graph()
-            #space between timesteps
-            space = 2
-
-            #loop of graph and add nodes to time-augmented graph
-            for t in range(self.T+1):
-                for n in g.nodes:
-                    id = self.get_time_augmented_id(n, t)
-                    G.add_node(id)
-                    G.nodes[id]['x'] = g.nodes[n]['x'] + space*t
-                    G.nodes[id]['y'] = g.nodes[n]['y']
-                    G.nodes[id]['agents'] = []
-
-            #loop of graph and add edges to time-augmented graph
-            i = 0
-            for n in g.nodes:
-                for t in range(self.T+1):
-                    for edge in g.out_edges(n, data = True):
-                        if edge[2]['type'] == 'transition' and t < self.T:
-                            out_id = self.get_time_augmented_id(n, t)
-                            in_id = self.get_time_augmented_id(edge[1], t+1)
-                            G.add_edge(out_id , in_id, type='transition')
-                        elif edge[2]['type'] == 'connectivity':
-                            out_id = self.get_time_augmented_id(n, t)
-                            in_id = self.get_time_augmented_id(edge[1], t)
-                            G.add_edge(out_id , in_id, type='connectivity')
-
-
-            #set 'pos' attribute for accurate position in plot (use ! in end for accurate positioning)
-            for n in G:
-                G.nodes[n]['pos'] =  ",".join(map(str,[G.nodes[n]['x'],G.nodes[n]['y']])) + '!'
-
-            #Set general edge-attributes
-            G.graph['edge'] = {'arrowsize': '0.6', 'splines': 'curved'}
-
-            #Set individual attributes based on solution
-            for (r,t), v in self.trajectories.items():
-                G.nodes[self.get_time_augmented_id(v, t)]['agents'].append(r)
-
-            for v in G.nodes:
-                G.nodes[v]['number_of_agents'] = len(G.nodes[v]['agents'])
-                G.nodes[v]['label'] = " ".join(map(str,(G.nodes[v]['agents'])))
-
-            for n in G:
-                if G.nodes[n]['number_of_agents']!=0:
-                    G.nodes[n]['color'] = 'black'
-                    G.nodes[n]['fillcolor'] = 'red'
-                    G.nodes[n]['style'] = 'filled'
-                else:
-                    G.nodes[n]['color'] = 'black'
-                    G.nodes[n]['fillcolor'] = 'white'
-                    G.nodes[n]['style'] = 'filled'
-                for nbr in G[n]:
-                    for edge in G[n][nbr]:
-                        if G[n][nbr][edge]['type']=='connectivity':
-                            if len(G.nodes[n]['agents']) != 0 and len(G.nodes[nbr]['agents'])!= 0:
-                                G[n][nbr][edge]['color']='black'
-                                G[n][nbr][edge]['style']='dashed'
-                            else:
-                                G[n][nbr][edge]['color']='grey'
-                                G[n][nbr][edge]['style']='dashed'
-                        else:
-                            G[n][nbr][edge]['color']='grey'
-                            G[n][nbr][edge]['style']='solid'
-            for n in G:
-                for nbr in G[n]:
-                    for edge in G[n][nbr]:
-                        if G[n][nbr][edge]['type']=='transition':
-                            for a in G.nodes[n]['agents']:
-                                if a in G.nodes[nbr]['agents']:
-                                    G[n][nbr][edge]['color']='black'
-                                    G[n][nbr][edge]['style']='solid'
-
-
-            #Plot/save graph
-            A = to_agraph(G)
-            A.layout()
-            A.draw('solution.png')
-
-    def animate_solution(self, full_graph = None, ANIM_STEP=30, filename='animation.mp4', labels=False):
-
-        # Initiate plot
-        fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-        ax.axis('off')
-
-        #if we have full graph, plot it in background
-        if full_graph:
-                #Setup position dictionary for node positions
-                dict_pos = {n: (full_graph.nodes[n]['x'], full_graph.nodes[n]['y']) for n in full_graph}
-
-                # FIXED STUFF
-                nx.draw_networkx_nodes(full_graph, dict_pos, ax=ax,
-                                       node_color='white', edgecolors='grey', linewidths=1.0)
-                nx.draw_networkx_edges(full_graph, dict_pos, ax=ax, edgelist=list(full_graph.tran_edges()),
-                                       connectionstyle='arc', edge_color='grey')
-
-                if labels:
-                    nx.draw_networkx_labels(full_graph, dict_pos, font_color='grey')
-
-                # VARIABLE STUFF
-                # connectivity edges
-                coll_cedge = nx.draw_networkx_edges(full_graph, dict_pos, ax=ax, edgelist=list(full_graph.conn_edges()),
-                                                    edge_color='grey')
-                if coll_cedge is not None:
-                    for cedge in coll_cedge:
-                        cedge.set_connectionstyle("arc3,rad=0.25")
-                        cedge.set_linestyle('dashed')
-
-        #Plot IRM
-
-        #Setup position dictionary for node positions
-        dict_pos = {n: (self.graph.nodes[n]['x'], self.graph.nodes[n]['y']) for n in self.graph}
-
-        # Build dictionary robot,time -> position
-        traj_x = {(r,t): np.array([self.graph.nodes[v]['x'], self.graph.nodes[v]['y']])
-                  for (r,t), v in self.trajectories.items()}
-
-        # FIXED STUFF
-        nx.draw_networkx_nodes(self.graph, dict_pos, ax=ax,
-                               node_color='white', edgecolors='black', linewidths=1.0)
-        nx.draw_networkx_edges(self.graph, dict_pos, ax=ax, edgelist=list(self.graph.tran_edges()),
-                               connectionstyle='arc', edge_color='black')
-
-        if 'frontiers' in self.graph.nodes[0]:
-            frontiers = [v for v in self.graph if self.graph.nodes[v]['frontiers'] != 0]
-        else:
-            frontiers = []
-        if self.reward_dict != None:
-            reward_nodes = [v for v in self.reward_dict]
-        else:
-            reward_nodes = []
-        nx.draw_networkx_nodes(self.graph, dict_pos, ax=ax, nodelist = list(set(frontiers) | set(reward_nodes)),
-                               node_color='green', edgecolors='black', linewidths=1.0)
-
-        if labels:
-            nx.draw_networkx_labels(self.graph, dict_pos)
-
-        # VARIABLE STUFF
-        # connectivity edges
-        coll_cedge = nx.draw_networkx_edges(self.graph, dict_pos, ax=ax, edgelist=list(self.graph.conn_edges()),
-                                            edge_color='black')
-        if coll_cedge is not None:
-            for cedge in coll_cedge:
-                cedge.set_connectionstyle("arc3,rad=0.25")
-                cedge.set_linestyle('dashed')
-
-        # robot nodes
-        pos = np.array([traj_x[(r, 0)] for r in self.graph.agents])
-        colors = plt.cm.rainbow(np.linspace(0, 1, len(self.graph.agents)))
-        coll_rpos = ax.scatter(pos[:,0], pos[:,1], s=140, marker='o',
-                               c=colors, zorder=5, alpha=0.7,
-                               linewidths=2, edgecolors='black')
-
-        # robot labels
-        coll_text = [ax.text(pos[i,0], pos[i,1], str(r),
-                             horizontalalignment='center',
-                             verticalalignment='center',
-                             zorder=10, size=8, color='k',
-                             family='sans-serif', weight='bold', alpha=1.0)
-                     for i, r in enumerate(self.graph.agents)]
-
-        def animate(i):
-            t = int(i / ANIM_STEP)
-            anim_idx = i % ANIM_STEP
-            alpha = anim_idx / ANIM_STEP
-
-            # Update connectivity edge colors if there is flow information
-            if 'fbar' in self.vars:
-                for i, (v1, v2) in enumerate(self.graph.conn_edges()):
-                    coll_cedge[i].set_color('black')
-                    col_list = [colors[b_r] for b, b_r in enumerate(self.min_src_snk)
-                                if self.solution['x'][self.get_fbar_idx(b, v1, v2, min(self.T, t))] > 0.5]
-                    if len(col_list):
-                        coll_cedge[i].set_color(col_list[int(10 * alpha) % len(col_list)])
-
-            # Update robot node and label positions
-            pos = (1-alpha) * np.array([traj_x[(r, min(self.T, t))] for r in self.graph.agents]) \
-                  + alpha * np.array([traj_x[(r, min(self.T, t+1))] for r in self.graph.agents])
-
-            coll_rpos.set_offsets(pos)
-            for i in range(len(self.graph.agents)):
-                coll_text[i].set_x(pos[i, 0])
-                coll_text[i].set_y(pos[i, 1])
-
-        ani = animation.FuncAnimation(fig, animate, range((self.T+2) * ANIM_STEP), blit=False)
-
-        writer = animation.writers['ffmpeg'](fps = 0.5*ANIM_STEP)
-        ani.save(filename, writer=writer,dpi=100)

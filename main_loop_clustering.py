@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from itertools import product
 
+from colorama import Fore, Style
+
 from graph_connectivity.animate_problem_sequence import *
 from graph_connectivity.problem import *
 from graph_connectivity.explore_problem import *
@@ -139,15 +141,14 @@ while not G.is_known():
 
     #Process1-TRAVERSE TO FRONTIERS-----------------------------------------------------
     #CLUSTERING
-#try:
     print()
-    print("Solving to frontier problem")
+    print(Style.BRIGHT + Fore.BLUE + "Solving to frontier problem" + Style.RESET_ALL)
     cp1 = ClusterProblem()
     cp1.graph = g
     cp1.master = master
     cp1.static_agents = [r for r in static_agents]
     cp1.graph.init_agents(agent_positions)
-    cp1.solve_to_frontier_problem()
+    cp1.solve_to_frontier_problem(verbose=True)
     agent_positions = {r: cp1.trajectories[(r, cp1.T)] for r in cp1.graph.agents}
     problem_list.append(cp1)
 
@@ -163,25 +164,17 @@ while not G.is_known():
     #Process3-SEND DATA TO BASE-----------------------------------------------------
     #CLUSTERING
     print()
-    print("Solving to base problem")
+    print(Style.BRIGHT + Fore.BLUE + "Solving to base problem" + Style.RESET_ALL)
     cp2 = ClusterProblem()
     cp2.graph = g
     cp2.master = master
     cp2.static_agents = [r for r in static_agents]
     cp2.graph.init_agents(agent_positions)
-    '''
-    cp2.agent_clusters = cp1.agent_clusters
-    cp2.subgraphs = cp1.subgraphs
-    cp2.submasters = cp1.submasters
-    cp2.subsinks = cp1.subsinks
-    cp2.child_clusters = cp1.child_clusters
-    cp2.parent_clusters = cp1.parent_clusters
-    '''
-    cp2.solve_to_base_problem()
+    cp2.solve_to_base_problem(verbose=True)
     agent_positions = {r: cp2.trajectories[(r, cp2.T)] for r in cp2.graph.agents}
     problem_list.append(cp2)
-#except Exception as e:
-#    print(e)
-#    break
 #ANIMATION----------------------------------------------------------------------
+
+print("Whole loop is completed!")
+
 animate_cluster_problem_sequence(G, problem_list, ANIM_STEP=10, labels = True)

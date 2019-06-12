@@ -47,8 +47,8 @@ def generate_connectivity_constraint(problem, b_list, add_S):
     constraint_idx = 0
     #For each base
     for b, S_v_t in product(b_list, add_S):
-        pre_S_transition = problem.graph.get_pre_S_transition(S_v_t)
-        pre_S_connectivity = problem.graph.get_pre_S_connectivity(S_v_t)
+        pre_S_transition = problem.graph.pre_tran_vt(S_v_t)
+        pre_S_connectivity = problem.graph.pre_conn_vt(S_v_t)
         for v, t in S_v_t:
             #add y
             A_iq_row.append(constraint_idx)
