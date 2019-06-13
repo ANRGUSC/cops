@@ -213,7 +213,7 @@ def animate_cluster_problem_sequence(graph, problem_list, ANIM_STEP=30, filename
               for (r,t), v in problem_list[0].trajectories.items()}
 
     #plot unknown graph in background
-    node_colors = plt.cm.gist_rainbow(np.linspace(0, 1, 10))    #cluster colors
+    node_colors = plt.cm.gist_rainbow(np.linspace(0, 1, 20))    #cluster colors
     edge_ncolor = np.full(len(graph.nodes), 'grey')             #edge/node_edge colors
     ncolors = [[1,1,1,1] for i in graph.nodes]                  #node colors (chosen from node_colors)
     npos = np.array([dict_pos[i] for i in graph.nodes])
@@ -381,5 +381,5 @@ def animate_cluster_problem_sequence(graph, problem_list, ANIM_STEP=30, filename
 
     ani = animation.FuncAnimation(fig, animate, range((total_time + 2 * len(problem_list) ) * ANIM_STEP), blit=False)
 
-    writer = animation.writers['ffmpeg'](fps = 0.5*ANIM_STEP)
+    writer = animation.writers['ffmpeg'](fps = 2*ANIM_STEP)
     ani.save(filename, writer=writer,dpi=100)

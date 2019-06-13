@@ -245,18 +245,12 @@ class ConnectivityProblem(object):
         t = self.T
         cut = True
         while cut and t>0:
-            for r in self.graph.agents:
-                if self.trajectories[(r, t)] != self.trajectories[(r, t - 1)]:
+            for r, v in product(self.graph.agents, self.graph.nodes):
+                if abs(self.solution['x'][self.get_z_idx(r, v, t)] - self.solution['x'][self.get_z_idx(r, v, t-1)]) > 0.5:
                     cut = False
             if cut:
                 t -= 1
-
         self.T = t
-
-        self.trajectories = {}
-        for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T+1)):
-            if self.solution['x'][self.get_z_idx(r, v, t)] > 0.5:
-                self.trajectories[(r,t)] = v
 
     def solve_powerset(self, optimal = False, solver=None, output=False, integer=True):
 
@@ -342,8 +336,8 @@ class ConnectivityProblem(object):
             valid_solution, add_S = self.test_solution()
             self.constraint &= generate_connectivity_constraint(self, range(self.num_src), add_S)
 
-    def solve_flow(self, master = False, connectivity = True, optimal = False, 
-                   solver=None, output=False, integer=True, 
+    def solve_flow(self, master = False, connectivity = True, optimal = False,
+                   solver=None, output=False, integer=True,
                    frontier_reward = True, verbose=False):
 
         self.prepare_problem()
@@ -393,8 +387,8 @@ class ConnectivityProblem(object):
 
         self._solve(solver=None, output=False, integer=True, verbose=verbose)
 
-    def diameter_solve_flow(self, master = False, connectivity = True, 
-                            optimal = False, solver=None, output=False, 
+    def diameter_solve_flow(self, master = False, connectivity = True,
+                            optimal = False, solver=None, output=False,
                             integer=True, frontier_reward = True,
                             verbose=False):
 
@@ -408,22 +402,22 @@ class ConnectivityProblem(object):
 
         if verbose:
             print(Fore.GREEN + "Solving flow [R={}, V={}, Et={}, Ec={}, static={}]"
-                  .format(len(self.graph.agents), 
+                  .format(len(self.graph.agents),
                           self.graph.number_of_nodes(),
                           self.graph.number_of_tran_edges(),
-                          self.graph.number_of_conn_edges(),                          
-                          self.static_agents) 
+                          self.graph.number_of_conn_edges(),
+                          self.static_agents)
                   + Style.RESET_ALL )
 
         while not feasible_solution:
             self.T = T
 
             if verbose:
-                print("Trying" + Style.BRIGHT + " T={}".format(self.T) 
+                print("Trying" + Style.BRIGHT + " T={}".format(self.T)
                       + Style.RESET_ALL)
 
             #Solve
-            self.solve_flow(master, connectivity, optimal, solver, 
+            self.solve_flow(master, connectivity, optimal, solver,
                             output, integer, frontier_reward,
                             verbose=verbose)
 
@@ -431,8 +425,6 @@ class ConnectivityProblem(object):
                 feasible_solution = True
 
             T += 1
-
-        self.cut_solution()
 
     def linear_search_solve_flow(self, master = False, connectivity = True, optimal = False, solver=None, output=False, integer=True, frontier_reward = True):
 
@@ -468,7 +460,7 @@ class ConnectivityProblem(object):
         # Solve it
         t0 = time.time()
         self.solution = solve_ilp(obj, self.constraint, J_int, J_bin, solver, output)
-        
+
         if verbose:
             print("Solver time {:.2f}s".format(time.time() - t0))
 
@@ -479,6 +471,8 @@ class ConnectivityProblem(object):
             if verbose:
                 print("Problem infeasible")
         else:
+            #cut static part of solution
+            self.cut_solution()
             # save trajectories
             for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T+1)):
                 if self.solution['x'][self.get_z_idx(r, v, t)] > 0.5:
@@ -562,4 +556,3 @@ class ConnectivityProblem(object):
             return False, add_S
         else:
             return True, add_S
-

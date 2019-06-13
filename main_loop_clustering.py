@@ -177,4 +177,4 @@ while not G.is_known():
 
 print("Whole loop is completed!")
 
-animate_cluster_problem_sequence(G, problem_list, ANIM_STEP=10, labels = True)
+animate_cluster_problem_sequence(G, problem_list, ANIM_STEP=3, labels = True)

@@ -6,13 +6,19 @@ Jet Propulsion Laboratory, NASA
 
 ---------------------------------------------------------------------
 
-Contributors: Filip Klaesson, Petter Nilsson
+Contributors: Filip Klaesson, Petter Nilsson, Richard Murray
 
 ---------------------------------------------------------------------
 
 Packages:
 
 Gurobi Optimizer
-Networkx
+networkx
+matplotlib
+scipy
+nose
+sklearn
+colorama
+
 
 ---------------------------------------------------------------------

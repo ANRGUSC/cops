@@ -19,7 +19,7 @@ class ClusterProblem(object):
         self.master = None
         self.static_agents = None
         self.T = None
-        self.max_problem_size = 1500
+        self.max_problem_size = 4000
 
         #Clusters
         self.agent_clusters = None
@@ -72,6 +72,18 @@ class ClusterProblem(object):
             g.edges[edge]['weight'] = 1/g.edges[edge]['weight']
         return g
 
+    def parent_first_iter(self):
+        for c in self.problems:
+            if self.problems[c].master == self.master:
+                active =[c]
+        while len(active) > 0:
+            c = active.pop(0)
+            if c in self.child_clusters:
+                for child in self.child_clusters[c]:
+                    if child[0] in self.problems:
+                        active.append(child[0])
+            yield c
+
     #===CLUSTER FUNCTIONS=======================================================
 
     def problem_size(self, verbose=False):
@@ -80,9 +92,9 @@ class ClusterProblem(object):
         for c in self.subgraphs:
 
             # number of robots
-            R  = len(set(self.agent_clusters[c]) - set(self.static_agents))
+            R  = len(self.agent_clusters[c]) + len(self.child_clusters[c])
             # number of nodes
-            V = len(self.subgraphs[c])
+            V = len(self.subgraphs[c]) + len(self.child_clusters[c])
             # number of occupied nodes
             Rp = len(set(v for r, v in self.graph.agents.items()
                          if r in self.agent_clusters[c]))
@@ -264,7 +276,7 @@ class ClusterProblem(object):
             small_problem_size = max(self.problem_size().values()) < self.max_problem_size
 
             # Strategy 1: cluster
-            while not small_problem_size and len(dynamic_agent_graph) > 1:
+            while not small_problem_size and self.k < len(dynamic_agent_graph)/2:
                 self.k += 1
 
                 print('Strategy 1: clustering with k={}'.format(self.k))
@@ -297,7 +309,6 @@ class ClusterProblem(object):
 
                 small_problem_size = max(self.problem_size(verbose=verbose).values()) < self.max_problem_size
 
-            print("Finished create_subgraphs with clusters", self.subgraphs, "and agent clusters", self.agent_clusters)
         else:
             #detect agent clusters
             self.spectral_clustering(dynamic_agent_graph)
@@ -360,10 +371,12 @@ class ClusterProblem(object):
             while len(active) > 0:
                 c = active.pop(0)
                 for child in self.child_clusters[c]:
+                    if c not in self.problems:
+                        continue
                     active.append(child[0])
                     #find time when submaster in child graph is no longer updated
                     submaster = self.submasters[child[0]]
-                    submaster_node = self.problem[c].graph.agents[submaster]
+                    submaster_node = self.problems[c].graph.agents[submaster]
                     t = self.problems[c].T
                     cut = True
                     while cut and t>0:
@@ -371,11 +384,12 @@ class ClusterProblem(object):
                             != self.problems[c].trajectories[(submaster, t - 1)]):
                                 cut = False
                         else:
-                            for v0, v1, b in self.problem[c].conn[t]:
+                            for v0, v1, b in self.problems[c].conn[t]:
                                 if (v0 == submaster_node or v1 == submaster_node):
                                     cut = False
                         if cut:
                             t -= 1
+
                     start_time[child[0]] = start_time[c] + t
 
         else:
@@ -388,10 +402,12 @@ class ClusterProblem(object):
             while len(active) > 0:
                 c = active.pop(0)
                 for child in self.child_clusters[c]:
+                    if c not in self.problems:
+                        continue
                     active.append(child[0])
                     #find time when submaster in child graph is no longer updated
                     submaster = self.submasters[child[0]]
-                    submaster_node = self.problem[c].graph.agents[submaster]
+                    submaster_node = self.problems[c].graph.agents[submaster]
                     t = self.problems[c].T
                     cut = True
                     while cut and t>0:
@@ -399,7 +415,7 @@ class ClusterProblem(object):
                             != self.problems[c].trajectories[(submaster, t - 1)]):
                                 cut = False
                         else:
-                            for v0, v1, b in self.problem[c].conn[t]:
+                            for v0, v1, b in self.problems[c].conn[t]:
                                 if (v0 == submaster_node or v1 == submaster_node):
                                     cut = False
                         if cut:
@@ -409,12 +425,18 @@ class ClusterProblem(object):
             start_time = {c: end_time[c] - self.problems[c].T for c in self.problems}
             start_time = {c: t - min(start_time.values()) for c, t in start_time.items()}
 
-
         # Construct communication dictionary for cluster problem
-        self.conn = {start_time[c] + t: (v0, v1, b) for c in self.problems for t, (v0, v1, b) in self.problems[c].conn.items()}
+        self.conn = {start_time[c] + t: conn_t for c in self.problems for t, conn_t in self.problems[c].conn.items()}
         # Construct trajectories for cluster problem
-        self.trajectories = {(r, start_time[c] + t): v for c in self.problems for (r, t), v in self.problems[c].trajectories.items()}
+        self.trajectories = {(r, start_time[c] + t): v for c in self.parent_first_iter() for (r, t), v in self.problems[c].trajectories.items()}
 
+        self.T = max(start_time[c] + self.problems[c].T for c in self.problems)
+
+        for r, t in product(self.graph.agents, range(self.T+1)):
+            if t == 0:
+                self.trajectories[(r,t)] = self.graph.agents[r]
+            if (r,t) not in self.trajectories:
+                self.trajectories[(r,t)] = self.trajectories[(r,t-1)]
 
     def solve_to_frontier_problem(self, verbose=False):
 
@@ -467,7 +489,8 @@ class ClusterProblem(object):
             cp.snk = sinks
 
             cp.diameter_solve_flow(master = True, connectivity = True,
-                                   optimal = True, verbose = verbose)
+                                   optimal = True
+                                   , verbose = verbose)
             self.problems[c] = cp
 
         self.merge_solutions(order = 'forward')
