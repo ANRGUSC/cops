@@ -363,16 +363,20 @@ class ClusterProblem(object):
         else:
             start_time = fwd_start_time
 
-        # Communication dictionary for cluster problem
-        self.conn = {start_time[c] + t: conn_t 
-                     for c in self.parent_first_iter() if c in self.problems
-                     for t, conn_t in self.problems[c].conn.items()}
+        # Cluster problem total time
+        self.T = max(start_time[c] + self.problems[c].T for c in self.problems)
         # Trajectories for cluster problem
         self.trajectories = {(r, start_time[c] + t): v 
                              for c in self.parent_first_iter() if c in self.problems
                              for (r, t), v in self.problems[c].trajectories.items()}
-        # Cluster problem total time
-        self.T = max(start_time[c] + self.problems[c].T for c in self.problems)
+        # Communication dictionary for cluster problem
+        self.conn = {t : set() for t in range(self.T+1)}
+        for c in self.parent_first_iter():
+            if c in self.problems:
+                for t, conn_t in self.problems[c].conn.items():
+                    for (v1, v2, b) in conn_t:
+                        # save connectivity info with submaster as third element
+                        self.conn[start_time[c] + t].add((v1, v2, self.submasters[c]))
 
         # Fill out empty trajectory slots
         for r, t in product(self.graph.agents, range(self.T+1)):

@@ -273,6 +273,9 @@ def animate_cluster_problem_sequence(graph, problem_list, ANIM_STEP=30, filename
         anim_idx = i % ANIM_STEP
         alpha = anim_idx / ANIM_STEP
 
+        if anim_idx == 0:
+            print("Animating time step {}/{}".format(int(time_idx / ANIM_STEP), total_time + 2 * len(problem_list)))
+
 
         if isinstance(problem, ClusterProblem):
 
@@ -313,8 +316,8 @@ def animate_cluster_problem_sequence(graph, problem_list, ANIM_STEP=30, filename
                 if (v1, v2) in problem.graph.conn_edges():
                     if problem.graph.nodes[v1]['known'] and problem.graph.nodes[v2]['known']:
                         coll_cedge[i].set_color('black')
-                    col_list = [colors[b_r] for b, b_r in enumerate(problem.graph.agents)
-                                if (b_r, v1, v2, t) in problem.conn]
+                    col_list = [colors[b] for b, b_r in enumerate(problem.graph.agents)
+                                if t in problem.conn and (v1, v2, b_r) in problem.conn[t]]
                     if len(col_list):
                         coll_cedge[i].set_color(col_list[int(10 * alpha) % len(col_list)])
 

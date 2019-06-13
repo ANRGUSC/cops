@@ -464,16 +464,17 @@ class ConnectivityProblem(object):
         if verbose:
             print("Solver time {:.2f}s".format(time.time() - t0))
 
-        self.trajectories = {}
-        self.conn = {t : [] for t in range(self.T+1)}
-
         if self.solution['status'] == 'infeasible':
             if verbose:
                 print("Problem infeasible")
         else:
             #cut static part of solution
             self.cut_solution()
-            # save trajectories
+
+            # save info
+            self.trajectories = {}
+            self.conn = {t : set() for t in range(self.T+1)}
+
             for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T+1)):
                 if self.solution['x'][self.get_z_idx(r, v, t)] > 0.5:
                     self.trajectories[(r,t)] = v
@@ -482,12 +483,12 @@ class ConnectivityProblem(object):
                 for t, b, (v1, v2) in product(range(self.T+1), range(self.num_min_src_snk),
                                               self.graph.conn_edges()):
                     if self.solution['x'][self.get_fbar_idx(b, v1, v2, t)] > 0.5:
-                        self.conn[t].append((v1, v2, 'b{}'.format(b)))
+                        self.conn[t].add((v1, v2, 'b{}'.format(b)))
 
             if 'mbar' in self.vars:
                 for t, (v1, v2) in product(range(self.T+1), self.graph.conn_edges()):
                     if self.solution['x'][self.get_mbar_idx(v1, v2, t)] > 0.5:
-                        self.conn[t].append((v1, v2, 'm'))
+                        self.conn[t].add((v1, v2, 'm'))
 
 
     ##GRAPH HELPER FUNCTIONS##
