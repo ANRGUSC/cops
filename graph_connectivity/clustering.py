@@ -33,10 +33,6 @@ class ClusterProblem(object):
         self.problems = {}
         self.trajectories = {}
         self.conn = {}
-        self.com_in = {}
-        self.com_out = {}
-        self.start_time = {}
-        self.end_time = {}
 
     #===GRAPH HELPER FUNCTIONS==================================================
 
@@ -93,7 +89,7 @@ class ClusterProblem(object):
             # number of transition edges
             Et = self.graph.number_of_tran_edges(self.subgraphs[c])
             # number of connectivity edges
-            Ec = self.graph.number_of_conn_edges(self.subgraphs[c])            
+            Ec = self.graph.number_of_conn_edges(self.subgraphs[c])
             # graph diameter
             D = nx.diameter(nx.subgraph(self.graph, self.subgraphs[c]))
 
@@ -352,219 +348,73 @@ class ClusterProblem(object):
 
     #===SOLVE FUNCTIONS=========================================================
 
-    def augment_solutions(self):
+    def merge_solutions(self, order = 'forward'):
 
-        #Construct communication dictionaries
-        for c in self.problems:
-            for t, (v1, v2) in product(range(self.problems[c].T+1), self.problems[c].graph.conn_edges()):
-
-                # add communication between agents
-                for (b, br) in enumerate(self.problems[c].min_src_snk)
-                    if self.problems[c].solution['x'][self.problems[c].get_fbar_idx(b, v1, v2, t)] > 0.5:
-                        for r_in, r_out in product(self.problems[c].graph.agents, self.problems[c].graph.agents):
-                            self.com_out[r_out,t] = []
-                            self.com_in[r_in,t] = []
-                            if (self.problems[c].solution['x'][self.problems[c].get_z_idx(r_in, v1, t)] > 0.5
-                                and self.problems[c].solution['x'][self.problems[c].get_z_idx(r_out, v2, t)] > 0.5):
-                                    self.com_out[r_out,t] += (r_in, v2, br)
-                                    self.com_in[r_in,t] += (r_out, v1, br)
-                                    self.conn[(br, v1, v2, t)] = 1
-
-                # add master communication between agents
-                if self.problems[c].solution['x'][self.problems[c].get_mbar_idx(v1, v2, t)] > 0.5:
-                    for r_in, r_out in product(self.problems[c].graph.agents, self.problems[c].graph.agents):
-                        if (self.problems[c].solution['x'][self.problems[c].get_z_idx(r_in, v1, t)] > 0.5
-                            and self.problems[c].solution['x'][self.problems[c].get_z_idx(r_out, v2, t)] > 0.5):
-                                self.com_out[r_out,t] += (r_in, v2, self.problems[c].master)
-                                self.com_in[r_in,t] += (r_out, v1, self.problems[c].master)
-                                self.conn[(self.problems[c].master, v1, v2, t)] = 1
-
-
-
-        #Find start time for each cluster
-        for c in self.problems:
-            if self.problems[c].master == self.master:
-                self.start_time[c] = 0
-            for child in self.child_clusters[c]:
-                submaster = self.submasters[child[0]]
-                #find time when submaster in child graph is no longer updated
-                t = self.problems[c].T
-                cut = True
-                while cut and t>0:
-                    if (self.problems[c].trajectories[(submaster, t)] != self.problems[c].trajectories[(submaster, t - 1)]:
-                            cut = False
-                    else:
-                        for com_in in self.com_in[(submaster, t)]
-                            if com_in[2] in self.problems[c].agents:
-                                    cut = False
-                        for com_out in self.com_out[(submaster, t)]
-                            if com_out[2] in self.problems[c].agents:
-                                    cut = False
-                    if cut:
-                        t -= 1
-                self.start_time[child[0]] = t
-
-
-        #Re-construct communication dictionaries with new starting times
-        self.com_out = {}
-        self.com_in = {}
-        self.conn = {}
-        for c in self.subgraphs:
-            if c in self.problems:
-                for t, (b, br), (v1, v2) in product(range(self.problems[c].T+1), enumerate(self.problems[c].min_src_snk), self.problems[c].graph.conn_edges()):
-                    if self.problems[c].solution['x'][self.problems[c].get_fbar_idx(b, v1, v2, t)] > 0.5:
-                        for r in self.problems[c].graph.agents:
-                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
-                                r_out = r
-                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
-                                r_in = r
-                        self.com_out[r_out,t+self.start_time[c]] = (r_in, v2, br)
-                        self.com_in[r_in,t+self.start_time[c]] = (r_out, v1, br)
-                        self.conn[(br, v1, v2, t+self.start_time[c])] = 1
-
-                for t, (v1, v2) in product(range(self.problems[c].T+1), self.problems[c].graph.conn_edges()):
-                    if self.problems[c].solution['x'][self.problems[c].get_mbar_idx(v1, v2, t)] > 0.5:
-                        for r in self.problems[c].graph.agents:
-                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
-                                r_out = r
-                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
-                                r_in = r
-                        self.com_out[r_out,t+self.start_time[c]] = (r_in, v2, self.problems[c].master)
-                        self.com_in[r_in,t+self.start_time[c]] = (r_out, v1, self.problems[c].master)
-                        self.conn[(self.problems[c].master, v1, v2, t+self.start_time[c])] = 1
-
-
-        #Construct trajectories
-        self.T = 0
-        for r, v in self.graph.agents.items():
-            self.trajectories[(r,0)] = v
-        for c in self.subgraphs:
-            if self.master in self.agent_clusters[c]:
-                active = [c]        # construct active in parent-first order
-        while len(active)>0:
-            c = active.pop(0)
-            print(c)
-            if c in self.child_clusters:
-                children = [child for child in self.child_clusters[c]]
-                for child in children:
-                    active.append(child[0])
-            if c in self.problems:
-                for r, v, t in product(self.agent_clusters[c], self.problems[c].graph.nodes, range(self.problems[c].T + 1)):
-                    if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v, t)] > 0.5:
-                        self.trajectories[(r,t + self.start_time[c])] = v
-                        if t + self.start_time[c] > self.T:
-                            self.T = t + self.start_time[c]
-
-        #Fill out trajectories
-        for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T + 1)):
-            if (r,t) not in self.trajectories:
-                self.trajectories[(r,t)] = self.trajectories[(r,t-1)]
-
-    def augment_solutions_reversed(self):
-
-        #Construct communication dictionaries
-        for c in self.subgraphs:
-            if c in self.problems:
-                for t, (b, br), (v1, v2) in product(range(self.problems[c].T+1), enumerate(self.problems[c].min_src_snk), self.problems[c].graph.conn_edges()):
-                    if self.problems[c].solution['x'][self.problems[c].get_fbar_idx(b, v1, v2, t)] > 0.5:
-                        for r in self.problems[c].graph.agents:
-                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
-                                r_out = r
-                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
-                                r_in = r
-                        self.com_out[r_out,t] = (r_in, v2, br)
-                        self.com_in[r_in,t] = (r_out, v1, br)
-                        self.conn[(br, v1, v2, t)] = 1
-
-                for t, (v1, v2) in product(range(self.problems[c].T+1), self.problems[c].graph.conn_edges()):
-                    if self.problems[c].solution['x'][self.problems[c].get_mbar_idx(v1, v2, t)] > 0.5:
-                        for r in self.problems[c].graph.agents:
-                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
-                                r_out = r
-                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
-                                r_in = r
-                        self.com_out[r_out,t] = (r_in, v2, self.problems[c].master)
-                        self.com_in[r_in,t] = (r_out, v1, self.problems[c].master)
-                        self.conn[(self.problems[c].master, v1, v2, t)] = 1
-
-        #Find end time for each cluster
-        min_time = None
-        for c in self.problems:
-            if min_time == None:
-                min_time = self.problems[c].T
-            if c in self.problems:
+        if order == 'forward':
+            #Find start time for each cluster
+            start_time = {}
+            for c in self.problems:
                 if self.problems[c].master == self.master:
-                    self.end_time[c] = self.problems[c].T
+                    start_time[c] = 0
+                    active = [c]
+            while len(active) > 0:
+                c = active.pop(0)
                 for child in self.child_clusters[c]:
+                    active.append(child[0])
+                    #find time when submaster in child graph is no longer updated
                     submaster = self.submasters[child[0]]
-                    #find time when submaster in upper subgraph no longer updated
+                    submaster_node = self.problem[c].graph.agents[submaster]
                     t = self.problems[c].T
                     cut = True
                     while cut and t>0:
-                        if (self.problems[c].trajectories[(submaster, t)] != self.problems[c].trajectories[(submaster, t - 1)]
-                        or (submaster, t) in self.com_in or (submaster, t) in self.com_out):
-                            cut = False
+                        if (self.problems[c].trajectories[(submaster, t)]
+                            != self.problems[c].trajectories[(submaster, t - 1)]):
+                                cut = False
+                        else:
+                            for v0, v1, b in self.problem[c].conn[t]:
+                                if (v0 == submaster_node or v1 == submaster_node):
+                                    cut = False
                         if cut:
                             t -= 1
-                    self.end_time[child[0]] = t
-                    if t < min_time:
-                        min_time = t
+                    start_time[child[0]] = start_time[c] + t
 
-
-        #Re-construct communication dictionaries with new starting times
-        self.com_out = {}
-        self.com_in = {}
-        self.conn = {}
-        for c in self.subgraphs:
-            if c in self.problems:
-                for t, (b, br), (v1, v2) in product(range(self.problems[c].T+1), enumerate(self.problems[c].min_src_snk), self.problems[c].graph.conn_edges()):
-                    if self.problems[c].solution['x'][self.problems[c].get_fbar_idx(b, v1, v2, t)] > 0.5:
-                        for r in self.problems[c].graph.agents:
-                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
-                                r_out = r
-                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
-                                r_in = r
-                        self.com_out[r_out,self.end_time[c] - (self.problems[c].T - t)] = (r_in, v2, br)
-                        self.com_in[r_in,self.end_time[c] - (self.problems[c].T - t)] = (r_out, v1, br)
-                        self.conn[(br, v1, v2, self.end_time[c] - (self.problems[c].T - t))] = 1
-
-                for t, (v1, v2) in product(range(self.problems[c].T+1), self.problems[c].graph.conn_edges()):
-                    if self.problems[c].solution['x'][self.problems[c].get_mbar_idx(v1, v2, t)] > 0.5:
-                        for r in self.problems[c].graph.agents:
-                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v1, t)] > 0.5:
-                                r_out = r
-                            if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v2, t)] > 0.5:
-                                r_in = r
-                        self.com_out[r_out,self.end_time[c] - (self.problems[c].T - t)] = (r_in, v2, self.problems[c].master)
-                        self.com_in[r_in,self.end_time[c] - (self.problems[c].T - t)] = (r_out, v1, self.problems[c].master)
-                        self.conn[(self.problems[c].master, v1, v2, self.end_time[c] - (self.problems[c].T - t))] = 1
-
-        #Construct trajectories
-        self.T = 0
-        for r, v in self.graph.agents.items():
-            self.trajectories[(r,0)] = v
-        for c in self.subgraphs:
-            if self.master in self.agent_clusters[c]:
-                active = [c]        # construct active in parent-first order
-        while len(active)>0:
-            c = active.pop(0)
-            if c in self.child_clusters:
-                children = [child for child in self.child_clusters[c]]
-                for child in children:
+        else:
+            #Find start time for each cluster
+            end_time = {}
+            for c in self.problems:
+                if self.problems[c].master == self.master:
+                    end_time[c] = 0
+                    active = [c]
+            while len(active) > 0:
+                c = active.pop(0)
+                for child in self.child_clusters[c]:
                     active.append(child[0])
-            if c in self.problems:
-                for r, v, t in product(self.agent_clusters[c], self.problems[c].graph.nodes, range(self.problems[c].T + 1)):
-                    if self.problems[c].solution['x'][self.problems[c].get_z_idx(r, v, t)] > 0.5:
-                        self.trajectories[(r, self.end_time[c] - (self.problems[c].T - t))] = v
-                        if self.end_time[c] - (self.problems[c].T - t) > self.T:
-                            self.T = self.end_time[c] - (self.problems[c].T - t)
+                    #find time when submaster in child graph is no longer updated
+                    submaster = self.submasters[child[0]]
+                    submaster_node = self.problem[c].graph.agents[submaster]
+                    t = self.problems[c].T
+                    cut = True
+                    while cut and t>0:
+                        if (self.problems[c].trajectories[(submaster, t)]
+                            != self.problems[c].trajectories[(submaster, t - 1)]):
+                                cut = False
+                        else:
+                            for v0, v1, b in self.problem[c].conn[t]:
+                                if (v0 == submaster_node or v1 == submaster_node):
+                                    cut = False
+                        if cut:
+                            t -= 1
+                    end_time[child[0]] = end_time[c] - self.problems[c].T + t
+
+            start_time = {c: end_time[c] - self.problems[c].T for c in self.problems}
+            start_time = {c: t - min(start_time.values()) for c, t in start_time.items()}
 
 
+        # Construct communication dictionary for cluster problem
+        self.conn = {start_time[c] + t: (v0, v1, b) for c in self.problems for t, (v0, v1, b) in self.problems[c].conn.items()}
+        # Construct trajectories for cluster problem
+        self.trajectories = {(r, start_time[c] + t): v for c in self.problems for (r, t), v in self.problems[c].trajectories.items()}
 
-        #Fill out trajectories
-        for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T + 1)):
-            if (r,t) not in self.trajectories:
-                self.trajectories[(r,t)] = self.trajectories[(r,t-1)]
 
     def solve_to_frontier_problem(self, verbose=False):
 
@@ -616,11 +466,11 @@ class ClusterProblem(object):
             #Sinks are submaster in active higger ranked subgraphs
             cp.snk = sinks
 
-            cp.diameter_solve_flow(master = True, connectivity = True, 
+            cp.diameter_solve_flow(master = True, connectivity = True,
                                    optimal = True, verbose = verbose)
             self.problems[c] = cp
 
-        self.augment_solutions()
+        self.merge_solutions(order = 'forward')
 
     def solve_to_base_problem(self, verbose=False):
 
@@ -676,10 +526,10 @@ class ClusterProblem(object):
             #Submaster is sink
             cp.snk = [self.submasters[c]]
 
-            cp.diameter_solve_flow(master = False, connectivity = True, 
+            cp.diameter_solve_flow(master = False, connectivity = True,
                                    optimal = True, frontier_reward = False,
                                    verbose = verbose)
             self.problems[c] = cp
 
 
-        self.augment_solutions_reversed()
+        self.merge_solutions(order = 'reversed')
