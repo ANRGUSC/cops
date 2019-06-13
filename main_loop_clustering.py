@@ -126,6 +126,8 @@ problem_list = []
 
 master = 0
 static_agents = [0]
+MAXITER = 999
+i_iter = 0
 
 #MAIN-LOOP----------------------------------------------------------------------
 while not G.is_known():
@@ -173,8 +175,13 @@ while not G.is_known():
     cp2.solve_to_base_problem(verbose=True)
     agent_positions = {r: cp2.trajectories[(r, cp2.T)] for r in cp2.graph.agents}
     problem_list.append(cp2)
+
+    i_iter += 1
+    if i_iter > MAXITER:
+        break
+
 #ANIMATION----------------------------------------------------------------------
 
 print("Whole loop is completed!")
 
-animate_cluster_problem_sequence(G, problem_list, ANIM_STEP=3, labels = True)
+animate_cluster_problem_sequence(G, problem_list, ANIM_STEP=5, labels = True)

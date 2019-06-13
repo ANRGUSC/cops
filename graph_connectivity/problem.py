@@ -467,6 +467,9 @@ class ConnectivityProblem(object):
         if self.solution['status'] == 'infeasible':
             if verbose:
                 print("Problem infeasible")
+
+            self.trajectories = {}
+            self.conn = {}
         else:
             #cut static part of solution
             self.cut_solution()

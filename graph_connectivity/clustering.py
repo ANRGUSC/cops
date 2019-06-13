@@ -326,12 +326,9 @@ class ClusterProblem(object):
 
     def merge_solutions(self, order = 'forward'):
 
-        #Find start time for each cluster
-        fwd_start_time = {}
-        rev_end_time = {}
-
-        fwd_start_time[self.master_cluster] = 0
-        rev_end_time[self.master_cluster] = 0
+        #Find start and end times for each cluster
+        fwd_start_time = {self.master_cluster : 0}
+        rev_end_time = {self.master_cluster : 0}
 
         for c in self.parent_first_iter():
 
@@ -341,25 +338,21 @@ class ClusterProblem(object):
             for child in self.child_clusters[c]:
                 submaster = self.submasters[child[0]]
                 submaster_node = self.problems[c].graph.agents[submaster]
-                t = self.problems[c].T
-                cut = True
-                while cut and t>0:
-                    if (self.problems[c].trajectories[(submaster, t)]
-                        != self.problems[c].trajectories[(submaster, t - 1)]):
-                            cut = False
-                    else:
-                        for v0, v1, b in self.problems[c].conn[t]:
-                            if (v0 == submaster_node or v1 == submaster_node):
-                                cut = False
-                    if cut:
-                        t -= 1
 
-                fwd_start_time[child[0]] = fwd_start_time[c] + t
-                rev_end_time[child[0]] = rev_end_time[c] - self.problems[c].T + t
+                # first time when c has finished communicating with submaster of child
+                t_cut = next( (t for t in range(self.problems[c].T, 0, -1) 
+                               if self.problems[c].trajectories[(submaster, t)]
+                                  != self.problems[c].trajectories[(submaster, t - 1)]
+                               or any(submaster_node in conn_t[0:2]
+                                      for conn_t in self.problems[c].conn[t])), 
+                              0)
+
+                fwd_start_time[child[0]] = fwd_start_time[c] + t_cut
+                rev_end_time[child[0]] = rev_end_time[c] - self.problems[c].T + t_cut
 
         if order == 'reversed':
-            start_time = {c: rev_end_time[c] - self.problems[c].T for c in self.problems}
-            start_time = {c: t - min(start_time.values()) for c, t in start_time.items()}
+            min_t = min(rev_end_time[c] - self.problems[c].T for c in self.problems)
+            start_time = {c: rev_end_time[c] - self.problems[c].T - min_t for c in self.problems}
         else:
             start_time = fwd_start_time
 
