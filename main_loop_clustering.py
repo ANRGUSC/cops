@@ -142,7 +142,7 @@ while not G.is_known():
     #Process1-TRAVERSE TO FRONTIERS-----------------------------------------------------
     #CLUSTERING
     print()
-    print(Style.BRIGHT + Fore.BLUE + "Solving to frontier problem" + Style.RESET_ALL)
+    print(Style.BRIGHT + Fore.BLUE + "Solving to frontier problem on {} known nodes".format(len(g)) + Style.RESET_ALL)
     cp1 = ClusterProblem()
     cp1.graph = g
     cp1.master = master

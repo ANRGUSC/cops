@@ -17,12 +17,7 @@ def test_activation1():
     cp.agent_clusters = {'c0' : [0], 'c1': [1], 'c2': [2]}
     cp.master = 0
 
-    clusters, child_clusters, parent_clusters = cp.create_clusters()
-
-    print("Hej")
-    print(clusters)
-    print(child_clusters)
-    print(parent_clusters)
+    clusters, child_clusters, parent_clusters = cp.inflate_clusters()
 
     np.testing.assert_equal(clusters['c0'], set([0]))
     np.testing.assert_equal(clusters['c1'], set([1]))
@@ -53,11 +48,7 @@ def test_activation2():
     cp.agent_clusters = {'c0' : [0, 1], 'c1': [2, 3], 'c2': [4, 5]}
     cp.master = 0
 
-    clusters, child_clusters, parent_clusters = cp.create_clusters()
-
-    print(clusters)
-    print(child_clusters)
-    print(parent_clusters)
+    clusters, child_clusters, parent_clusters = cp.inflate_clusters()
 
     np.testing.assert_equal(clusters['c0'], set([0,1,2,3]))
     np.testing.assert_equal(clusters['c1'], set([4,5,6,7]))

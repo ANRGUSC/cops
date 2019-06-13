@@ -27,14 +27,36 @@ class ClusterProblem(object):
         self.parent_clusters = None
         self.subgraphs = None
         self.submasters = None
-        self.subsinks = None
 
         #Problems/Solutions
         self.problems = {}
         self.trajectories = {}
         self.conn = {}
 
-    #===GRAPH HELPER FUNCTIONS==================================================
+    #=== HELPER FUNCTIONS==================================================
+
+    @property
+    def master_cluster(self):
+        for c in self.agent_clusters:
+            if self.master in self.agent_clusters[c]:
+                return c
+        print("Warning: no master cluster found")
+        return None
+
+    def parent_first_iter(self):
+        '''iterate over clusters s.t. parents come before children'''
+        active = [self.master_cluster]
+        while len(active) > 0:
+            c = active.pop(0)
+            if c in self.child_clusters:
+                for child in self.child_clusters[c]:
+                    active.append(child[0])
+            yield c
+
+    def children_first_iter(self):
+        '''iterate over clusters s.t. children come before parents'''
+        for c in reversed(list(self.parent_first_iter())):
+            yield c
 
     def create_graph_tran(self):
 
@@ -71,18 +93,6 @@ class ClusterProblem(object):
         for edge in g.edges:
             g.edges[edge]['weight'] = 1/g.edges[edge]['weight']
         return g
-
-    def parent_first_iter(self):
-        for c in self.problems:
-            if self.problems[c].master == self.master:
-                active =[c]
-        while len(active) > 0:
-            c = active.pop(0)
-            if c in self.child_clusters:
-                for child in self.child_clusters[c]:
-                    if child[0] in self.problems:
-                        active.append(child[0])
-            yield c
 
     #===CLUSTER FUNCTIONS=======================================================
 
@@ -150,14 +160,11 @@ class ClusterProblem(object):
                             self.agent_clusters[c].append(r)
                             added = True
 
-    def create_clusters(self):
+    def inflate_clusters(self):
         '''
         Requires: self.graph
                   self.agent_clusters { 'c' : [r0, r1] ...}
                   self.master
-
-        Produces: clusters, child_clusters, parent_clusters
-
         '''
 
         if self.graph_tran is None:
@@ -210,7 +217,7 @@ class ClusterProblem(object):
                     del self.agent_clusters[c]
                     for i, r_list in comp_dict.items():
                         self.agent_clusters["{}_{}".format(c, i+1)] = r_list
-                    return self.create_clusters()
+                    return self.inflate_clusters() # recursive call
 
             # find closest neighbor and activate it
             neighbors = self.graph.post_tran(active_nodes) - active_nodes
@@ -236,29 +243,6 @@ class ClusterProblem(object):
 
         return clusters, child_clusters, parent_clusters
 
-    def create_sub_dict(self):
-
-        # create dictionaries mapping clusters to sub-master/sub-sinks
-        self.subsinks = {}
-        for c in self.subgraphs:
-            self.subsinks[c] = []
-            if len(self.parent_clusters[c]) == 0:
-                self.submasters = {c: self.master}
-                active = [c]
-
-        while len(active)>0:
-            cluster = active.pop(0)
-            for child in self.child_clusters[cluster]:
-                for r in self.graph.agents:
-                    if self.graph.agents[r] == child[1]:
-                        if child[0] not in self.submasters:
-                            self.submasters[child[0]] = r
-                        if r not in self.subsinks[cluster]:
-                            self.subsinks[cluster].append(r)
-                active.append(child[0])
-        self.subsinks = {c : [r for r in self.subsinks[c]] for c in self.subsinks
-                        if len(self.subsinks[c])>0}
-
     def create_subgraphs(self, verbose=False):
 
         small_problem_size = False
@@ -271,25 +255,22 @@ class ClusterProblem(object):
         if self.k == None:
             self.k = 1
             self.agent_clusters = {'cluster0': [r for r in self.graph.agents]}
-            self.subgraphs, self.child_clusters, self.parent_clusters = self.create_clusters()
-            self.create_sub_dict()
+            self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters()
             small_problem_size = max(self.problem_size().values()) < self.max_problem_size
 
             # Strategy 1: cluster
-            while not small_problem_size and self.k < len(dynamic_agent_graph)/2:
+            while not small_problem_size and self.k < len(dynamic_agent_graph):
                 self.k += 1
 
                 print('Strategy 1: clustering with k={}'.format(self.k))
                 #detect agent clusters
                 self.spectral_clustering(dynamic_agent_graph)
                 #dictionary mapping cluster to nodes
-                self.subgraphs, self.child_clusters, self.parent_clusters = self.create_clusters()
-                #dictionary mapping cluster to submaster, subsinks
-                self.create_sub_dict()
+                self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters()
 
                 small_problem_size = max(self.problem_size(verbose=verbose).values()) < self.max_problem_size
 
-            # Strategy 2: deactivate agents problem
+            # Strategy 2: deactivate agents
             while not small_problem_size:
                 print("Strategy 2: Make robot static")
 
@@ -301,8 +282,7 @@ class ClusterProblem(object):
                                         if r not in self.static_agents
                                         and self.graph.agents[r]==v]
                                         for v in self.subgraphs[c]}
-                        max_pop = max(population.values(), key = len)
-                        for r in max_pop:
+                        for r in max(population.values(), key = len):
                             if r != self.master:
                                 self.static_agents.append(r)
                                 break
@@ -314,124 +294,87 @@ class ClusterProblem(object):
             self.spectral_clustering(dynamic_agent_graph)
 
             #dictionary mapping cluster to nodes
-            self.subgraphs, self.child_clusters, self.parent_clusters = self.create_clusters()
+            self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters()
 
-            #dictionary mapping cluster to submaster, subsinks
-            self.create_sub_dict()
+        # create dictionaries mapping cluster to submaster, subsinks
+        self.submasters = {self.master_cluster: self.master}
+        self.subsinks = {c : [] for c in self.subgraphs}
 
-    def frontiers_in_cluster(self, c):
-        cluster_frontiers = []
-        for v in self.graph.nodes:
-            if self.graph.nodes[v]['frontiers'] != 0 and v in self.subgraphs[c] and v != self.subsinks[c]:
-                cluster_frontiers.append(v)
-        return cluster_frontiers
+        for c in self.parent_first_iter():
+            for child, r in product(self.child_clusters[c], self.graph.agents):
+                if self.graph.agents[r] == child[1]:
+                    if child[0] not in self.submasters:
+                        self.submasters[child[0]] = r
+                    if r not in self.subsinks[c]:
+                        self.subsinks[c].append(r)
 
-    def active_clusters(self):
-        active_clusters = []
-        #set clusters with frontiers as active
-        for c in self.subgraphs:
-            active = False
-            for v in self.graph.nodes:
-                if self.graph.node[v]['frontiers'] != 0 and v in self.subgraphs[c]:
-                    active = True
-            if active:
-                active_clusters.append(c)
-        #set children of active clusters to active
-        for c in active_clusters:
-            children = self.find_all_children_clusters(c)
-            for child in children:
-                if child not in active_clusters:
-                    active_clusters.append(child)
-        return active_clusters
-
-    def find_all_children_clusters(self, c):
-        children = []
-        active = [c]
-        while len(active)>0:
-            cluster = active.pop(0)
-            children.append(cluster)
-            if cluster in self.parent_clusters:
-                for child in self.parent_clusters[cluster]:
-                    active.append(child[0])
-                    children.append(child[0])
-        children.remove(c)
-        return children
+        self.subsinks = {c : subsinks for c, subsinks in self.subsinks.items() if len(subsinks)>0}
 
     #===SOLVE FUNCTIONS=========================================================
 
+    def frontier_clusters(self):
+        #set clusters with frontiers as active
+        frontier_clusters = set(c for c in self.subgraphs
+                              if any(self.graph.node[v]['frontiers'] != 0
+                                     for v in self.subgraphs[c]))
+        
+        for c in self.children_first_iter():
+            if any(child_c in frontier_clusters for child_c,_ in self.child_clusters[c]):
+               frontier_clusters.add(c)
+
+        return frontier_clusters
+
     def merge_solutions(self, order = 'forward'):
 
-        if order == 'forward':
-            #Find start time for each cluster
-            start_time = {}
-            for c in self.problems:
-                if self.problems[c].master == self.master:
-                    start_time[c] = 0
-                    active = [c]
-            while len(active) > 0:
-                c = active.pop(0)
-                for child in self.child_clusters[c]:
-                    if c not in self.problems:
-                        continue
-                    active.append(child[0])
-                    #find time when submaster in child graph is no longer updated
-                    submaster = self.submasters[child[0]]
-                    submaster_node = self.problems[c].graph.agents[submaster]
-                    t = self.problems[c].T
-                    cut = True
-                    while cut and t>0:
-                        if (self.problems[c].trajectories[(submaster, t)]
-                            != self.problems[c].trajectories[(submaster, t - 1)]):
+        #Find start time for each cluster
+        fwd_start_time = {}
+        rev_end_time = {}
+
+        fwd_start_time[self.master_cluster] = 0
+        rev_end_time[self.master_cluster] = 0
+
+        for c in self.parent_first_iter():
+
+            if c not in self.problems:
+                continue
+
+            for child in self.child_clusters[c]:
+                submaster = self.submasters[child[0]]
+                submaster_node = self.problems[c].graph.agents[submaster]
+                t = self.problems[c].T
+                cut = True
+                while cut and t>0:
+                    if (self.problems[c].trajectories[(submaster, t)]
+                        != self.problems[c].trajectories[(submaster, t - 1)]):
+                            cut = False
+                    else:
+                        for v0, v1, b in self.problems[c].conn[t]:
+                            if (v0 == submaster_node or v1 == submaster_node):
                                 cut = False
-                        else:
-                            for v0, v1, b in self.problems[c].conn[t]:
-                                if (v0 == submaster_node or v1 == submaster_node):
-                                    cut = False
-                        if cut:
-                            t -= 1
+                    if cut:
+                        t -= 1
 
-                    start_time[child[0]] = start_time[c] + t
+                fwd_start_time[child[0]] = fwd_start_time[c] + t
+                rev_end_time[child[0]] = rev_end_time[c] - self.problems[c].T + t
 
-        else:
-            #Find start time for each cluster
-            end_time = {}
-            for c in self.problems:
-                if self.problems[c].master == self.master:
-                    end_time[c] = 0
-                    active = [c]
-            while len(active) > 0:
-                c = active.pop(0)
-                for child in self.child_clusters[c]:
-                    if c not in self.problems:
-                        continue
-                    active.append(child[0])
-                    #find time when submaster in child graph is no longer updated
-                    submaster = self.submasters[child[0]]
-                    submaster_node = self.problems[c].graph.agents[submaster]
-                    t = self.problems[c].T
-                    cut = True
-                    while cut and t>0:
-                        if (self.problems[c].trajectories[(submaster, t)]
-                            != self.problems[c].trajectories[(submaster, t - 1)]):
-                                cut = False
-                        else:
-                            for v0, v1, b in self.problems[c].conn[t]:
-                                if (v0 == submaster_node or v1 == submaster_node):
-                                    cut = False
-                        if cut:
-                            t -= 1
-                    end_time[child[0]] = end_time[c] - self.problems[c].T + t
-
-            start_time = {c: end_time[c] - self.problems[c].T for c in self.problems}
+        if order == 'reversed':
+            start_time = {c: rev_end_time[c] - self.problems[c].T for c in self.problems}
             start_time = {c: t - min(start_time.values()) for c, t in start_time.items()}
+        else:
+            start_time = fwd_start_time
 
-        # Construct communication dictionary for cluster problem
-        self.conn = {start_time[c] + t: conn_t for c in self.problems for t, conn_t in self.problems[c].conn.items()}
-        # Construct trajectories for cluster problem
-        self.trajectories = {(r, start_time[c] + t): v for c in self.parent_first_iter() for (r, t), v in self.problems[c].trajectories.items()}
-
+        # Communication dictionary for cluster problem
+        self.conn = {start_time[c] + t: conn_t 
+                     for c in self.parent_first_iter() if c in self.problems
+                     for t, conn_t in self.problems[c].conn.items()}
+        # Trajectories for cluster problem
+        self.trajectories = {(r, start_time[c] + t): v 
+                             for c in self.parent_first_iter() if c in self.problems
+                             for (r, t), v in self.problems[c].trajectories.items()}
+        # Cluster problem total time
         self.T = max(start_time[c] + self.problems[c].T for c in self.problems)
 
+        # Fill out empty trajectory slots
         for r, t in product(self.graph.agents, range(self.T+1)):
             if t == 0:
                 self.trajectories[(r,t)] = self.graph.agents[r]
@@ -442,7 +385,7 @@ class ClusterProblem(object):
 
         self.create_subgraphs(verbose=verbose)
 
-        active_subgraphs = self.active_clusters()
+        active_subgraphs = self.frontier_clusters()
 
         for c in active_subgraphs:
 
@@ -485,12 +428,11 @@ class ClusterProblem(object):
 
             #Source is submaster
             cp.src = [self.submasters[c]]
-            #Sinks are submaster in active higger ranked subgraphs
+            #Sinks are submaster in active higher ranked subgraphs
             cp.snk = sinks
 
             cp.diameter_solve_flow(master = True, connectivity = True,
-                                   optimal = True
-                                   , verbose = verbose)
+                                   optimal = True, verbose = verbose)
             self.problems[c] = cp
 
         self.merge_solutions(order = 'forward')
@@ -499,7 +441,7 @@ class ClusterProblem(object):
 
         self.create_subgraphs(verbose=verbose)
 
-        active_subgraphs = self.active_clusters()
+        active_subgraphs = self.frontier_clusters()
 
         for c in active_subgraphs:
 
@@ -544,7 +486,7 @@ class ClusterProblem(object):
 
             cp.final_position = {r: v for r,v in self.graph.agents.items() if r == self.submasters[c]}
 
-            #Sources are submaster in active higger ranked subgraphs
+            #Sources are submaster in active higher ranked subgraphs
             cp.src = sources
             #Submaster is sink
             cp.snk = [self.submasters[c]]
@@ -553,6 +495,5 @@ class ClusterProblem(object):
                                    optimal = True, frontier_reward = False,
                                    verbose = verbose)
             self.problems[c] = cp
-
 
         self.merge_solutions(order = 'reversed')
