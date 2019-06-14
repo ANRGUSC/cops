@@ -126,7 +126,7 @@ problem_list = []
 
 master = 0
 static_agents = [0]
-MAXITER = 2
+MAXITER = 10
 i_iter = 0
 
 #MAIN-LOOP----------------------------------------------------------------------

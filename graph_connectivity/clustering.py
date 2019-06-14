@@ -308,8 +308,6 @@ class ClusterProblem(object):
                     if r not in self.subsinks[c]:
                         self.subsinks[c].append(r)
 
-        self.subsinks = {c : subsinks for c, subsinks in self.subsinks.items() if len(subsinks)>0}
-
     #===SOLVE FUNCTIONS=========================================================
 
     def frontier_clusters(self):
@@ -324,6 +322,7 @@ class ClusterProblem(object):
 
         return frontier_clusters
 
+
     def merge_solutions(self, order = 'forward'):
 
         #Find start and end times for each cluster
@@ -331,12 +330,11 @@ class ClusterProblem(object):
         rev_end_time = {self.master_cluster : 0}
 
         for c in self.parent_first_iter():
-
             if c not in self.problems:
                 continue
 
-            for child in self.child_clusters[c]:
-                submaster = self.submasters[child[0]]
+            for child, _ in self.child_clusters[c]:
+                submaster = self.submasters[child]
                 submaster_node = self.problems[c].graph.agents[submaster]
 
                 # first time when c has finished communicating with submaster of child
@@ -347,8 +345,8 @@ class ClusterProblem(object):
                                       for conn_t in self.problems[c].conn[t])),
                               0)
 
-                fwd_start_time[child[0]] = fwd_start_time[c] + t_cut
-                rev_end_time[child[0]] = rev_end_time[c] - self.problems[c].T + t_cut
+                fwd_start_time[child] = fwd_start_time[c] + t_cut
+                rev_end_time[child] = rev_end_time[c] - self.problems[c].T + t_cut
 
         if order == 'reversed':
             min_t = min(rev_end_time[c] - self.problems[c].T for c in self.problems)
@@ -358,10 +356,15 @@ class ClusterProblem(object):
 
         # Cluster problem total time
         self.T = max(start_time[c] + self.problems[c].T for c in self.problems)
+
         # Trajectories for cluster problem
-        self.traj = {(r, start_time[c] + t): v
-                             for c in self.parent_first_iter() if c in self.problems
-                             for (r, t), v in self.problems[c].traj.items()}
+        self.traj = {}
+        for c in self.parent_first_iter():
+            if c in self.problems:
+                for (r, t), v in self.problems[c].traj.items():
+                    if r not in self.subsinks[c]:
+                         self.traj[r, start_time[c] + t] = v
+
         # Communication dictionary for cluster problem
         self.conn = {t : set() for t in range(self.T+1)}
         for c in self.parent_first_iter():

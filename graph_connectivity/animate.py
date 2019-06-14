@@ -103,7 +103,7 @@ def animate(graph, traj, conn,
 
     # robot nodes
     coll_rpos = ax.scatter(rob_pos[0][:,0], rob_pos[0][:,1], s=140, marker='o',
-                           c=rob_col, zorder=5, alpha=0.7,
+                           c=rob_col, zorder=7, alpha=1,
                            linewidths=2, edgecolors='black')
     # robot labels
     coll_rtext = [ax.text(rob_pos[0][i,0], rob_pos[0][i,1], str(r),
@@ -139,8 +139,9 @@ def animate(graph, traj, conn,
         alpha = anim_idx / FRAMES_PER_STEP
 
         if anim_idx == 1:
-            print("Animating time step {}/{}".format(t+1, total_time))
+            print("Animating step {}/{}".format(t+1, total_time))
 
+        if anim_idx == 0:
             # set node colors
             coll_npos.set_facecolor(nod_col[min(T, t)])
             coll_npos.set_edgecolor(nod_ecol[min(T,t)])
@@ -162,7 +163,7 @@ def animate(graph, traj, conn,
             if (t, v1, v2) in conn_col:
                 col_list = conn_col[t,v1,v2]
                 coll_conn_edge[i].set_color(col_list[int(10 * alpha) % len(col_list)])
-                coll_conn_edge[i].set_linewidth(4)
+                coll_conn_edge[i].set_linewidth(2.5)
 
         # Update robot node and label positions
         pos = (1-alpha) * rob_pos[min(T, t)] + alpha * rob_pos[min(T, t+1)]
@@ -203,7 +204,7 @@ def animate_cluster_sequence(graph, problem_list, STEP_T = 1, FPS = 20, filename
     ### Merge trajectories
     traj = {}
     for i in range(len(problem_list)):
-        for (r,t), v in problem_list[i].traj.items():
+        for (r, t), v in problem_list[i].traj.items():
             traj[r, start_time[i] + t] = v
 
     # Fill in missing values with blanks
@@ -241,16 +242,15 @@ def animate_cluster_sequence(graph, problem_list, STEP_T = 1, FPS = 20, filename
         if isinstance(problem, ExplorationProblem):
             for t, g in enumerate(problem.graph_list):
                 for n in g.nodes:
-                    node_explored[start_time[i] + t, n] = g.nodes[n]['known']
-
-            g = problem.graph_list[min(problem.T, t)]
+                    if g.nodes[n]['known']:
+                        node_explored[start_time[i] + t, n] = True
 
     # Fill in missing values with blanks
-    for i, v in enumerate(graph.nodes):
+    for v in graph.nodes:
         for t in range(T+1):
             if (t, v) not in node_explored:
                 node_explored[t, v] = node_explored[t-1, v]
 
     return animate(graph, traj, conn, 
-                  node_colors=node_colors, node_explored=node_explored,
-                  STEP_T=STEP_T, FPS=FPS, filename=filename)
+                   node_colors=node_colors, node_explored=node_explored,
+                   STEP_T=STEP_T, FPS=FPS, filename=filename)
