@@ -111,7 +111,7 @@ node_positions = {0: (0,0), 1: (0,1), 2: (-2,1), 3: (-2,2), 4: (-3,2), 5: (-3,1)
 G.set_node_positions(node_positions)
 
 #Set initial position of agents
-agent_positions = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, 15: 0, 16: 0, 17: 0}    #agent:position
+agent_positions = {r: 0 for r in range(20)}    #agent:position
 G.init_agents(agent_positions)
 
 #Set known attribute
@@ -137,16 +137,18 @@ while not G.is_known():
     G.set_frontiers(frontiers)
 
     #create sub-graph
-    g = deepcopy(G)
+    g1 = deepcopy(G)
+    g2 = deepcopy(G)
     unknown = [v for v in G.nodes if not G.nodes[v]['known']]
-    g.remove_nodes_from(unknown)
+    g1.remove_nodes_from(unknown)
+    g2.remove_nodes_from(unknown)
 
     #Process1-TRAVERSE TO FRONTIERS-----------------------------------------------------
     #CLUSTERING
     print()
-    print(Style.BRIGHT + Fore.BLUE + "Solving to frontier problem on {} known nodes".format(len(g)) + Style.RESET_ALL)
+    print(Style.BRIGHT + Fore.BLUE + "Solving to frontier problem on {} known nodes".format(len(g1)) + Style.RESET_ALL)
     cp1 = ClusterProblem()
-    cp1.graph = g
+    cp1.graph = g1
     cp1.master = master
     cp1.static_agents = [r for r in static_agents]
     cp1.graph.init_agents(agent_positions)
@@ -168,7 +170,7 @@ while not G.is_known():
     print()
     print(Style.BRIGHT + Fore.BLUE + "Solving to base problem" + Style.RESET_ALL)
     cp2 = ClusterProblem()
-    cp2.graph = g
+    cp2.graph = g2
     cp2.master = master
     cp2.static_agents = [r for r in static_agents]
     cp2.graph.init_agents(agent_positions)

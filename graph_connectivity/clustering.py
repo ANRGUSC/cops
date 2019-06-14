@@ -426,7 +426,7 @@ class ClusterProblem(object):
             norm = max(cp.reward_dict.values())
             if norm == 0:
                 norm = 1
-            cp.reward_dict = {v: 10*val/norm for v, val in cp.reward_dict.items()}
+            cp.reward_dict = {v: 20*val/norm for v, val in cp.reward_dict.items()}
 
             #Source is submaster
             cp.src = [self.submasters[c]]
@@ -495,7 +495,11 @@ class ClusterProblem(object):
                 norm = 1
             cp.reward_dict = {v: 10*val/norm for v, val in cp.reward_dict.items()}
 
-            cp.final_position = {r: v for r,v in self.to_frontier_problem.graph.agents.items() if r == self.submasters[c]}
+            if self.to_frontier_problem != 0:
+                cp.final_position = {r: v for r, v in self.to_frontier_problem.graph.agents.items() if r == self.submasters[c]}
+            else:
+                cp.final_position = {r: v for r,v in self.graph.agents.items() if r == self.submasters[c]}
+            print('final:', cp.final_position)
 
             #Sources are submaster in active higher ranked subgraphs
             cp.src = sources
