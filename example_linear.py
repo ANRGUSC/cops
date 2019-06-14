@@ -1,5 +1,5 @@
 from graph_connectivity.problem import *
-from graph_connectivity.problem_animate import *
+from graph_connectivity.animate import *
 
 n = 7  # size of graph
 
@@ -20,10 +20,10 @@ cp.static_agents = []          # static agents
 cp.src = [1]
 
 #Solve
-sol = cp.solve_adaptive()
+sol = cp.solve_flow()
 
 #Plot Graph (saves image as graph.png)
-plot_solution(cp)
+# plot_solution(cp)
 
 #Animate solution
-animate_solution(cp)
+animate(G, cp.traj, cp.conn)

@@ -6,7 +6,7 @@ from itertools import product
 
 from colorama import Fore, Style
 
-from graph_connectivity.animate_problem_sequence import *
+from graph_connectivity.animate import *
 from graph_connectivity.problem import *
 from graph_connectivity.explore_problem import *
 from graph_connectivity.clustering import *
@@ -126,7 +126,7 @@ problem_list = []
 
 master = 0
 static_agents = [0]
-MAXITER = 999
+MAXITER = 2
 i_iter = 0
 
 #MAIN-LOOP----------------------------------------------------------------------
@@ -151,7 +151,7 @@ while not G.is_known():
     cp1.static_agents = [r for r in static_agents]
     cp1.graph.init_agents(agent_positions)
     cp1.solve_to_frontier_problem(verbose=True)
-    agent_positions = {r: cp1.trajectories[(r, cp1.T)] for r in cp1.graph.agents}
+    agent_positions = {r: cp1.traj[(r, cp1.T)] for r in cp1.graph.agents}
     problem_list.append(cp1)
 
     #Process2-EXPLORE FRONTIERS-----------------------------------------------------
@@ -173,7 +173,7 @@ while not G.is_known():
     cp2.static_agents = [r for r in static_agents]
     cp2.graph.init_agents(agent_positions)
     cp2.solve_to_base_problem(verbose=True)
-    agent_positions = {r: cp2.trajectories[(r, cp2.T)] for r in cp2.graph.agents}
+    agent_positions = {r: cp2.traj[(r, cp2.T)] for r in cp2.graph.agents}
     problem_list.append(cp2)
 
     i_iter += 1
@@ -184,4 +184,4 @@ while not G.is_known():
 
 print("Whole loop is completed!")
 
-animate_cluster_problem_sequence(G, problem_list, ANIM_STEP=5, labels = True)
+animate_cluster_sequence(G, problem_list, FPS=15, STEP_T=0.5)

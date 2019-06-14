@@ -35,7 +35,8 @@ class ExplorationProblem(object):
         self.k = None
 
         # Heuristic solution
-        self.trajectories = {}
+        self.traj = {}
+        self.conn = {}
 
     ##PROPERTIES##
     @property
@@ -172,14 +173,14 @@ class ExplorationProblem(object):
         self._solve()
 
         #generate trajectories
-        self.trajectories = {}
+        self.traj = {}
         for t in range(self.T+1):
             for fr, r in self.frontier_robot_dict.items():
                 v = self.get_agent_position(fr,t)
-                self.trajectories[(r,t)] = v
+                self.traj[(r,t)] = v
             for r in self.graph.agents:
                 if r not in self.frontier_robot_dict.values():
-                    self.trajectories[(r,t)] = self.graph.agents[r]
+                    self.traj[(r,t)] = self.graph.agents[r]
 
     def _solve(self):
         for t in range(1,int(self.T/2)+1):
@@ -214,7 +215,7 @@ class ExplorationProblem(object):
 
         # Build dictionary robot,time -> position
         traj_x = {(r,t): np.array([self.graph.nodes[v]['x'], self.graph.nodes[v]['y']])
-                  for (r,t), v in self.trajectories.items()}
+                  for (r,t), v in self.traj.items()}
 
 
 
