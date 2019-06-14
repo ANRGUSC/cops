@@ -7,16 +7,13 @@ import matplotlib.animation as animation
 from graph_connectivity.clustering import ClusterProblem
 from graph_connectivity.explore_problem import ExplorationProblem
 
-#===ANIMATE=====================================================================
-
 def animate(graph, traj, conn,
-            node_colors = None,     # dict t,v : color
-            node_explored = None,   # dict t,v : explored
-            unkown_color = 'white',
-            STEP_T = 1, FPS = 20, filename="animation.mp4"):
-
-
-    ########## PRE CALCULATE STUFF ###########
+            node_colors=None,     # dict t,v : color
+            node_explored=None,   # dict t,v : bool
+            titles=None,          # dict t: title
+            unkown_color='white',
+            STEP_T=1, FPS=20, size=10,
+            filename="animation.mp4"):
 
     T = max(t for r,t in traj)
 
@@ -40,39 +37,49 @@ def animate(graph, traj, conn,
             else:
                 conn_col[t, v1, v2].append(rob_col[b])
 
-    # Node colors: t -> [c0 c1 ... cV]
+    # Node styling: t -> [c0 c1 ... cV]
     if node_colors is not None:
         nod_col = {t : [node_colors[t,v] for v in graph.nodes] for t in range(T+1)}
     else:
         nod_col = {t : ['white' for v in graph.nodes] for t in range(T+1)}
     nod_ecol = {t : ['black' for v in graph.nodes] for t in range(T+1)}
+    nod_lcol = {t : ['black' for v in graph.nodes] for t in range(T+1)}
+    nod_thick = {t : [1. for v in graph.nodes] for t in range(T+1)}
 
-    # Edge colors
-    nod_tran_alpha = {t : [1. for v in graph.tran_edges()] for t in range(T+1)}
-    nod_conn_alpha = {t : [1. for v in graph.conn_edges()] for t in range(T+1)}
+    # Edge styling
+    tran_edge_alpha = {t : [1. for v in graph.tran_edges()] for t in range(T+1)}
+    tran_edge_color = {t : ['black' for v in graph.tran_edges()] for t in range(T+1)}
+    tran_edge_thick = {t : [1. for v in graph.tran_edges()] for t in range(T+1)}
+    conn_edge_alpha = {t : [1. for v in graph.conn_edges()] for t in range(T+1)}
 
+    # Style exploration colors
     if node_explored is not None:
         for t in range(T+1):
-            for v in graph.nodes:
-                if not node_explored[t, v]:
-                    nod_col[t][v] = unkown_color
-                    nod_ecol[t][v] = unkown_color
+            for i, v in enumerate(graph.nodes):
+                if not node_explored[t, v]:                            # Hidden node
+                    nod_col[t][i] = unkown_color
+                    nod_ecol[t][i] = unkown_color
+                    nod_lcol[t][i] = unkown_color
 
             for i, (v1, v2) in enumerate(graph.tran_edges()):
-                if not node_explored[t, v1]:
-                    nod_tran_alpha[t][i] = 0.
+                if not node_explored[t, v1]:                           # Hidden edge
+                    tran_edge_alpha[t][i] = 0.
+                if node_explored[t, v1] and not node_explored[t, v2]:  # Frontier node/edge
+                    tran_edge_color[t][i] = 'orange'
+                    nod_ecol[t][list(graph.nodes).index(v1)] = 'orange'
+                    tran_edge_thick[t][i] = 2.5
+                    nod_thick[t][list(graph.nodes).index(v1)] = 2.5
 
             for i, (v1, v2) in enumerate(graph.conn_edges()):
                 if (not node_explored[t, v1]) or (not node_explored[t, v2]):
-                    nod_conn_alpha[t][i] = 0.
+                    conn_edge_alpha[t][i] = 0.
 
     ########## INITIAL PLOT ##################
 
     dict_pos = {n: (graph.nodes[n]['x'], graph.nodes[n]['y']) for n in graph}
     npos = np.array([dict_pos[i] for i in graph.nodes])
 
-
-    fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+    fig, ax = plt.subplots(1, 1, figsize=(size, size))
     ax.axis('off')
 
     # nodes
@@ -91,6 +98,18 @@ def animate(graph, traj, conn,
                                             connectionstyle='arc', edge_color='black')
     coll_conn_edge = nx.draw_networkx_edges(graph, dict_pos, ax=ax, edgelist=list(graph.conn_edges()),
                                             edge_color='black')
+    title_field = ax.text((max(npos[:,0])+min(npos[:,0]))/2,
+                          max(npos[:,1]), "",
+                          horizontalalignment='center',
+                          verticalalignment='top',
+                          zorder=5, size=14, color='black',
+                          family='sans-serif', weight='bold', alpha=1.0)
+    time_field = ax.text((max(npos[:,0])+min(npos[:,0]))/2,
+                         max(npos[:,1])-0.5, "",
+                         horizontalalignment='center',
+                         verticalalignment='top',
+                         zorder=5, size=14, color='black',
+                         family='sans-serif', weight='bold', alpha=1.0)
 
     if coll_conn_edge is not None:
         for cedge in coll_conn_edge:
@@ -99,9 +118,9 @@ def animate(graph, traj, conn,
 
     # initial colors
     for i, (v1, v2) in enumerate(graph.conn_edges()):
-        coll_conn_edge[i].set_alpha(nod_conn_alpha[0][i])
+        coll_conn_edge[i].set_alpha(conn_edge_alpha[0][i])
     for i, (v1, v2) in enumerate(graph.tran_edges()):
-        coll_tran_edge[i].set_alpha(nod_tran_alpha[0][i])
+        coll_tran_edge[i].set_alpha(tran_edge_alpha[0][i])
     coll_npos.set_facecolor(nod_col[0])
     coll_npos.set_edgecolor(nod_ecol[0])
     for i,n in enumerate(graph.nodes):
@@ -121,21 +140,6 @@ def animate(graph, traj, conn,
 
     ########## LOOP #############
 
-    # Requires:
-    #  - graph, graph.agents
-    #  - rob_pos [t]
-    #  - conn_col [t, v1, v2]
-    #  - cluster [t, v1]
-    #  - known/unknown []
-    #
-    # Writes to:
-    #  - coll_conn_edge  [connectivity colors]
-    #  - coll_npos       [cluster/known/unknown change color]
-    #  - coll_ntext      [known/unknown change color]
-    #  - coll_rtext       [move robot labels]
-    #  - coll_rpos       [move robots]
-
-    # Frames per time step
     FRAMES_PER_STEP = max(2, int(STEP_T * FPS))
     total_time = T + 2
 
@@ -148,21 +152,31 @@ def animate(graph, traj, conn,
             print("Animating step {}/{}".format(t+1, total_time))
 
         if anim_idx == 0:
-            # set node colors
+            # node styling
             coll_npos.set_facecolor(nod_col[min(T, t)])
             coll_npos.set_edgecolor(nod_ecol[min(T,t)])
-            for i,n in enumerate(graph.nodes):
-                coll_ntext[i].set_color(nod_ecol[min(T,t)][i])
+            coll_npos.set_linewidth(nod_thick[min(T,t)])
 
-            # connectivity edge colors
+            for i,n in enumerate(graph.nodes):
+                coll_ntext[i].set_color(nod_lcol[min(T,t)][i])
+
+            # connectivity edge styling
             for i, (v1, v2) in enumerate(graph.conn_edges()):
-                coll_conn_edge[i].set_alpha(nod_conn_alpha[min(T, t)][i])
+                coll_conn_edge[i].set_alpha(conn_edge_alpha[min(T, t)][i])
                 coll_conn_edge[i].set_color("black")
                 coll_conn_edge[i].set_linewidth(1)
 
-            # transition edge colors
+            # transition edge styling
             for i, (v1, v2) in enumerate(graph.tran_edges()):
-                coll_tran_edge[i].set_alpha(nod_tran_alpha[min(T, t)][i])
+                coll_tran_edge[i].set_alpha(tran_edge_alpha[min(T, t)][i])
+                coll_tran_edge[i].set_color(tran_edge_color[min(T, t)][i])
+                coll_tran_edge[i].set_linewidth(tran_edge_thick[min(T, t)][i])
+
+            # text/time fields
+            if titles is not None:
+                if t in titles:
+                    title_field.set_text(titles[t])
+            time_field.set_text("t={}".format(t))
 
         # Update connectivity edge colors if there is flow information
         for i, (v1, v2) in enumerate(graph.conn_edges()):
@@ -184,9 +198,7 @@ def animate(graph, traj, conn,
     ani.save(filename)
 
 
-def animate_cluster(graph, traj, conn,
-                    subgraphs,
-                    STEP_T = 1, FPS = 20, filename="animation.mp4"):
+def animate_cluster(graph, traj, conn, subgraphs, **kwargs):
 
     T = max(t for r,t in traj)
 
@@ -195,12 +207,10 @@ def animate_cluster(graph, traj, conn,
                                        for v in v_list
                                        for t in range(T+1)}
 
-    return animate(graph, traj, conn,
-                  node_colors=node_colors, node_explored=None,
-                  STEP_T=STEP_T, FPS=FPS, filename=filename)
+    return animate(graph, traj, conn, node_colors=node_colors, **kwargs)
 
 
-def animate_cluster_sequence(graph, problem_list, STEP_T = 1, FPS = 20, filename="animation.mp4"):
+def animate_cluster_sequence(graph, problem_list, **kwargs):
 
     # Use a one to put one time step between problems
     start_time = [0] + list(accumulate([problem.T + 1 for problem in problem_list]))
@@ -257,6 +267,15 @@ def animate_cluster_sequence(graph, problem_list, STEP_T = 1, FPS = 20, filename
             if (t, v) not in node_explored:
                 node_explored[t, v] = node_explored[t-1, v]
 
-    return animate(graph, traj, conn,
-                   node_colors=node_colors, node_explored=node_explored,
-                   STEP_T=STEP_T, FPS=FPS, filename=filename)
+    titles = {}
+    out = True
+    for i, problem in enumerate(problem_list):
+        if isinstance(problem, ExplorationProblem):
+            titles[start_time[i]] = "Exploration"
+        if isinstance(problem, ClusterProblem):
+            titles[start_time[i]] = "To Frontiers" if out else "To base"
+            out = not out
+
+    return animate(graph, traj, conn, node_colors=node_colors,
+                   node_explored=node_explored, titles=titles,
+                   **kwargs)
