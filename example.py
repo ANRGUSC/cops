@@ -5,7 +5,7 @@ import matplotlib.animation as animation
 from itertools import product
 
 from graph_connectivity.problem import *
-from graph_connectivity.problem_animate import *
+from graph_connectivity.animate import *
 
 # Define a connectivity graph
 G = Graph()
@@ -77,7 +77,7 @@ cp.diameter_solve_flow(master = True, connectivity = False, optimal = True)
 #print(cp.solution['x'][cp.get_e_idx(2,1,3)])
 
 #Plot Graph (saves image as graph.png)
-plot_solution(cp)
+# plot_solution(cp)
 
 #Animate solution
-animate_solution(cp, labels=True)
+animate(G, cp.traj, cp.conn, FPS=10, STEP_T=1)

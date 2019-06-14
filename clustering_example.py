@@ -1,5 +1,5 @@
 from graph_connectivity.clustering import *
-from graph_connectivity.clustering_animate import *
+from graph_connectivity.animate import *
 
 
 # Define a connectivity graph
@@ -49,7 +49,7 @@ master = 0
 static_agents = [0]
 
 #Plot Graph (saves image as graph.png)
-G.plot_graph()
+# G.plot_graph()
 
 #CLUSTERING
 k = 4
@@ -60,14 +60,6 @@ cp.master = master
 cp.static_agents = static_agents
 cp.create_subgraphs()
 
-'''
-print("Agent clusters: {}".format(cp.agent_clusters))
-print("Subgraphs: {}".format(cp.subgraphs))
-print("Submasters: {}".format(cp.submasters))
-print("Subsinks: {}".format(cp.subsinks))
-print("Hier-Ascend: {}".format(cp.hier_ascend))
-print("Hier-Descend: {}".format(cp.hier_descend))
-'''
 
 cp.solve_to_base_problem()
-animate_solution(cp)
+animate_cluster(G, cp.traj, cp.conn, cp.subgraphs)

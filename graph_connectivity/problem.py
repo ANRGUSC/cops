@@ -48,7 +48,7 @@ class ConnectivityProblem(object):
 
         # ILP solution
         self.solution = None
-        self.trajectories = None
+        self.traj = None
 
         self.conn = None   # { t : [(v00, v01, b0), (v10, v11, b1)] }
 
@@ -468,30 +468,31 @@ class ConnectivityProblem(object):
             if verbose:
                 print("Problem infeasible")
 
-            self.trajectories = {}
+            self.traj = {}
             self.conn = {}
         else:
             #cut static part of solution
             self.cut_solution()
 
             # save info
-            self.trajectories = {}
+            self.traj = {}
             self.conn = {t : set() for t in range(self.T+1)}
 
             for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T+1)):
                 if self.solution['x'][self.get_z_idx(r, v, t)] > 0.5:
-                    self.trajectories[(r,t)] = v
+                    self.traj[(r,t)] = v
 
             if 'fbar' in self.vars:
                 for t, b, (v1, v2) in product(range(self.T+1), range(self.num_min_src_snk),
                                               self.graph.conn_edges()):
                     if self.solution['x'][self.get_fbar_idx(b, v1, v2, t)] > 0.5:
-                        self.conn[t].add((v1, v2, 'b{}'.format(b)))
+                        b_r = self.src[b] if len(self.src) <= len(self.snk) else self.snk[b]
+                        self.conn[t].add((v1, v2, b_r))
 
             if 'mbar' in self.vars:
                 for t, (v1, v2) in product(range(self.T+1), self.graph.conn_edges()):
                     if self.solution['x'][self.get_mbar_idx(v1, v2, t)] > 0.5:
-                        self.conn[t].add((v1, v2, 'm'))
+                        self.conn[t].add((v1, v2, self.master))
 
 
     ##GRAPH HELPER FUNCTIONS##

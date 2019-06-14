@@ -30,7 +30,7 @@ class ClusterProblem(object):
 
         #Problems/Solutions
         self.problems = {}
-        self.trajectories = {}
+        self.traj = {}
         self.conn = {}
 
     #=== HELPER FUNCTIONS==================================================
@@ -341,8 +341,8 @@ class ClusterProblem(object):
 
                 # first time when c has finished communicating with submaster of child
                 t_cut = next( (t for t in range(self.problems[c].T, 0, -1)
-                               if self.problems[c].trajectories[(submaster, t)]
-                                  != self.problems[c].trajectories[(submaster, t - 1)]
+                               if self.problems[c].traj[(submaster, t)]
+                                  != self.problems[c].traj[(submaster, t - 1)]
                                or any(submaster_node in conn_t[0:2]
                                       for conn_t in self.problems[c].conn[t])),
                               0)
@@ -359,9 +359,9 @@ class ClusterProblem(object):
         # Cluster problem total time
         self.T = max(start_time[c] + self.problems[c].T for c in self.problems)
         # Trajectories for cluster problem
-        self.trajectories = {(r, start_time[c] + t): v
+        self.traj = {(r, start_time[c] + t): v
                              for c in self.parent_first_iter() if c in self.problems
-                             for (r, t), v in self.problems[c].trajectories.items()}
+                             for (r, t), v in self.problems[c].traj.items()}
         # Communication dictionary for cluster problem
         self.conn = {t : set() for t in range(self.T+1)}
         for c in self.parent_first_iter():
@@ -374,9 +374,9 @@ class ClusterProblem(object):
         # Fill out empty trajectory slots
         for r, t in product(self.graph.agents, range(self.T+1)):
             if t == 0:
-                self.trajectories[(r,t)] = self.graph.agents[r]
-            if (r,t) not in self.trajectories:
-                self.trajectories[(r,t)] = self.trajectories[(r,t-1)]
+                self.traj[(r,t)] = self.graph.agents[r]
+            if (r,t) not in self.traj:
+                self.traj[(r,t)] = self.traj[(r,t-1)]
 
     def solve_to_frontier_problem(self, verbose=False):
 
