@@ -20,6 +20,7 @@ class ClusterProblem(object):
         self.static_agents = None
         self.T = None
         self.max_problem_size = 4000
+        self.to_frontier_problem = None
 
         #Clusters
         self.agent_clusters = None
@@ -27,6 +28,7 @@ class ClusterProblem(object):
         self.parent_clusters = None
         self.subgraphs = None
         self.submasters = None
+        self.subsinks = None
 
         #Problems/Solutions
         self.problems = {}
@@ -439,7 +441,16 @@ class ClusterProblem(object):
 
     def solve_to_base_problem(self, verbose=False):
 
-        self.create_subgraphs(verbose=verbose)
+        # if previous to_frontier_problem specified, use same clusters
+        if self.to_frontier_problem != None:
+            self.agent_clusters = self.to_frontier_problem.agent_clusters
+            self.child_clusters = self.to_frontier_problem.child_clusters
+            self.parent_clusters = self.to_frontier_problem.parent_clusters
+            self.subgraphs = self.to_frontier_problem.subgraphs
+            self.submasters = self.to_frontier_problem.submasters
+            self.subsinks = self.to_frontier_problem.subsinks
+        else:
+            self.create_subgraphs(verbose=verbose)
 
         active_subgraphs = self.frontier_clusters()
 
@@ -484,7 +495,7 @@ class ClusterProblem(object):
                 norm = 1
             cp.reward_dict = {v: 10*val/norm for v, val in cp.reward_dict.items()}
 
-            cp.final_position = {r: v for r,v in self.graph.agents.items() if r == self.submasters[c]}
+            cp.final_position = {r: v for r,v in self.to_frontier_problem.graph.agents.items() if r == self.submasters[c]}
 
             #Sources are submaster in active higher ranked subgraphs
             cp.src = sources

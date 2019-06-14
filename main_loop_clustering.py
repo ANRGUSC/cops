@@ -126,7 +126,7 @@ problem_list = []
 
 master = 0
 static_agents = [0]
-MAXITER = 10
+MAXITER = 10000
 i_iter = 0
 
 #MAIN-LOOP----------------------------------------------------------------------
@@ -172,6 +172,7 @@ while not G.is_known():
     cp2.master = master
     cp2.static_agents = [r for r in static_agents]
     cp2.graph.init_agents(agent_positions)
+    cp2.to_frontier_problem = cp1
     cp2.solve_to_base_problem(verbose=True)
     agent_positions = {r: cp2.traj[(r, cp2.T)] for r in cp2.graph.agents}
     problem_list.append(cp2)
