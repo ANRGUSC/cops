@@ -12,6 +12,7 @@ from graph_connectivity.explore_problem import ExplorationProblem
 def animate(graph, traj, conn, 
             node_colors = None,     # dict t,v : color
             node_explored = None,   # dict t,v : explored
+            titles = None,          # dict t: title
             unkown_color = 'white',
             STEP_T = 1, FPS = 20, filename="animation.mp4"):
 
@@ -65,7 +66,6 @@ def animate(graph, traj, conn,
     dict_pos = {n: (graph.nodes[n]['x'], graph.nodes[n]['y']) for n in graph}
     npos = np.array([dict_pos[i] for i in graph.nodes])
 
-
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
     ax.axis('off')
 
@@ -85,6 +85,18 @@ def animate(graph, traj, conn,
                                             connectionstyle='arc', edge_color='black')
     coll_conn_edge = nx.draw_networkx_edges(graph, dict_pos, ax=ax, edgelist=list(graph.conn_edges()),
                                             edge_color='black')
+    title_field = ax.text((max(npos[:,0])+min(npos[:,0]))/2, 
+                          max(npos[:,1]), "",
+                    horizontalalignment='center',
+                    verticalalignment='top',
+                    zorder=5, size=14, color='black',
+                    family='sans-serif', weight='bold', alpha=1.0)
+    time_field = ax.text((max(npos[:,0])+min(npos[:,0]))/2, 
+                         max(npos[:,1])-0.5, "",
+                    horizontalalignment='center',
+                    verticalalignment='top',
+                    zorder=5, size=14, color='black',
+                    family='sans-serif', weight='bold', alpha=1.0)
 
     if coll_conn_edge is not None:
         for cedge in coll_conn_edge:
@@ -157,6 +169,12 @@ def animate(graph, traj, conn,
             # transition edge colors
             for i, (v1, v2) in enumerate(graph.tran_edges()):
                 coll_tran_edge[i].set_alpha(nod_tran_alpha[min(T, t)][i])
+
+            # text/time fields
+            if titles is not None:
+                if t in titles:
+                    title_field.set_text(titles[t])
+            time_field.set_text("t={}".format(t))
 
         # Update connectivity edge colors if there is flow information
         for i, (v1, v2) in enumerate(graph.conn_edges()):
@@ -251,6 +269,16 @@ def animate_cluster_sequence(graph, problem_list, STEP_T = 1, FPS = 20, filename
             if (t, v) not in node_explored:
                 node_explored[t, v] = node_explored[t-1, v]
 
+    titles = {}
+    out = True
+    for i, problem in enumerate(problem_list):
+        if isinstance(problem, ExplorationProblem):
+            titles[start_time[i]] = "Exploration"
+        if isinstance(problem, ClusterProblem):
+            titles[start_time[i]] = "To Frontiers" if out else "To base"
+            out = not out
+
     return animate(graph, traj, conn, 
                    node_colors=node_colors, node_explored=node_explored,
+                   titles=titles,
                    STEP_T=STEP_T, FPS=FPS, filename=filename)
