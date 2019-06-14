@@ -317,7 +317,7 @@ class ClusterProblem(object):
         frontier_clusters = set(c for c in self.subgraphs
                               if any(self.graph.node[v]['frontiers'] != 0
                                      for v in self.subgraphs[c]))
-        
+
         for c in self.children_first_iter():
             if any(child_c in frontier_clusters for child_c,_ in self.child_clusters[c]):
                frontier_clusters.add(c)
@@ -340,11 +340,11 @@ class ClusterProblem(object):
                 submaster_node = self.problems[c].graph.agents[submaster]
 
                 # first time when c has finished communicating with submaster of child
-                t_cut = next( (t for t in range(self.problems[c].T, 0, -1) 
+                t_cut = next( (t for t in range(self.problems[c].T, 0, -1)
                                if self.problems[c].trajectories[(submaster, t)]
                                   != self.problems[c].trajectories[(submaster, t - 1)]
                                or any(submaster_node in conn_t[0:2]
-                                      for conn_t in self.problems[c].conn[t])), 
+                                      for conn_t in self.problems[c].conn[t])),
                               0)
 
                 fwd_start_time[child[0]] = fwd_start_time[c] + t_cut
@@ -359,7 +359,7 @@ class ClusterProblem(object):
         # Cluster problem total time
         self.T = max(start_time[c] + self.problems[c].T for c in self.problems)
         # Trajectories for cluster problem
-        self.trajectories = {(r, start_time[c] + t): v 
+        self.trajectories = {(r, start_time[c] + t): v
                              for c in self.parent_first_iter() if c in self.problems
                              for (r, t), v in self.problems[c].trajectories.items()}
         # Communication dictionary for cluster problem
