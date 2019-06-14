@@ -9,7 +9,7 @@ from graph_connectivity.explore_problem import ExplorationProblem
 
 #===ANIMATE=====================================================================
 
-def animate(graph, traj, conn, 
+def animate(graph, traj, conn,
             node_colors = None,     # dict t,v : color
             node_explored = None,   # dict t,v : explored
             unkown_color = 'white',
@@ -24,15 +24,21 @@ def animate(graph, traj, conn,
     rob_col = plt.cm.rainbow(np.linspace(0, 1, len(graph.agents)))
 
     # Build dictionary time -> positions
-    rob_pos = {t : np.array([[graph.nodes[traj[r,t]]['x'], 
-                             graph.nodes[traj[r,t]]['y']] for r in graph.agents]) 
+    rob_pos = {t : np.array([[graph.nodes[traj[r,t]]['x'],
+                             graph.nodes[traj[r,t]]['y']] for r in graph.agents])
                for t in range(T+1)}
 
     # Connectivity colors: t,v1,v2 -> [c0 c1 c2]
     conn_col = { (t,v1,v2) : [] for t, conn_list in conn.items() for (v1, v2, b) in conn_list }
     for t, conn_list in conn.items():
         for (v1, v2, b) in conn_list:
-            conn_col[t, v1, v2].append(rob_col[b])
+            if type(b) is tuple:
+                if len(b)>1:
+                    conn_col[t, v1, v2].append('black')
+                else:
+                    conn_col[t, v1, v2].append(rob_col[b[0]])
+            else:
+                conn_col[t, v1, v2].append(rob_col[b])
 
     # Node colors: t -> [c0 c1 ... cV]
     if node_colors is not None:
@@ -121,7 +127,7 @@ def animate(graph, traj, conn,
     #  - conn_col [t, v1, v2]
     #  - cluster [t, v1]
     #  - known/unknown []
-    # 
+    #
     # Writes to:
     #  - coll_conn_edge  [connectivity colors]
     #  - coll_npos       [cluster/known/unknown change color]
@@ -178,18 +184,18 @@ def animate(graph, traj, conn,
     ani.save(filename)
 
 
-def animate_cluster(graph, traj, conn, 
-                    subgraphs, 
+def animate_cluster(graph, traj, conn,
+                    subgraphs,
                     STEP_T = 1, FPS = 20, filename="animation.mp4"):
-    
+
     T = max(t for r,t in traj)
 
     clu_col = dict(zip(subgraphs, plt.cm.gist_rainbow(np.linspace(0, 1, len(subgraphs)))))
-    node_colors = {(t, v) : clu_col[c] for c,v_list in subgraphs.items() 
+    node_colors = {(t, v) : clu_col[c] for c,v_list in subgraphs.items()
                                        for v in v_list
                                        for t in range(T+1)}
 
-    return animate(graph, traj, conn, 
+    return animate(graph, traj, conn,
                   node_colors=node_colors, node_explored=None,
                   STEP_T=STEP_T, FPS=FPS, filename=filename)
 
@@ -229,7 +235,7 @@ def animate_cluster_sequence(graph, problem_list, STEP_T = 1, FPS = 20, filename
                 for v in v_list:
                     for t in range(start_time[i], start_time[i] + problem.T):
                         node_colors[t, v] = clu_col[j]
-    
+
     # Fill in missing values with blanks
     for i, v in enumerate(graph.nodes):
         for t in range(T+1):
@@ -251,6 +257,6 @@ def animate_cluster_sequence(graph, problem_list, STEP_T = 1, FPS = 20, filename
             if (t, v) not in node_explored:
                 node_explored[t, v] = node_explored[t-1, v]
 
-    return animate(graph, traj, conn, 
+    return animate(graph, traj, conn,
                    node_colors=node_colors, node_explored=node_explored,
                    STEP_T=STEP_T, FPS=FPS, filename=filename)

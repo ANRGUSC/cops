@@ -26,8 +26,9 @@ def generate_flow_master_constraints(problem):
     c_54 = _dynamic_constraint_54(problem)
     c_55 = _dynamic_constraint_55(problem)
     c_59 = _dynamic_constraint_59(problem)
+    c_61 = _dynamic_constraint_61(problem)
 
-    return c_48 & c_49 & c_54 & c_55 #& c_59
+    return c_48 & c_49 & c_54 & c_55 & c_59 & c_61
 
 ##########################################################
 ##########################################################
@@ -237,7 +238,7 @@ def _dynamic_constraint_54(problem):
     A_iq_data = []
     b_iq_54 = []
 
-    v0 = problem.graph.agents[problem.master]
+    v0 = [problem.graph.agents[r] for r in problem.master]
 
     constraint_idx = 0
     for t, v in product(range(problem.T+1), problem.graph.nodes):
@@ -264,8 +265,8 @@ def _dynamic_constraint_54(problem):
             A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], t))
             A_iq_data.append(1)
 
-        if t == 0 and v == v0:
-            b_iq_54.append(len(problem.graph.agents) - 1)
+        if t == 0 and v in v0:
+            b_iq_54.append(len(problem.graph))
         else:
             b_iq_54.append(0)
         constraint_idx += 1
@@ -282,10 +283,10 @@ def _dynamic_constraint_55(problem):
     b_iq_55 = []
 
     constraint_idx = 0
-    m_v0 = problem.graph.agents[problem.master]
+    m_v0 = [problem.graph.agents[r] for r in problem.master]
     for t, r in product(range(problem.T+1), problem.graph.agents):
         v0 = problem.graph.agents[r]
-        if r != problem.master and v0 != m_v0:
+        if r not in problem.master and v0 not in m_v0:
             A_iq_row.append(constraint_idx)
             A_iq_col.append(problem.get_z_idx(r, v0, t))
             A_iq_data.append(-1)
@@ -324,44 +325,102 @@ def _dynamic_constraint_55(problem):
 
 
 def _dynamic_constraint_59(problem):
-    # Constructing A_eq and b_eq for equality (59) as sp.coo matrix
+    # Constructing A_iq and b_iq for equality (59) as sp.coo matrix
     A_iq_row  = []
     A_iq_col  = []
     A_iq_data = []
 
     constraint_idx = 0
-    m_v0 = problem.graph.agents[problem.master]
     for v in problem.graph.nodes:
 
+        A_iq_row.append(constraint_idx)
+        A_iq_col.append(problem.get_y_idx(v))
+        A_iq_data.append(1)
+
+        if problem.T>0:
+            for edge in problem.graph.tran_in_edges(v):
+                A_iq_row.append(constraint_idx)
+                A_iq_col.append(problem.get_m_idx(edge[0], edge[1], problem.T-1))
+                A_iq_data.append(-1)
+
+        for edge in problem.graph.conn_in_edges(v):
             A_iq_row.append(constraint_idx)
-            A_iq_col.append(problem.get_y_idx(v))
+            A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], problem.T))
+            A_iq_data.append(-1)
+
+        for edge in problem.graph.conn_out_edges(v):
+            A_iq_row.append(constraint_idx)
+            A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], problem.T))
             A_iq_data.append(1)
 
-            for tau in range(problem.T+1):
-                if tau > 0:
-                    for edge in problem.graph.tran_in_edges(v):
-                        A_iq_row.append(constraint_idx)
-                        A_iq_col.append(problem.get_m_idx(edge[0], edge[1], tau-1))
-                        A_iq_data.append(-1)
-
-                for edge in problem.graph.conn_in_edges(v):
-                    A_iq_row.append(constraint_idx)
-                    A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], tau))
-                    A_iq_data.append(-1)
-
-                if tau < problem.T:
-                    for edge in problem.graph.tran_out_edges(v):
-                        A_iq_row.append(constraint_idx)
-                        A_iq_col.append(problem.get_m_idx(edge[0], edge[1], tau))
-                        A_iq_data.append(1)
-
-                for edge in problem.graph.conn_out_edges(v):
-                    A_iq_row.append(constraint_idx)
-                    A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], tau))
-                    A_iq_data.append(1)
-
-            constraint_idx += 1
+        constraint_idx += 1
 
     A_iq_59 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
     # print("Constraint 59: {}".format(A_iq_59.shape[0]))
     return Constraint(A_iq=A_iq_59, b_iq=np.zeros(constraint_idx))
+
+
+def _dynamic_constraint_61(problem):
+    # Constructing A_iq and b_iq for equality (61) as sp.coo matrix
+    A_iq_row  = []
+    A_iq_col  = []
+    A_iq_data = []
+
+    constraint_idx = 0
+    m_v = [problem.graph.agents[m] for m in problem.master]
+    for t, v, b in product(range(problem.T+1), problem.graph.nodes, problem.min_src_snk):
+
+        if v not in m_v or t!=0:
+
+            #masterdata
+            if t > 0:
+                for edge in problem.graph.tran_in_edges(v):
+                    A_iq_row.append(constraint_idx)
+                    A_iq_col.append(problem.get_m_idx(edge[0], edge[1], t-1))
+                    A_iq_data.append(-1)
+
+            for edge in problem.graph.conn_in_edges(v):
+                A_iq_row.append(constraint_idx)
+                A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], t))
+                A_iq_data.append(-1)
+
+            if t < problem.T:
+                for edge in problem.graph.tran_out_edges(v):
+                    A_iq_row.append(constraint_idx)
+                    A_iq_col.append(problem.get_m_idx(edge[0], edge[1], t))
+                    A_iq_data.append(1)
+
+            for edge in problem.graph.conn_out_edges(v):
+                A_iq_row.append(constraint_idx)
+                A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], t))
+                A_iq_data.append(1)
+
+
+            #sourcedata
+            if t > 0:
+                for edge in problem.graph.tran_in_edges(v):
+                    A_iq_row.append(constraint_idx)
+                    A_iq_col.append(problem.get_f_idx(b, edge[0], edge[1], t-1))
+                    A_iq_data.append(1)
+
+            for edge in problem.graph.conn_in_edges(v):
+                A_iq_row.append(constraint_idx)
+                A_iq_col.append(problem.get_fbar_idx(b, edge[0], edge[1], t))
+                A_iq_data.append(1)
+
+            if t < problem.T:
+                for edge in problem.graph.tran_out_edges(v):
+                    A_iq_row.append(constraint_idx)
+                    A_iq_col.append(problem.get_f_idx(b, edge[0], edge[1], t))
+                    A_iq_data.append(-1)
+
+            for edge in problem.graph.conn_out_edges(v):
+                A_iq_row.append(constraint_idx)
+                A_iq_col.append(problem.get_fbar_idx(b, edge[0], edge[1], t))
+                A_iq_data.append(-1)
+
+            constraint_idx += 1
+
+    A_iq_61 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
+    # print("Constraint 59: {}".format(A_iq_59.shape[0]))
+    return Constraint(A_iq=A_iq_61, b_iq=np.zeros(constraint_idx))

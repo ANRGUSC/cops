@@ -58,9 +58,9 @@ G.plot_graph()
 
 # Set up the connectivity problem
 cp = ConnectivityProblem()
-cp.graph = G                            #graph
+cp.graph = G                             #graph
 cp.T = 12                                #time
-cp.master = 0                           #master_agent
+cp.master = [0, 5]                       #master_agent
 cp.static_agents = [0]                   #static agents
 
 #Define sources and sinks as subsets of agents

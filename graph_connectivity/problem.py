@@ -51,6 +51,7 @@ class ConnectivityProblem(object):
         self.traj = None
 
         self.conn = None   # { t : [(v00, v01, b0), (v10, v11, b1)] }
+        self.tran = None   # { t : [(v00, v01, b0), (v10, v11, b1)] }
 
     ##PROPERTIES##
 
@@ -85,6 +86,9 @@ class ConnectivityProblem(object):
     ##INDEX HELPER FUNCTIONS##
 
     def prepare_problem(self):
+
+        if type(self.master) is not list:
+            self.master = [self.master]
 
         #reset contraints
         self.constraint = Constraint()
@@ -396,7 +400,7 @@ class ConnectivityProblem(object):
         Rp = len(set(v for r, v in self.graph.agents.items()))
         V = self.graph.number_of_nodes()
 
-        T = int(max(D/2, D - Rp))
+        T = int(max(D/2, D - int(Rp/2)))
 
         feasible_solution = False
 
@@ -470,6 +474,7 @@ class ConnectivityProblem(object):
 
             self.traj = {}
             self.conn = {}
+            self.tran = {}
         else:
             #cut static part of solution
             self.cut_solution()
@@ -477,6 +482,7 @@ class ConnectivityProblem(object):
             # save info
             self.traj = {}
             self.conn = {t : set() for t in range(self.T+1)}
+            self.tran = {t : set() for t in range(self.T)}
 
             for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T+1)):
                 if self.solution['x'][self.get_z_idx(r, v, t)] > 0.5:
@@ -492,7 +498,20 @@ class ConnectivityProblem(object):
             if 'mbar' in self.vars:
                 for t, (v1, v2) in product(range(self.T+1), self.graph.conn_edges()):
                     if self.solution['x'][self.get_mbar_idx(v1, v2, t)] > 0.5:
-                        self.conn[t].add((v1, v2, self.master))
+                        self.conn[t].add((v1, v2, tuple(self.master)))
+
+
+            if 'f' in self.vars:
+                for t, b, (v1, v2) in product(range(self.T), range(self.num_min_src_snk),
+                                              self.graph.tran_edges()):
+                    if self.solution['x'][self.get_f_idx(b, v1, v2, t)] > 0.5:
+                        b_r = self.src[b] if len(self.src) <= len(self.snk) else self.snk[b]
+                        self.tran[t].add((v1, v2, b_r))
+
+            if 'm' in self.vars:
+                for t, (v1, v2) in product(range(self.T), self.graph.tran_edges()):
+                    if self.solution['x'][self.get_m_idx(v1, v2, t)] > 0.5:
+                        self.tran[t].add((v1, v2, tuple(self.master)))
 
 
     ##GRAPH HELPER FUNCTIONS##

@@ -19,7 +19,7 @@ class ClusterProblem(object):
         self.master = None
         self.static_agents = None
         self.T = None
-        self.max_problem_size = 4000
+        self.max_problem_size = 5000
         self.to_frontier_problem = None
 
         #Clusters
@@ -29,6 +29,7 @@ class ClusterProblem(object):
         self.subgraphs = None
         self.submasters = None
         self.subsinks = None
+        self.active_agents = None   #agents that got activated with masterdata
 
         #Problems/Solutions
         self.problems = {}
@@ -117,7 +118,7 @@ class ClusterProblem(object):
             # graph diameter
             D = nx.diameter(nx.subgraph(self.graph, self.subgraphs[c]))
 
-            T = int(max(D/2, D - Rp))
+            T = int(max(D/2, D - int(Rp/2)))
 
             size = R * Et * T
 
@@ -324,7 +325,6 @@ class ClusterProblem(object):
 
         return frontier_clusters
 
-
     def merge_solutions(self, order = 'forward'):
 
         #Find start and end times for each cluster
@@ -439,6 +439,32 @@ class ClusterProblem(object):
 
         self.merge_solutions(order = 'forward')
 
+        # find activated agents
+        self.active_agents = {}
+        for c in self.problems:
+
+            # initial position activated nodes
+            self.active_agents[c] = [r for r in self.graph.agents
+                                    if (self.graph.agents[r] == self.graph.agents[self.submasters[c]])]
+
+            # connectivity activated nodes
+            for t, conn_t in self.problems[c].conn.items():
+                for (v1, v2, b) in conn_t:
+                    if type(b) is tuple:    #if b is a tuple then b is a master (by the construction of conn)
+                        for r in self.graph.agents:
+                            if self.graph.agents[r] == v2:
+                                if r not in self.active_agents[c]:
+                                    self.active_agents[c].append(r)
+
+            # transition activated nodes
+            for t, tran_t in self.problems[c].tran.items():
+                for (v1, v2, b) in tran_t:
+                    if type(b) is tuple:    #if b is a tuple then b is a master (by the construction of tran)
+                        for r in self.graph.agents:
+                            if self.graph.agents[r] == v2:
+                                if r not in self.active_agents[c]:
+                                    self.active_agents[c].append(r)
+
     def solve_to_base_problem(self, verbose=False):
 
         # if previous to_frontier_problem specified, use same clusters
@@ -459,8 +485,13 @@ class ClusterProblem(object):
             #Setup connectivity problem
             cp = ConnectivityProblem()
 
-            #Master is submaster of cluster
-            cp.master = self.submasters[c]
+            if self.to_frontier_problem != None:
+                #Masters are active agents in cluster
+                cp.master = self.to_frontier_problem.active_agents[c]
+            else:
+                cp.master = [self.submasters[c]]
+
+            print('active:', cp.master)
 
             #Setup agents and static agents in subgraph
             agents = {}
@@ -499,16 +530,18 @@ class ClusterProblem(object):
                 cp.final_position = {r: v for r, v in self.to_frontier_problem.graph.agents.items() if r == self.submasters[c]}
             else:
                 cp.final_position = {r: v for r,v in self.graph.agents.items() if r == self.submasters[c]}
-            print('final:', cp.final_position)
 
             #Sources are submaster in active higher ranked subgraphs
             cp.src = sources
+            print('from frontier:', sources)
+
             #Submaster is sink
             cp.snk = [self.submasters[c]]
 
-            cp.diameter_solve_flow(master = False, connectivity = True,
+            cp.diameter_solve_flow(master = True, connectivity = True,
                                    optimal = True, frontier_reward = False,
                                    verbose = verbose)
+
             self.problems[c] = cp
 
         self.merge_solutions(order = 'reversed')

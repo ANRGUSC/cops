@@ -132,6 +132,7 @@ i_iter = 0
 #MAIN-LOOP----------------------------------------------------------------------
 while not G.is_known():
 
+#try:
     #find frontiers
     frontiers ={v: 1 for v in G.nodes if G.is_frontier(v)}
     G.set_frontiers(frontiers)
@@ -182,6 +183,9 @@ while not G.is_known():
     i_iter += 1
     if i_iter > MAXITER:
         break
+#except:
+#    print('Break')
+#    break
 
 #ANIMATION----------------------------------------------------------------------
 
