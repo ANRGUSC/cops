@@ -290,7 +290,13 @@ def animate_cluster_buildup(graph, problem,
     active_cluster = {i: data[1] for i, data in enumerate(problem.cluster_builup)}
     new_node = {i: data[2] for i, data in enumerate(problem.cluster_builup)}
     path = {i: data[3] for i, data in enumerate(problem.cluster_builup)}
-    T = len(cluster_instances) - 1
+    T = len(cluster_instances)
+
+    # add one extra in end
+    cluster_instances[len(cluster_instances)] = cluster_instances[len(cluster_instances)-1]
+    active_cluster[len(active_cluster)] = active_cluster[len(active_cluster)-1]
+    new_node[len(new_node)] = None
+    path[len(path)] = None
 
     # find time when clusters/nodes are activated
     activated_clusters = {T: []}
