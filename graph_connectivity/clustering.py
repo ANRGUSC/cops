@@ -19,17 +19,18 @@ class ClusterProblem(object):
         self.master = None
         self.static_agents = None
         self.T = None
-        self.max_problem_size = 5000
+        self.max_problem_size = 2000
         self.to_frontier_problem = None
 
         #Clusters
+        self.cluster_builup = None
         self.agent_clusters = None
         self.child_clusters = None
         self.parent_clusters = None
         self.subgraphs = None
         self.submasters = None
         self.subsinks = None
-        self.active_agents = None   #agents that got activated with masterdata
+        self.active_agents = None
 
         #Problems/Solutions
         self.problems = {}
@@ -163,12 +164,15 @@ class ClusterProblem(object):
                             self.agent_clusters[c].append(r)
                             added = True
 
-    def inflate_clusters(self):
+    def inflate_clusters(self, save_buildup = False):
         '''
         Requires: self.graph
                   self.agent_clusters { 'c' : [r0, r1] ...}
                   self.master
         '''
+
+        if save_buildup and self.cluster_builup == None:
+            self.cluster_builup = []
 
         if self.graph_tran is None:
             self.create_graph_tran()
@@ -183,6 +187,9 @@ class ClusterProblem(object):
         # start with master cluster active
         active_clusters = [c for c, r_list in self.agent_clusters.items()
                            if self.master in r_list]
+
+        if save_buildup:
+            self.cluster_builup.append((deepcopy(clusters), deepcopy(active_clusters), None, None))
 
         while True:
 
@@ -228,7 +235,7 @@ class ClusterProblem(object):
             if (len(neighbors) == 0):
                 break  # nothing more to do
 
-            new_cluster, new_node, min_dist = -1, -1, 99999
+            new_cluster, new_node, min_dist, min_path = -1, -1, 99999, None
             for c in active_clusters:
                 c_neighbors = self.graph.post_tran(clusters[c])
 
@@ -236,17 +243,20 @@ class ClusterProblem(object):
 
                 for n in neighbors & c_neighbors:
 
-                    dist = nx.multi_source_dijkstra(self.graph_tran,
+                    dist, path = nx.multi_source_dijkstra(self.graph_tran,
                                                     sources=agent_positions,
-                                                    target=n)[0]
+                                                    target=n)
                     if dist < min_dist:
-                        min_dist, new_node, new_cluster = dist, n, c
+                        min_dist, new_node, new_cluster, min_path = dist, n, c, path
 
             clusters[new_cluster].add(new_node)
 
+            if save_buildup:
+                self.cluster_builup.append((deepcopy(clusters), deepcopy(active_clusters), deepcopy(new_node), min_path))
+
         return clusters, child_clusters, parent_clusters
 
-    def create_subgraphs(self, verbose=False):
+    def create_subgraphs(self, verbose=False, save_buildup = False):
 
         small_problem_size = False
 
@@ -258,7 +268,7 @@ class ClusterProblem(object):
         if self.k == None:
             self.k = 1
             self.agent_clusters = {'cluster0': [r for r in self.graph.agents]}
-            self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters()
+            self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters(save_buildup)
             small_problem_size = max(self.problem_size().values()) < self.max_problem_size
 
             # Strategy 1: cluster
@@ -269,7 +279,7 @@ class ClusterProblem(object):
                 #detect agent clusters
                 self.spectral_clustering(dynamic_agent_graph)
                 #dictionary mapping cluster to nodes
-                self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters()
+                self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters(save_buildup)
 
                 small_problem_size = max(self.problem_size(verbose=verbose).values()) < self.max_problem_size
 
@@ -297,7 +307,7 @@ class ClusterProblem(object):
             self.spectral_clustering(dynamic_agent_graph)
 
             #dictionary mapping cluster to nodes
-            self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters()
+            self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters(save_buildup)
 
         # create dictionaries mapping cluster to submaster, subsinks
         self.submasters = {self.master_cluster: self.master}
@@ -324,6 +334,40 @@ class ClusterProblem(object):
                frontier_clusters.add(c)
 
         return frontier_clusters
+
+    def activate_agents(self):
+        self.active_agents = {}
+        for c in self.problems:
+
+            # initial position activated nodes
+            self.active_agents[c] = [r for r in self.graph.agents
+                                    if (self.graph.agents[r] == self.graph.agents[self.submasters[c]])]
+
+            # connectivity activated nodes
+            for t, conn_t in self.problems[c].conn.items():
+                for (v1, v2, b) in conn_t:
+                    if type(b) is tuple:    #if b is a tuple then b is a master (by the construction of conn)
+                        for r in self.graph.agents:
+                            if self.graph.agents[r] == v2:
+                                if r not in self.active_agents[c]:
+                                    self.active_agents[c].append(r)
+                    elif b == self.submasters[c]:
+                        for r in self.graph.agents:
+                            if self.graph.agents[r] == v2:
+                                if r not in self.active_agents[c]:
+                                    self.active_agents[c].append(r)
+
+            # transition activated nodes
+            for t, tran_t in self.problems[c].tran.items():
+                for (v1, v2, b) in tran_t:
+                    if type(b) is tuple:    #if b is a tuple then b is a master (by the construction of tran)
+                        for r in self.graph.agents:
+                            if self.graph.agents[r] == v2 and r not in self.active_agents[c]:
+                                    self.active_agents[c].append(r)
+                    elif b == self.submasters[c]:
+                        for r in self.graph.agents:
+                            if self.graph.agents[r] == v2 and r not in self.active_agents[c]:
+                                    self.active_agents[c].append(r)
 
     def merge_solutions(self, order = 'forward'):
 
@@ -440,30 +484,7 @@ class ClusterProblem(object):
         self.merge_solutions(order = 'forward')
 
         # find activated agents
-        self.active_agents = {}
-        for c in self.problems:
-
-            # initial position activated nodes
-            self.active_agents[c] = [r for r in self.graph.agents
-                                    if (self.graph.agents[r] == self.graph.agents[self.submasters[c]])]
-
-            # connectivity activated nodes
-            for t, conn_t in self.problems[c].conn.items():
-                for (v1, v2, b) in conn_t:
-                    if type(b) is tuple:    #if b is a tuple then b is a master (by the construction of conn)
-                        for r in self.graph.agents:
-                            if self.graph.agents[r] == v2:
-                                if r not in self.active_agents[c]:
-                                    self.active_agents[c].append(r)
-
-            # transition activated nodes
-            for t, tran_t in self.problems[c].tran.items():
-                for (v1, v2, b) in tran_t:
-                    if type(b) is tuple:    #if b is a tuple then b is a master (by the construction of tran)
-                        for r in self.graph.agents:
-                            if self.graph.agents[r] == v2:
-                                if r not in self.active_agents[c]:
-                                    self.active_agents[c].append(r)
+        self.activate_agents()
 
     def solve_to_base_problem(self, verbose=False):
 
@@ -526,7 +547,7 @@ class ClusterProblem(object):
                 norm = 1
             cp.reward_dict = {v: 10*val/norm for v, val in cp.reward_dict.items()}
 
-            if self.to_frontier_problem != 0:
+            if self.to_frontier_problem != None:
                 cp.final_position = {r: v for r, v in self.to_frontier_problem.graph.agents.items() if r == self.submasters[c]}
             else:
                 cp.final_position = {r: v for r,v in self.graph.agents.items() if r == self.submasters[c]}

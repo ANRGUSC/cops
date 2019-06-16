@@ -161,7 +161,12 @@ while not G.is_known():
     ep = ExplorationProblem()
     ep.graph = G                                         #full graph
     ep.T = 8                                             #exploration time
+
     ep.static_agents = [r for r in static_agents]        #static agents
+    nonactivated_agents = set(agent_positions.keys()) - set(r for r_list in cp1.active_agents.values() for r in r_list)
+    for r in nonactivated_agents:
+        ep.static_agents.append(r)
+
     ep.graph.agents = agent_positions
     ep.solve()
     problem_list.append(ep)

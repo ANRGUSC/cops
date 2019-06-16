@@ -279,3 +279,221 @@ def animate_cluster_sequence(graph, problem_list, **kwargs):
     return animate(graph, traj, conn, node_colors=node_colors,
                    node_explored=node_explored, titles=titles,
                    **kwargs)
+
+
+def animate_cluster_buildup(graph, problem,
+                            STEP_T=2, FPS=20, size=10,
+                            filename="clustering_animation.mp4"):
+
+    # extract cluster information
+    cluster_instances = {i: data[0] for i, data in enumerate(problem.cluster_builup)}
+    active_cluster = {i: data[1] for i, data in enumerate(problem.cluster_builup)}
+    new_node = {i: data[2] for i, data in enumerate(problem.cluster_builup)}
+    path = {i: data[3] for i, data in enumerate(problem.cluster_builup)}
+    T = len(cluster_instances) - 1
+
+    # find time when clusters/nodes are activated
+    activated_clusters = {T: []}
+    for i in range(T):
+        activated_clusters[i] = set(active_cluster[i+1]) - set(active_cluster[i])
+    activated_nodes = {}
+    for i in range(T+1):
+        activated_nodes[i] = []
+        for c in activated_clusters[i]:
+            for v in cluster_instances[i][c]:
+                activated_nodes[i].append(v)
+
+    #find connectivity edges used to activate clusters
+    conn_activate = {}
+    for i in range(T+1):
+        conn_activate[i] = []
+        for c in activated_clusters[i]:
+            (c_parent, v_parent) = problem.parent_clusters[c][0]
+            for (c1, v1) in problem.child_clusters[c_parent]:
+                if c == c1:
+                    c_child = c1
+                    v_child = v1
+            conn_activate[i].append((v_parent, v_child))
+
+    ### Prepare node colors
+    num_clusters = len(cluster_instances[T-1].keys())
+    clu_col = plt.cm.gist_rainbow(np.linspace(0, 1, num_clusters))
+
+    node_colors = {(t, v) : 'white' for v in graph.nodes for t in range(T+1)}
+    for t, clusters in cluster_instances.items():
+        for i, (c, v_list) in enumerate(clusters.items()):
+            for v in v_list:
+                node_colors[t, v] = clu_col[i]
+
+    # Fill in missing values with blanks
+    for i, v in enumerate(graph.nodes):
+        for t in range(T+1):
+            if (t, v) not in node_colors:
+                node_colors[t, v] = 'white'
+
+    # Colors for robots
+    rob_col = plt.cm.rainbow(np.linspace(0, 1, len(graph.agents)))
+
+    # Build dictionary time -> positions
+    rob_pos = {t : np.array([[graph.nodes[v]['x'],
+                             graph.nodes[v]['y']] for r, v in graph.agents.items()])
+               for t in range(T+1)}
+
+    # Node styling: t -> [c0 c1 ... cV]
+    if node_colors is not None:
+        nod_col = {t : [node_colors[t,v] for v in graph.nodes] for t in range(T+1)}
+    else:
+        nod_col = {t : ['white' for v in graph.nodes] for t in range(T+1)}
+    nod_ecol = {t : ['black' for v in graph.nodes] for t in range(T+1)}
+    nod_lcol = {t : ['black' for v in graph.nodes] for t in range(T+1)}
+    nod_thick = {t : [1. for v in graph.nodes] for t in range(T+1)}
+
+    # Edge styling
+    tran_edge_alpha = {t : [1. for v in graph.tran_edges()] for t in range(T+1)}
+    tran_edge_color = {t : ['black' for v in graph.tran_edges()] for t in range(T+1)}
+    tran_edge_thick = {t : [1. for v in graph.tran_edges()] for t in range(T+1)}
+    conn_edge_alpha = {t : [1. for v in graph.conn_edges()] for t in range(T+1)}
+
+    ########## INITIAL PLOT ##################
+
+    dict_pos = {n: (graph.nodes[n]['x'], graph.nodes[n]['y']) for n in graph}
+    npos = np.array([dict_pos[i] for i in graph.nodes])
+
+    fig, ax = plt.subplots(1, 1, figsize=(size, size))
+    ax.axis('off')
+
+    # nodes
+    coll_npos = ax.scatter(npos[:,0], npos[:,1], s=450, marker='o',
+                           c=nod_col[0], zorder=5, alpha=1,
+                           linewidths=1.0, edgecolors=np.full(len(graph.nodes), 'black'))
+    # node labels
+    coll_ntext = [ax.text(npos[i,0], npos[i,1], str(n),
+                          horizontalalignment='center',
+                          verticalalignment='center',
+                          zorder=5, size=8, color='black',
+                          family='sans-serif', weight='bold', alpha=1.0)
+                  for i, n in enumerate(graph.nodes)]
+
+    coll_tran_edge = nx.draw_networkx_edges(graph, dict_pos, ax=ax, edgelist=list(graph.tran_edges()),
+                                            connectionstyle='arc', edge_color='black')
+    coll_conn_edge = nx.draw_networkx_edges(graph, dict_pos, ax=ax, edgelist=list(graph.conn_edges()),
+                                            edge_color='black')
+
+    if coll_conn_edge is not None:
+        for cedge in coll_conn_edge:
+            cedge.set_connectionstyle("arc3,rad=0.25")
+            cedge.set_linestyle('dashed')
+
+    # initial colors
+    for i, (v1, v2) in enumerate(graph.conn_edges()):
+        coll_conn_edge[i].set_alpha(conn_edge_alpha[0][i])
+    for i, (v1, v2) in enumerate(graph.tran_edges()):
+        coll_tran_edge[i].set_alpha(tran_edge_alpha[0][i])
+    coll_npos.set_facecolor(nod_col[0])
+    coll_npos.set_edgecolor(nod_ecol[0])
+    for i,n in enumerate(graph.nodes):
+        coll_ntext[i].set_color(nod_ecol[0][i])
+
+    # robot nodes
+    coll_rpos = ax.scatter(rob_pos[0][:,0], rob_pos[0][:,1], s=140, marker='o',
+                           c=rob_col, zorder=7, alpha=1,
+                           linewidths=2, edgecolors='black')
+    # robot labels
+    coll_rtext = [ax.text(rob_pos[0][i,0], rob_pos[0][i,1], str(r),
+                         horizontalalignment='center',
+                         verticalalignment='center',
+                         zorder=10, size=8, color='k',
+                         family='sans-serif', weight='bold', alpha=1.0)
+                 for i, r in enumerate(graph.agents)]
+
+    ########## LOOP #############
+
+    FRAMES_PER_STEP = max(2, int(STEP_T * FPS))
+    total_time = T + 2
+
+    def animate(i):
+        t = int(i / FRAMES_PER_STEP)
+        anim_idx = i % FRAMES_PER_STEP
+        alpha = anim_idx / FRAMES_PER_STEP
+
+        if anim_idx == 1:
+            print("Animating step {}/{}".format(t+1, total_time))
+
+        # Update node colors
+        freq = 5
+        ncol = [node_colors[min(T, t), v] for v in graph.nodes()]
+        if anim_idx%(2*freq)<freq:
+            if new_node[min(T, t)] != None:
+                ncol[new_node[min(T, t)]]='white'
+                for v in graph.nodes():
+                    if v in activated_nodes[min(T, t)] or v == new_node[min(T, t)]:
+                        ncol[v]='white'
+
+        active = []
+        for c in active_cluster[min(T, t)]:
+            for v in cluster_instances[min(T, t)][c]:
+                active.append(v)
+        active = set(active).union(set(activated_nodes[min(T, t)]))
+
+        necol = []
+        nod_thick = []
+        for v in graph.nodes():
+            if v in active:
+                if anim_idx%(2*freq)<freq:
+                    if v in activated_nodes[min(T, t)] or v == new_node[min(T, t)]:
+                        necol.append('grey')
+                        nod_thick.append(1.)
+                    else:
+                        necol.append('orange')
+                        nod_thick.append(2.5)
+                else:
+                    necol.append('orange')
+                    nod_thick.append(2.5)
+            else:
+                necol.append('grey')
+                nod_thick.append(1.)
+
+
+        coll_npos.set_facecolor(ncol)
+        coll_npos.set_edgecolor(necol)
+        coll_npos.set_linewidth(nod_thick)
+
+
+        # find used transition edge
+        path_edges = []
+        if path[min(T, t)] != None:
+            for i in range(1, len(path[min(T, t)])):
+                path_edges.append((path[min(T, t)][i-1],path[min(T, t)][i]))
+
+        for i, (v1, v2) in enumerate(graph.tran_edges()):
+            if (v1, v2) in path_edges or (v2, v1) in path_edges:
+                if str(ncol[new_node[min(T, t)]]) == 'white':
+                    tran_edge_color[min(T, t)][i] = 'black'
+                    tran_edge_thick[min(T, t)][i] = 1.
+                else:
+                    tran_edge_color[min(T, t)][i] = ncol[new_node[min(T, t)]]
+                    tran_edge_thick[min(T, t)][i] = 2.5
+
+        # transition edge styling
+        for i, (v1, v2) in enumerate(graph.tran_edges()):
+            coll_tran_edge[i].set_alpha(tran_edge_alpha[min(T, t)][i])
+            coll_tran_edge[i].set_color(tran_edge_color[min(T, t)][i])
+            coll_tran_edge[i].set_linewidth(tran_edge_thick[min(T, t)][i])
+
+
+        # Update connectivity edge colors if there is flow information
+        for i, (v1, v2) in enumerate(graph.conn_edges()):
+            if (v1, v2) in conn_activate[min(T, t)]:
+                if anim_idx%(2*freq)<freq:
+                    coll_conn_edge[i].set_color('black')
+                    coll_conn_edge[i].set_linewidth(1.)
+                else:
+                    coll_conn_edge[i].set_color('orange')
+                    coll_conn_edge[i].set_linewidth(2.5)
+            else:
+                coll_conn_edge[i].set_color('black')
+                coll_conn_edge[i].set_linewidth(1.)
+
+    ani = animation.FuncAnimation(fig, animate, range(total_time * FRAMES_PER_STEP),
+                                  interval=1000/FPS, blit=False)
+    ani.save(filename)

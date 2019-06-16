@@ -58,8 +58,5 @@ cp.graph = G
 cp.k = k #uncomment for automatic choice of number of clusters
 cp.master = master
 cp.static_agents = static_agents
-cp.create_subgraphs()
-
-
-cp.solve_to_base_problem()
-animate_cluster(G, cp.traj, cp.conn, cp.subgraphs)
+cp.create_subgraphs(save_buildup = True)
+animate_cluster_buildup(G, cp)

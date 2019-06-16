@@ -26,9 +26,9 @@ def generate_flow_master_constraints(problem):
     c_54 = _dynamic_constraint_54(problem)
     c_55 = _dynamic_constraint_55(problem)
     c_59 = _dynamic_constraint_59(problem)
-    c_61 = _dynamic_constraint_61(problem)
+    #c_61 = _dynamic_constraint_61(problem)
 
-    return c_48 & c_49 & c_54 & c_55 & c_59 & c_61
+    return c_48 & c_49 & c_54 & c_55 & c_59 #& c_61
 
 ##########################################################
 ##########################################################
@@ -368,9 +368,12 @@ def _dynamic_constraint_61(problem):
 
     constraint_idx = 0
     m_v = [problem.graph.agents[m] for m in problem.master]
-    for t, v, b in product(range(problem.T+1), problem.graph.nodes, problem.min_src_snk):
+    print('mastern:', m_v)
+    for t, v, (b, b_r) in product(range(problem.T+1), problem.graph.nodes, enumerate(problem.min_src_snk)):
 
-        if v not in m_v or t!=0:
+        if v not in m_v or t != 0:
+
+            print(t,v,b)
 
             #masterdata
             if t > 0:
@@ -422,5 +425,5 @@ def _dynamic_constraint_61(problem):
             constraint_idx += 1
 
     A_iq_61 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
-    # print("Constraint 59: {}".format(A_iq_59.shape[0]))
+    # print("Constraint 61: {}".format(A_iq_61.shape[0]))
     return Constraint(A_iq=A_iq_61, b_iq=np.zeros(constraint_idx))
