@@ -13,3 +13,7 @@
 *.DS_STORE
 
 *.pdf
+*.jpg
+
+*.csv
+*.txt

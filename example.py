@@ -50,7 +50,7 @@ frontiers = {8: 1, 13: 1, 24: 1}
 G.set_frontiers(frontiers)
 
 #Set initial position of agents
-agent_positions = {0: 0, 1: 1, 2: 4, 3: 7, 4: 12, 5: 14, 6: 19, 7: 23}    #agent:position
+agent_positions = {0: 0, 1: 1, 2: 2, 3: 7, 4: 11}    #agent:position
 G.init_agents(agent_positions)
 
 #Plot Graph (saves image as graph.png)
@@ -59,17 +59,17 @@ G.plot_graph()
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 cp.graph = G                             #graph
-cp.T = 12                                #time
-cp.master = [0, 5]                       #master_agent
+cp.T = 4                                #time
+cp.master = [0]                       #master_agent
 cp.static_agents = [0]                   #static agents
 
 #Define sources and sinks as subsets of agents
-cp.src = []
-cp.snk = []
+cp.src = [1,2,3,4]
+cp.snk = [1,2,3,4]
 
 
 #Solve
-cp.diameter_solve_flow(master = True, connectivity = False, optimal = True)
+cp.solve_flow(master = False, connectivity = True, optimal = True, frontier_reward = False)
 
 #print(cp.solution['primal objective'])
 #print(cp.solution['x'][cp.get_e_idx(0,1,3)])

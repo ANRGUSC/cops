@@ -55,8 +55,9 @@ static_agents = [0]
 k = 4
 cp = ClusterProblem()
 cp.graph = G
-cp.k = k #uncomment for automatic choice of number of clusters
+#cp.k = k #uncomment for automatic choice of number of clusters
 cp.master = master
 cp.static_agents = static_agents
-cp.create_subgraphs(save_buildup = True)
-animate_cluster_buildup(G, cp)
+cp.create_subgraphs()
+cp.solve_to_frontier_problem()
+animate_cluster(G, cp.traj, cp.conn, cp.subgraphs)

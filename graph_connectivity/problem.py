@@ -103,10 +103,10 @@ class ConnectivityProblem(object):
             self.static_agents = []
 
         if self.src is None: # all-to-sinks connectivity if sources undefined
-            self.src = self.graph.agents.keys()
+            self.src = list(self.graph.agents.keys())
 
         if self.snk is None: # sources-to-all connectivity if sinks undefined
-            self.snk = self.graph.agents.keys()
+            self.snk = list(self.graph.agents.keys())
 
         # Create dictionaries for (i,j)->k mapping for edges
         self.dict_tran = {(i,j): k for k, (i,j) in enumerate(self.graph.tran_edges())}
@@ -196,9 +196,10 @@ class ConnectivityProblem(object):
                     obj[self.get_y_idx(v)] = -r
 
             # add frontier rewards
-            for v in self.graph.nodes:
-                if self.graph.nodes[v]['frontiers'] != 0:
-                    obj[self.get_y_idx(v)] -= self.std_frontier_reward
+            if 'frontiers' in self.graph.nodes[0]:
+                for v in self.graph.nodes:
+                    if self.graph.nodes[v]['frontiers'] != 0:
+                        obj[self.get_y_idx(v)] -= self.std_frontier_reward
 
             # add transition weights
             for e, t in product(self.graph.edges(data=True), range(self.T)):
@@ -334,11 +335,47 @@ class ConnectivityProblem(object):
 
         valid_solution = False
         while not valid_solution:
-            self._solve(solver, output, integer)
+            self._solve(solver, output, integer, adaptive = True)
             if self.solution['status'] == 'infeasible':
                 break
             valid_solution, add_S = self.test_solution()
             self.constraint &= generate_connectivity_constraint(self, range(self.num_src), add_S)
+        #cut static part of solution
+        self.cut_solution()
+
+        # save info
+        self.traj = {}
+        self.conn = {t : set() for t in range(self.T+1)}
+        self.tran = {t : set() for t in range(self.T)}
+
+        for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T+1)):
+            if self.solution['x'][self.get_z_idx(r, v, t)] > 0.5:
+                self.traj[(r,t)] = v
+
+        if 'fbar' in self.vars:
+            for t, b, (v1, v2) in product(range(self.T+1), range(self.num_min_src_snk),
+                                          self.graph.conn_edges()):
+                if self.solution['x'][self.get_fbar_idx(b, v1, v2, t)] > 0.5:
+                    b_r = self.src[b] if len(self.src) <= len(self.snk) else self.snk[b]
+                    self.conn[t].add((v1, v2, b_r))
+
+        if 'mbar' in self.vars:
+            for t, (v1, v2) in product(range(self.T+1), self.graph.conn_edges()):
+                if self.solution['x'][self.get_mbar_idx(v1, v2, t)] > 0.5:
+                    self.conn[t].add((v1, v2, tuple(self.master)))
+
+
+        if 'f' in self.vars:
+            for t, b, (v1, v2) in product(range(self.T), range(self.num_min_src_snk),
+                                          self.graph.tran_edges()):
+                if self.solution['x'][self.get_f_idx(b, v1, v2, t)] > 0.5:
+                    b_r = self.src[b] if len(self.src) <= len(self.snk) else self.snk[b]
+                    self.tran[t].add((v1, v2, b_r))
+
+        if 'm' in self.vars:
+            for t, (v1, v2) in product(range(self.T), self.graph.tran_edges()):
+                if self.solution['x'][self.get_m_idx(v1, v2, t)] > 0.5:
+                    self.tran[t].add((v1, v2, tuple(self.master)))
 
     def solve_flow(self, master = False, connectivity = True, optimal = False,
                    solver=None, output=False, integer=True,
@@ -446,7 +483,7 @@ class ConnectivityProblem(object):
 
             T += 1
 
-    def _solve(self, solver=None, output=False, integer=True, verbose=False):
+    def _solve(self, solver=None, output=False, integer=True, verbose=False, adaptive = False):
 
         obj = self.obj
 
@@ -468,6 +505,7 @@ class ConnectivityProblem(object):
         if verbose:
             print("Solver time {:.2f}s".format(time.time() - t0))
 
+
         if self.solution['status'] == 'infeasible':
             if verbose:
                 print("Problem infeasible")
@@ -476,8 +514,9 @@ class ConnectivityProblem(object):
             self.conn = {}
             self.tran = {}
         else:
-            #cut static part of solution
-            self.cut_solution()
+            if not adaptive:
+                #cut static part of solution
+                self.cut_solution()
 
             # save info
             self.traj = {}
@@ -571,10 +610,13 @@ class ConnectivityProblem(object):
                 if (self.graph.agents[b],0) not in S:
                     valid = False
             if valid == False:
+                add_S.append(S)
+                ''' PRATA MED PETTER!!!
                 for b in self.src:
                     if (self.graph.agents[b],0) in S:
                         S.remove((self.graph.agents[b],0))
                 add_S.append(S)
+                '''
 
         if len(add_S) != 0:
             return False, add_S

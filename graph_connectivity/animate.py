@@ -99,13 +99,13 @@ def animate(graph, traj, conn,
     coll_conn_edge = nx.draw_networkx_edges(graph, dict_pos, ax=ax, edgelist=list(graph.conn_edges()),
                                             edge_color='black')
     title_field = ax.text((max(npos[:,0])+min(npos[:,0]))/2,
-                          max(npos[:,1]), "",
+                          max(npos[:,1])+1, "",
                           horizontalalignment='center',
                           verticalalignment='top',
                           zorder=5, size=14, color='black',
                           family='sans-serif', weight='bold', alpha=1.0)
     time_field = ax.text((max(npos[:,0])+min(npos[:,0]))/2,
-                         max(npos[:,1])-0.5, "",
+                         max(npos[:,1])+0.5, "",
                          horizontalalignment='center',
                          verticalalignment='top',
                          zorder=5, size=14, color='black',
@@ -196,6 +196,57 @@ def animate(graph, traj, conn,
     ani = animation.FuncAnimation(fig, animate, range(total_time * FRAMES_PER_STEP),
                                   interval=1000/FPS, blit=False)
     ani.save(filename)
+
+def animate_sequence(graph, problem_list, **kwargs):
+
+    # Use a one to put one time step between problems
+    start_time = [0] + list(accumulate([problem.T + 1 for problem in problem_list]))
+
+    T = start_time[-1]
+
+    ### Merge trajectories
+    traj = {}
+    for i in range(len(problem_list)):
+        for (r, t), v in problem_list[i].traj.items():
+            traj[r, start_time[i] + t] = v
+
+    # Fill in missing values with blanks
+    for r, t in product(graph.agents, range(T+1)):
+        if not (r,t) in traj:
+            traj[r,t] = traj[r,t-1]
+
+    ### Merge connectivity info
+    conn = {}
+    for i in range(len(problem_list)):
+        if problem_list[i].conn is not None:
+            for t, conn_list in problem_list[i].conn.items():
+                conn[start_time[i] + t] = conn_list
+
+    ### Prepare explored/unexplored
+    node_explored = { (0, v) : False for v in graph.nodes }
+    for i, problem in enumerate(problem_list):
+        if isinstance(problem, ExplorationProblem):
+            for t, g in enumerate(problem.graph_list):
+                for n in g.nodes:
+                    if g.nodes[n]['known']:
+                        node_explored[start_time[i] + t, n] = True
+
+    # Fill in missing values with blanks
+    for v in graph.nodes:
+        for t in range(T+1):
+            if (t, v) not in node_explored:
+                node_explored[t, v] = node_explored[t-1, v]
+
+    titles = {}
+    out = True
+    for i, problem in enumerate(problem_list):
+        if isinstance(problem, ExplorationProblem):
+            titles[start_time[i]] = "Exploration"
+        if isinstance(problem, ClusterProblem):
+            titles[start_time[i]] = "To Frontiers" if out else "To base"
+            out = not out
+
+    return animate(graph, traj, conn, node_explored=node_explored, titles=titles, **kwargs)
 
 
 def animate_cluster(graph, traj, conn, subgraphs, **kwargs):

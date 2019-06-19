@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from itertools import product
 
-from graph_connectivity.main_methods import *
+from graph_connectivity.animate import *
 from graph_connectivity.problem import *
 from graph_connectivity.explore_problem import *
 from copy import deepcopy
@@ -83,10 +83,8 @@ while not G.is_known():
     cp1.src = []
     cp1.snk = []
     cp1.diameter_solve_flow(master = True, connectivity = False, optimal = True)
-    agent_positions = {r: cp1.trajectories[(r, cp1.T)] for r in cp1.graph.agents}
-    print("Agent positions: {}".format(agent_positions))
+    agent_positions = {r: cp1.traj[(r, cp1.T)] for r in cp1.graph.agents}
     problem_list.append(cp1)
-    print(cp1.solution['primal objective'])
 
     #Process2-EXPLORE FRONTIERS-----------------------------------------------------
     ep = ExplorationProblem()
@@ -103,12 +101,12 @@ while not G.is_known():
     cp2.master = master                      #master_agent
     cp2.static_agents = static_agents        #static agents
     cp2.graph.agents = agent_positions       #end positions from process 1
-    cp2.src = [r for r in cp1.graph.agents if g.is_local_frontier(cp1.trajectories[(r, cp1.T)])]
+    cp2.src = [r for r in cp1.graph.agents if g.is_local_frontier(cp1.traj[(r, cp1.T)])]
     cp2.snk = [0]
     sol = cp2.linear_search_solve_flow(master = False, connectivity = True, optimal = True)
-    agent_positions = {r: cp2.trajectories[(r, cp2.T)] for r in cp2.graph.agents}
+    agent_positions = {r: cp2.traj[(r, cp2.T)] for r in cp2.graph.agents}
 
     problem_list.append(cp2)
 
 #ANIMATION----------------------------------------------------------------------
-animate_problem_sequence(G, problem_list, ANIM_STEP=30, labels = True)
+animate_sequence(G, problem_list, FPS=15, STEP_T=0.5)
