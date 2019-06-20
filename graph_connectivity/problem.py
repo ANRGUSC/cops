@@ -35,9 +35,9 @@ class ConnectivityProblem(object):
         self.snk = None
         self.master = None
         self.std_frontier_reward = 100
-        self.frontier_reward_decay = 0.8
+        self.frontier_reward_decay = 0.5
         self.reward_dict = None
-        self.k = 3
+        self.k = None
 
         # ILP setup
         self.dict_tran = None
@@ -88,6 +88,12 @@ class ConnectivityProblem(object):
     ##INDEX HELPER FUNCTIONS##
 
     def prepare_problem(self):
+
+        #find max number of agents in frontier
+        if 'frontiers' in self.graph.nodes[0]:
+            self.k = max(self.graph.nodes[v]['frontiers'] for v in self.graph.nodes)
+        else:
+            self.k = 1
 
         if type(self.master) is not list:
             self.master = [self.master]
@@ -226,8 +232,9 @@ class ConnectivityProblem(object):
 
             # add frontier rewards
             if frontier_reward:
-                for v,k in product(self.graph.nodes,range(1, self.k+1)):
-                    if self.graph.nodes[v]['frontiers'] != 0:
+                for v in self.graph.nodes:
+                    K = self.graph.nodes[v]['frontiers']
+                    for k in range(1,K+1):
                         obj[self.get_y_idx(v,k)] -= (self.frontier_reward_decay**(k-1))*self.std_frontier_reward
 
             # add transition weights
