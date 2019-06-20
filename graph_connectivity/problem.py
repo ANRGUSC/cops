@@ -35,7 +35,9 @@ class ConnectivityProblem(object):
         self.snk = None
         self.master = None
         self.std_frontier_reward = 100
+        self.frontier_reward_decay = 0.8
         self.reward_dict = None
+        self.k = 3
 
         # ILP setup
         self.dict_tran = None
@@ -138,9 +140,11 @@ class ConnectivityProblem(object):
         idx = np.ravel_multi_index((t,k), (self.T, len(self.dict_tran)))
         return self.vars['e'].start + idx
 
-    def get_y_idx(self, v):
-        k = self.dict_node[v]
-        return self.vars['y'].start + k
+    def get_y_idx(self, v, k):
+        V = self.dict_node[v]
+        K = k - 1
+        idx = np.ravel_multi_index((V,K), (len(self.dict_node), self.k))
+        return self.vars['y'].start + idx
 
     def get_yb_idx(self, b, v, t):
         idx = np.ravel_multi_index((t,b,v), (self.T+1, self.num_src, self.num_v))
@@ -192,14 +196,15 @@ class ConnectivityProblem(object):
 
             # add user-defined rewards
             if self.reward_dict != None:
-                for v, r in self.reward_dict.items():
-                    obj[self.get_y_idx(v)] = -r
+                for t,r in product(range(self.T+1), self.agents):
+                    for v, R in self.reward_dict.items():
+                        obj[self.get_z_idx(r,v,t)] = -(0.9**t)*R
 
             # add frontier rewards
             if 'frontiers' in self.graph.nodes[0]:
-                for v in self.graph.nodes:
+                for t,r,v in product(range(self.T+1), self.agents, self.graph.nodes):
                     if self.graph.nodes[v]['frontiers'] != 0:
-                        obj[self.get_y_idx(v)] -= self.std_frontier_reward
+                        obj[self.get_z_idx(r,v,t)] -= (0.9**t)*self.std_frontier_reward
 
             # add transition weights
             for e, t in product(self.graph.edges(data=True), range(self.T)):
@@ -217,13 +222,13 @@ class ConnectivityProblem(object):
             # add user-defined rewards
             if self.reward_dict != None:
                 for v, r in self.reward_dict.items():
-                    obj[self.get_y_idx(v)] -= r
+                    obj[self.get_y_idx(v,1)] -= r
 
             # add frontier rewards
             if frontier_reward:
-                for v in self.graph.nodes:
+                for v,k in product(self.graph.nodes,range(1, self.k+1)):
                     if self.graph.nodes[v]['frontiers'] != 0:
-                        obj[self.get_y_idx(v)] -= self.std_frontier_reward
+                        obj[self.get_y_idx(v,k)] -= (self.frontier_reward_decay**(k-1))*self.std_frontier_reward
 
             # add transition weights
             for e, t, r in product(self.graph.edges(data=True), range(self.T), self.graph.agents):
@@ -389,7 +394,7 @@ class ConnectivityProblem(object):
         xfvar = Variable(size=self.T * len(self.graph.agents) * len(self.dict_tran),
                         start=zvar.start + zvar.size,
                         binary=True)
-        yvar = Variable(size=self.num_v,
+        yvar = Variable(size=self.num_v*self.k,
                         start=xfvar.start + xfvar.size,
                         binary=True)
         fvar = Variable(size=self.T * self.num_min_src_snk * len(self.dict_tran),

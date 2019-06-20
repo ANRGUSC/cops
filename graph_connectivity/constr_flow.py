@@ -158,14 +158,14 @@ def _dynamic_constraint_50(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for v in problem.graph.nodes:
+    for v, k in product(problem.graph.nodes,range(1,problem.k+1)):
         A_iq_row.append(constraint_idx)
-        A_iq_col.append(problem.get_y_idx(v))
+        A_iq_col.append(problem.get_y_idx(v,k))
         A_iq_data.append(1)
         for r in problem.graph.agents:
             A_iq_row.append(constraint_idx)
             A_iq_col.append(problem.get_z_idx(r, v, problem.T))
-            A_iq_data.append(-1)
+            A_iq_data.append(-1/k)
         constraint_idx += 1
 
     A_iq_50 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
@@ -331,10 +331,10 @@ def _dynamic_constraint_59(problem):
     A_iq_data = []
 
     constraint_idx = 0
-    for v in problem.graph.nodes:
+    for v, k in product(problem.graph.nodes,range(1,problem.k+1)):
 
         A_iq_row.append(constraint_idx)
-        A_iq_col.append(problem.get_y_idx(v))
+        A_iq_col.append(problem.get_y_idx(v,k))
         A_iq_data.append(1)
 
         if problem.T>0:
@@ -368,7 +368,6 @@ def _dynamic_constraint_61(problem):
 
     constraint_idx = 0
     m_v = [problem.graph.agents[m] for m in problem.master]
-    print('mastern:', m_v)
     for t, v, (b, b_r) in product(range(problem.T+1), problem.graph.nodes, enumerate(problem.min_src_snk)):
 
         if v not in m_v or t != 0:

@@ -46,7 +46,7 @@ node_positions = {0: (0,0), 1: (0,1), 2: (-2,1), 3: (-2,2), 4: (-3,2), 5: (-3,1)
 G.set_node_positions(node_positions)
 
 
-frontiers = {8: 1, 13: 1, 24: 1}
+frontiers = {2: 1, 14: 1}
 G.set_frontiers(frontiers)
 
 #Set initial position of agents
@@ -59,7 +59,7 @@ G.plot_graph()
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 cp.graph = G                             #graph
-cp.T = 4                                #time
+cp.T = 8                                #time
 cp.master = [0]                       #master_agent
 cp.static_agents = [0]                   #static agents
 
@@ -69,15 +69,7 @@ cp.snk = [1,2,3,4]
 
 
 #Solve
-cp.solve_flow(master = False, connectivity = True, optimal = True, frontier_reward = False)
-
-#print(cp.solution['primal objective'])
-#print(cp.solution['x'][cp.get_e_idx(0,1,3)])
-#print(cp.solution['x'][cp.get_e_idx(1,1,3)])
-#print(cp.solution['x'][cp.get_e_idx(2,1,3)])
-
-#Plot Graph (saves image as graph.png)
-# plot_solution(cp)
+cp.solve_flow(master = True, connectivity = True, optimal = True)
 
 #Animate solution
 animate(G, cp.traj, cp.conn, FPS=10, STEP_T=1)
