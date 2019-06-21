@@ -134,7 +134,7 @@ while not G.is_known():
 
 #try:
     #find frontiers
-    frontiers ={v: 1 for v in G.nodes if G.is_frontier(v)}
+    frontiers ={v: 2 for v in G.nodes if G.is_frontier(v)}
     G.set_frontiers(frontiers)
 
     #create sub-graph
@@ -153,7 +153,7 @@ while not G.is_known():
     cp1.master = master
     cp1.static_agents = [r for r in static_agents]
     cp1.graph.init_agents(agent_positions)
-    cp1.solve_to_frontier_problem(verbose=True)
+    cp1.solve_to_frontier_problem(verbose=True, soft = True)
     agent_positions = {r: cp1.traj[(r, cp1.T)] for r in cp1.graph.agents}
     problem_list.append(cp1)
 

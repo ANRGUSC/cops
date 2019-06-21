@@ -90,8 +90,8 @@ class ConnectivityProblem(object):
     def prepare_problem(self):
 
         #find max number of agents in frontier
-        if 'frontiers' in self.graph.nodes[0]:
-            self.k = max(self.graph.nodes[v]['frontiers'] for v in self.graph.nodes)
+        if 'frontiers' in self.graph.nodes[list(self.graph.nodes)[0]]:
+            self.k = max(1,max(self.graph.nodes[v]['frontiers'] for v in self.graph.nodes))
         else:
             self.k = 1
 

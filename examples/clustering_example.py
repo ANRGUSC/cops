@@ -38,11 +38,11 @@ node_positions = {0: (0,0), 1: (0,1), 2: (-2,1), 3: (-2,2), 4: (-3,2), 5: (-3,1)
 
 G.set_node_positions(node_positions)
 
-frontiers = {8: 1, 13: 1, 24: 1}
+frontiers = {6: 1, 13: 1, 22: 1}
 G.set_frontiers(frontiers)
 
 #Set initial position of agents
-agent_positions = {0: 0, 1: 1, 2: 6, 3: 8, 4: 13, 5: 15, 6: 22, 7: 24}
+agent_positions = {0: 0, 1: 1, 2: 8, 3: 12, 4: 24}
 G.init_agents(agent_positions)
 
 master = 0
@@ -52,12 +52,11 @@ static_agents = [0]
 # G.plot_graph()
 
 #CLUSTERING
-k = 4
+k = 3
 cp = ClusterProblem()
 cp.graph = G
-#cp.k = k #uncomment for automatic choice of number of clusters
+cp.k = k #uncomment for automatic choice of number of clusters
 cp.master = master
 cp.static_agents = static_agents
-cp.create_subgraphs()
-cp.solve_to_frontier_problem()
+cp.solve_to_frontier_problem(soft = True)
 animate_cluster(G, cp.traj, cp.conn, cp.subgraphs)
