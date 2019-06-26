@@ -1,5 +1,6 @@
 import time
 from dataclasses import dataclass
+from copy import deepcopy
 
 import numpy as np
 import networkx as nx
@@ -34,10 +35,9 @@ class ConnectivityProblem(object):
         self.src = None
         self.snk = None
         self.master = None
-        self.std_frontier_reward = 100
-        self.frontier_reward_decay = 0.5
+        self.frontier_reward = 100
+        self.frontier_reward_decay = 0.4
         self.reward_dict = None
-        self.k = None
 
         # ILP setup
         self.dict_tran = None
@@ -89,15 +89,6 @@ class ConnectivityProblem(object):
 
     def prepare_problem(self):
 
-        #find max number of agents in frontier
-        if 'frontiers' in self.graph.nodes[list(self.graph.nodes)[0]]:
-            self.k = max(1,max(self.graph.nodes[v]['frontiers'] for v in self.graph.nodes))
-        else:
-            self.k = 1
-
-        if type(self.master) is not list:
-            self.master = [self.master]
-
         #reset contraints
         self.constraint = Constraint()
 
@@ -116,15 +107,6 @@ class ConnectivityProblem(object):
         if self.snk is None: # sources-to-all connectivity if sinks undefined
             self.snk = list(self.graph.agents.keys())
 
-        # Create dictionaries for (i,j)->k mapping for edges
-        self.dict_tran = {(i,j): k for k, (i,j) in enumerate(self.graph.tran_edges())}
-        self.dict_conn = {(i,j): k for k, (i,j) in enumerate(self.graph.conn_edges())}
-        # Create dictionary for v -> k mapping for nodes
-        self.dict_node = {v: k for k, v in enumerate(self.graph.nodes)}
-        # Create agent dictionary
-        self.dict_agent = {r: k for k, r in enumerate(self.graph.agents)}
-
-
         if not set(self.src) <= set(self.graph.agents.keys()):
             print((self.src,self.graph.agents.keys()))
             raise Exception("Invalid sources")
@@ -135,6 +117,19 @@ class ConnectivityProblem(object):
 
         if not set(self.graph.agents.values()) <= set(self.graph.nodes()):
             raise Exception("Invalid initial positions")
+
+        #redefine master as a list to enable multiple masters
+        if type(self.master) is not list:
+            self.master = [self.master]
+
+
+        # Create dictionaries for (i,j)->k mapping for edges
+        self.dict_tran = {(i,j): k for k, (i,j) in enumerate(self.graph.tran_edges())}
+        self.dict_conn = {(i,j): k for k, (i,j) in enumerate(self.graph.conn_edges())}
+        # Create dictionary for v -> k mapping for nodes
+        self.dict_node = {v: k for k, v in enumerate(self.graph.nodes)}
+        # Create agent dictionary
+        self.dict_agent = {r: k for k, r in enumerate(self.graph.agents)}
 
     def get_z_idx(self, r, v, t):
         R = self.dict_agent[r]
@@ -149,7 +144,7 @@ class ConnectivityProblem(object):
     def get_y_idx(self, v, k):
         V = self.dict_node[v]
         K = k - 1
-        idx = np.ravel_multi_index((V,K), (len(self.dict_node), self.k))
+        idx = np.ravel_multi_index((V,K), (len(self.dict_node), self.num_r))
         return self.vars['y'].start + idx
 
     def get_yb_idx(self, b, v, t):
@@ -210,7 +205,7 @@ class ConnectivityProblem(object):
             if 'frontiers' in self.graph.nodes[0]:
                 for t,r,v in product(range(self.T+1), self.agents, self.graph.nodes):
                     if self.graph.nodes[v]['frontiers'] != 0:
-                        obj[self.get_z_idx(r,v,t)] -= (0.9**t)*self.std_frontier_reward
+                        obj[self.get_z_idx(r,v,t)] -= (0.9**t)*self.frontier_reward
 
             # add transition weights
             for e, t in product(self.graph.edges(data=True), range(self.T)):
@@ -233,9 +228,9 @@ class ConnectivityProblem(object):
             # add frontier rewards
             if frontier_reward:
                 for v in self.graph.nodes:
-                    K = self.graph.nodes[v]['frontiers']
-                    for k in range(1,K+1):
-                        obj[self.get_y_idx(v,k)] -= (self.frontier_reward_decay**(k-1))*self.std_frontier_reward
+                    if self.graph.nodes[v]['frontiers'] > 0:
+                        for k in range(1,self.num_r+1):
+                            obj[self.get_y_idx(v,k)] -= (self.frontier_reward_decay**(k-1))*self.frontier_reward
 
             # add transition weights
             for e, t, r in product(self.graph.edges(data=True), range(self.T), self.graph.agents):
@@ -401,7 +396,7 @@ class ConnectivityProblem(object):
         xfvar = Variable(size=self.T * len(self.graph.agents) * len(self.dict_tran),
                         start=zvar.start + zvar.size,
                         binary=True)
-        yvar = Variable(size=self.num_v*self.k,
+        yvar = Variable(size=self.num_v*self.num_r,
                         start=xfvar.start + xfvar.size,
                         binary=True)
         fvar = Variable(size=self.T * self.num_min_src_snk * len(self.dict_tran),
@@ -563,7 +558,6 @@ class ConnectivityProblem(object):
                 for t, (v1, v2) in product(range(self.T), self.graph.tran_edges()):
                     if self.solution['x'][self.get_m_idx(v1, v2, t)] > 0.5:
                         self.tran[t].add((v1, v2, tuple(self.master)))
-
 
     ##GRAPH HELPER FUNCTIONS##
 

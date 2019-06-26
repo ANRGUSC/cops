@@ -125,12 +125,14 @@ G.plot_graph()
 problem_list = []
 
 master = 0
+master_node = agent_positions[master]
 static_agents = [0]
 MAXITER = 10000
 i_iter = 0
 
+agents_home = True
 #MAIN-LOOP----------------------------------------------------------------------
-while not G.is_known():
+while not G.is_known() or not agents_home:
 
 #try:
     #find frontiers
@@ -144,7 +146,7 @@ while not G.is_known():
     g1.remove_nodes_from(unknown)
     g2.remove_nodes_from(unknown)
 
-    #Process1-TRAVERSE TO FRONTIERS-----------------------------------------------------
+    #Process1-TRAVERSE TO FRONTIERS-----------------------------------------
     #CLUSTERING
     print()
     print(Style.BRIGHT + Fore.BLUE + "Solving to frontier problem on {} known nodes".format(len(g1)) + Style.RESET_ALL)
@@ -153,11 +155,11 @@ while not G.is_known():
     cp1.master = master
     cp1.static_agents = [r for r in static_agents]
     cp1.graph.init_agents(agent_positions)
-    cp1.solve_to_frontier_problem(verbose=True, soft = True)
+    cp1.solve_to_frontier_problem(verbose=True, soft = True, dead = True)
     agent_positions = {r: cp1.traj[(r, cp1.T)] for r in cp1.graph.agents}
     problem_list.append(cp1)
 
-    #Process2-EXPLORE FRONTIERS-----------------------------------------------------
+    #Process2-EXPLORE FRONTIERS---------------------------------------------
     ep = ExplorationProblem()
     ep.graph = G                                         #full graph
     ep.T = 8                                             #exploration time
@@ -171,7 +173,7 @@ while not G.is_known():
     ep.solve()
     problem_list.append(ep)
 
-    #Process3-SEND DATA TO BASE-----------------------------------------------------
+    #Process3-SEND DATA TO BASE---------------------------------------------
     #CLUSTERING
     print()
     print(Style.BRIGHT + Fore.BLUE + "Solving to base problem" + Style.RESET_ALL)
@@ -181,9 +183,15 @@ while not G.is_known():
     cp2.static_agents = [r for r in static_agents]
     cp2.graph.init_agents(agent_positions)
     cp2.to_frontier_problem = cp1
-    cp2.solve_to_base_problem(verbose=True)
+    cp2.solve_to_base_problem(verbose=True, dead = True)
     agent_positions = {r: cp2.traj[(r, cp2.T)] for r in cp2.graph.agents}
     problem_list.append(cp2)
+
+    #check if all agents are home-------------------------------------------
+    agents_home = True
+    for r,v in agent_positions.items():
+        if v != master_node:
+            agents_home = False
 
     i_iter += 1
     if i_iter > MAXITER:

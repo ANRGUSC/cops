@@ -106,6 +106,7 @@ class Graph(nx.MultiDiGraph):
         for n, p in position_dictionary.items():
             self.node[n]['x'] = p[0]
             self.node[n]['y'] = p[1]
+            self.node[n]['dead'] = False
 
     def conn_edges(self):
         for (i, j, data) in self.edges(data=True):

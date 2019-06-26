@@ -71,13 +71,6 @@ class ExplorationProblem(object):
         if not set(self.graph.agents.values()) <= set(self.graph.nodes()):
             raise Exception("Invalid initial positions")
 
-        in_frontier = False
-        for r, v in self.graph.agents.items():
-            if self.graph.is_frontier(v):
-                in_frontier = True
-        if not in_frontier:
-            raise Exception("Invalid exploration positions: No agents in frontiers")
-
         #add initial graph to graph_list
         self.graph_list.append(deepcopy(self.graph))
 

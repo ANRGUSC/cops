@@ -50,7 +50,7 @@ frontiers = {2: 1, 14: 3}
 G.set_frontiers(frontiers)
 
 #Set initial position of agents
-agent_positions = {0: 0, 1: 1, 2: 2, 3: 7, 4: 11}    #agent:position
+agent_positions = {0: 0, 1: 1, 2: 2}    #agent:position
 G.init_agents(agent_positions)
 
 #Plot Graph (saves image as graph.png)
@@ -60,7 +60,7 @@ G.plot_graph()
 cp = ConnectivityProblem()
 cp.graph = G                             #graph
 cp.T = 7                                #time
-cp.master = [0]                       #master_agent
+cp.master = [0]                         #master_agent
 cp.static_agents = [0]                   #static agents
 
 #Define sources and sinks as subsets of agents

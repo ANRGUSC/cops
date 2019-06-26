@@ -10,8 +10,10 @@ from graph_connectivity.explore_problem import ExplorationProblem
 def animate(graph, traj, conn,
             node_colors=None,     # dict t,v : color
             node_explored=None,   # dict t,v : bool
+            node_dead= None,      # dict t,v : bool
             titles=None,          # dict t: title
-            unkown_color='white',
+            unknown_color='white',
+            dead_color='white',
             STEP_T=1, FPS=20, size=10,
             filename="animation.mp4"):
 
@@ -57,9 +59,9 @@ def animate(graph, traj, conn,
         for t in range(T+1):
             for i, v in enumerate(graph.nodes):
                 if not node_explored[t, v]:                            # Hidden node
-                    nod_col[t][i] = unkown_color
-                    nod_ecol[t][i] = unkown_color
-                    nod_lcol[t][i] = unkown_color
+                    nod_col[t][i] = unknown_color
+                    nod_ecol[t][i] = unknown_color
+                    nod_lcol[t][i] = unknown_color
 
             for i, (v1, v2) in enumerate(graph.tran_edges()):
                 if not node_explored[t, v1]:                           # Hidden edge
@@ -73,6 +75,23 @@ def animate(graph, traj, conn,
             for i, (v1, v2) in enumerate(graph.conn_edges()):
                 if (not node_explored[t, v1]) or (not node_explored[t, v2]):
                     conn_edge_alpha[t][i] = 0.
+
+
+    ### Prepare dead nodes
+    if node_dead is None:
+        node_dead = { (0, v) : False for v in graph.nodes }
+        for t, n in product(range(T+1), graph.nodes):
+            if graph.nodes[n]['dead']:
+                node_dead[t, n] = True
+            else:
+                node_dead[t, n] = False
+
+
+    if node_dead is not None:
+        for t, (i, v) in product(range(T+1),enumerate(graph.nodes)):
+            if node_dead[t, v]:
+                nod_col[t][i] = dead_color
+
 
     ########## INITIAL PLOT ##################
 
@@ -197,6 +216,7 @@ def animate(graph, traj, conn,
                                   interval=1000/FPS, blit=False)
     ani.save(filename)
 
+
 def animate_sequence(graph, problem_list, **kwargs):
 
     # Use a one to put one time step between problems
@@ -237,6 +257,16 @@ def animate_sequence(graph, problem_list, **kwargs):
             if (t, v) not in node_explored:
                 node_explored[t, v] = node_explored[t-1, v]
 
+
+    ### Prepare dead nodes
+    node_dead = { (0, v) : False for v in graph.nodes }
+    for i, problem in enumerate(problem_list):
+        if isinstance(problem, ClusterProblem):
+            for n in problem.graph.nodes:
+                if problem.graph.nodes[n]['dead']:
+                    node_dead[start_time[i] + t, n] = True
+
+
     titles = {}
     out = True
     for i, problem in enumerate(problem_list):
@@ -246,10 +276,10 @@ def animate_sequence(graph, problem_list, **kwargs):
             titles[start_time[i]] = "To Frontiers" if out else "To base"
             out = not out
 
-    return animate(graph, traj, conn, node_explored=node_explored, titles=titles, **kwargs)
+    return animate(graph, traj, conn, node_explored=node_explored, node_dead=node_dead, titles=titles, **kwargs)
 
 
-def animate_cluster(graph, traj, conn, subgraphs, **kwargs):
+def animate_cluster(graph, traj, conn, subgraphs, dead_color = 'grey', **kwargs):
 
     T = max(t for r,t in traj)
 
@@ -257,8 +287,13 @@ def animate_cluster(graph, traj, conn, subgraphs, **kwargs):
     node_colors = {(t, v) : clu_col[c] for c,v_list in subgraphs.items()
                                        for v in v_list
                                        for t in range(T+1)}
+    # if (t,v) not in node_colors, v is dead
+    for v, t in product(graph.nodes, range(T+1)):
+        if (t,v) not in node_colors:
+            node_colors[(t, v)] = dead_color
 
-    return animate(graph, traj, conn, node_colors=node_colors, **kwargs)
+
+    return animate(graph, traj, conn, node_colors=node_colors, node_dead = node_dead, **kwargs)
 
 
 def animate_cluster_sequence(graph, problem_list, **kwargs):
@@ -303,6 +338,16 @@ def animate_cluster_sequence(graph, problem_list, **kwargs):
             if (t, v) not in node_colors:
                 node_colors[t, v] = node_colors[t-1, v]
 
+    ### Prepare dead nodes
+    node_dead = { (0, v) : False for v in graph.nodes }
+    for i, problem in enumerate(problem_list):
+        if isinstance(problem, ClusterProblem):
+            for t, n in product(range(T+1), graph.nodes):
+                if n in problem.original_graph.nodes and problem.original_graph.nodes[n]['dead']:
+                    node_dead[start_time[i] + t, n] = True
+                else:
+                    node_dead[start_time[i] + t, n] = False
+
     ### Prepare explored/unexplored
     node_explored = { (0, v) : False for v in graph.nodes }
     for i, problem in enumerate(problem_list):
@@ -328,8 +373,8 @@ def animate_cluster_sequence(graph, problem_list, **kwargs):
             out = not out
 
     return animate(graph, traj, conn, node_colors=node_colors,
-                   node_explored=node_explored, titles=titles,
-                   **kwargs)
+                   node_explored=node_explored, node_dead = node_dead,
+                   titles=titles, **kwargs)
 
 
 def animate_cluster_buildup(graph, problem,

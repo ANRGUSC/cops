@@ -158,7 +158,7 @@ def _dynamic_constraint_50(problem):
     N = len(problem.graph.agents)
 
     constraint_idx = 0
-    for v, k in product(problem.graph.nodes,range(1,problem.k+1)):
+    for v, k in product(problem.graph.nodes,range(1,problem.num_r+1)):
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_y_idx(v,k))
         A_iq_data.append(1)
@@ -237,6 +237,7 @@ def _dynamic_constraint_54(problem):
     A_iq_col  = []
     A_iq_data = []
     b_iq_54 = []
+
 
     v0 = [problem.graph.agents[r] for r in problem.master]
 
@@ -331,7 +332,7 @@ def _dynamic_constraint_59(problem):
     A_iq_data = []
 
     constraint_idx = 0
-    for v, k in product(problem.graph.nodes,range(1,problem.k+1)):
+    for v, k in product(problem.graph.nodes,range(1,problem.num_r+1)):
 
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_y_idx(v,k))

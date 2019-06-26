@@ -42,7 +42,7 @@ frontiers = {6: 1, 13: 1, 22: 1}
 G.set_frontiers(frontiers)
 
 #Set initial position of agents
-agent_positions = {0: 0, 1: 1, 2: 8, 3: 12, 4: 24}
+agent_positions = {0: 0, 1: 1, 2: 2, 3: 9}
 G.init_agents(agent_positions)
 
 master = 0
