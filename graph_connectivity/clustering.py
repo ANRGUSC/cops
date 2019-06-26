@@ -489,11 +489,18 @@ class ClusterProblem(object):
         else:
             start_time = fwd_start_time
 
+        #Find maximal evac time
+        max_evac_time = 0
+        for c in self.evac:
+            max_evac_c = max(len(path) for r, path in self.evac[c].items())
+            if max_evac_c > max_evac_time:
+                max_evac_time = max_evac_c
+
         # Cluster problem total time
         if len(self.problems)>0:
-            self.T = max(start_time[c] + self.problems[c].T for c in self.problems)
+            self.T = max(max_evac_time,max(start_time[c] + self.problems[c].T for c in self.problems))
         else:
-            self.T = max(len(path) for r, path in self.evac[c].items())
+            self.T = max_evac_time
 
         # Trajectories for cluster problem
         self.traj = {}
