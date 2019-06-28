@@ -82,6 +82,13 @@ class Graph(nx.MultiDiGraph):
             else:
                 self.nodes[v]['frontiers'] = 0
 
+    def set_small_node(self, small_nodes):
+        for v in self.nodes:
+            if v in small_nodes:
+                self.nodes[v]['small'] = True
+            else:
+                self.nodes[v]['small'] = False
+
     def is_frontier(self, v):
         frontier = False
         if self.node[v]['known']:

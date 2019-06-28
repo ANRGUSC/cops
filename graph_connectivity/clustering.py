@@ -47,7 +47,7 @@ class ClusterProblem(object):
         self.traj = {}
         self.conn = {}
 
-    #=== HELPER FUNCTIONS==================================================
+    #=== HELPER FUNCTIONS======================================================
 
     @property
     def master_cluster(self):
@@ -710,6 +710,8 @@ class ClusterProblem(object):
                 self.problems[c] = cp
 
 
+
+
             if soft:
                 #find activated subgraphs
                 activated_subgraphs = set()
@@ -731,8 +733,10 @@ class ClusterProblem(object):
                     if child[0] not in activated_subgraphs:
                         del self.problems[child[0]]
 
+                cp.reward_dict = {v: self.evac_reward for v in g.nodes}
 
-                cluster_reward[c] = cp.solution['primal objective']
+                initial_centrality_reward = sum(cp.reward_dict[self.graph.agents[r]] for r in self.agent_clusters[c])
+                cluster_reward[c] = cp.solution['primal objective'] - initial_centrality_reward
 
         self.merge_solutions(order = 'forward')
 

@@ -32,12 +32,14 @@ class ConnectivityProblem(object):
         self.graph = None                    #Graph
         self.T = None                        #Time horizon
         self.static_agents = None
+        self.big_agents = None
         self.eagents = None
         self.final_position = None
         self.src = None
         self.snk = None
         self.master = None
         self.frontier_reward = 100
+        self.frontier_reward_frac_demand = 0.8
         self.frontier_reward_decay = 0.4
         self.reward_dict = None
         self.additional_constraints = None
@@ -128,6 +130,8 @@ class ConnectivityProblem(object):
         if type(self.master) is not list:
             self.master = [self.master]
 
+        if self.big_agents == None:
+            self.big_agents = []
 
         # Create dictionaries for (i,j)->k mapping for edges
         self.dict_tran = {(i,j): k for k, (i,j) in enumerate(self.graph.tran_edges())}
@@ -455,6 +459,10 @@ class ConnectivityProblem(object):
                             integer=True, frontier_reward = True,
                             verbose=False):
 
+        num_frontiers = len([v for v in self.graph.nodes if self.graph.nodes[v]['frontiers']!=0])
+        num_dyn_agents = len([r for r in self.graph.agents if r not in self.static_agents])
+
+
         D = nx.diameter(self.graph)
         Rp = len(set(v for r, v in self.graph.agents.items()))
         V = self.graph.number_of_nodes()
@@ -462,6 +470,7 @@ class ConnectivityProblem(object):
         T = int(max(D/2, D - int(Rp/2)))
 
         feasible_solution = False
+        small_optimal_value = True
 
         if verbose:
             print(Fore.GREEN + "Solving flow [R={}, V={}, Et={}, Ec={}, static={}]"
@@ -472,7 +481,7 @@ class ConnectivityProblem(object):
                           self.static_agents)
                   + Style.RESET_ALL )
 
-        while not feasible_solution:
+        while not feasible_solution or small_optimal_value:
             self.T = T
 
             if verbose:
@@ -486,6 +495,12 @@ class ConnectivityProblem(object):
 
             if self.solution['status'] is not 'infeasible':
                 feasible_solution = True
+
+            if num_frontiers > 0 and frontier_reward and feasible_solution:
+                if self.solution['primal objective'] < - self.frontier_reward_frac_demand * self.frontier_reward:
+                    small_optimal_value = False
+            else:
+                small_optimal_value = False
 
             T += 1
 

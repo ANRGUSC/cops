@@ -45,12 +45,15 @@ node_positions = {0: (0,0), 1: (0,1), 2: (-2,1), 3: (-2,2), 4: (-3,2), 5: (-3,1)
 
 G.set_node_positions(node_positions)
 
+#Set small nodes
+small_nodes = [1]
+G.set_small_node(small_nodes)
 
 frontiers = {2: 1, 14: 3}
 G.set_frontiers(frontiers)
 
 #Set initial position of agents
-agent_positions = {0: 0, 1: 1, 2: 2}    #agent:position
+agent_positions = {0: 0, 1: 1, 2: 1}    #agent:position
 G.init_agents(agent_positions)
 
 #Plot Graph (saves image as graph.png)
@@ -62,11 +65,11 @@ cp.graph = G                             #graph
 cp.T = 7                                #time
 cp.master = [0]                         #master_agent
 cp.static_agents = [0]                   #static agents
+cp.big_agents = [0, 1, 2]
 
 #Define sources and sinks as subsets of agents
 cp.src = []
 cp.snk = []
-
 
 #Solve
 cp.solve_flow(master = True, connectivity = True, optimal = True)

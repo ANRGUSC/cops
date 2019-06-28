@@ -25,9 +25,9 @@ def generate_flow_master_constraints(problem):
     c_49 = _dynamic_constraint_49_m(problem)
     c_54 = _dynamic_constraint_54(problem)
     c_55 = _dynamic_constraint_55(problem)
-    c_59 = _dynamic_constraint_59(problem)
+    c_58 = _dynamic_constraint_58(problem)
 
-    return c_48 & c_49 & c_54 & c_55 & c_59
+    return c_48 & c_49 & c_54 & c_55 & c_58
 
 ##########################################################
 ##########################################################
@@ -332,8 +332,8 @@ def _dynamic_constraint_55(problem):
     return Constraint(A_iq=A_iq_55, b_iq=b_iq_55)
 
 
-def _dynamic_constraint_59(problem):
-    # Constructing A_iq and b_iq for equality (59) as sp.coo matrix
+def _dynamic_constraint_58(problem):
+    # Constructing A_iq and b_iq for equality (58) as sp.coo matrix
     A_iq_row  = []
     A_iq_col  = []
     A_iq_data = []
@@ -363,6 +363,6 @@ def _dynamic_constraint_59(problem):
 
         constraint_idx += 1
 
-    A_iq_59 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
-    # print("Constraint 59: {}".format(A_iq_59.shape[0]))
-    return Constraint(A_iq=A_iq_59, b_iq=np.zeros(constraint_idx))
+    A_iq_58 = sp.coo_matrix((A_iq_data, (A_iq_row, A_iq_col)), shape=(constraint_idx, problem.num_vars))
+    # print("Constraint 58: {}".format(A_iq_58.shape[0]))
+    return Constraint(A_iq=A_iq_58, b_iq=np.zeros(constraint_idx))

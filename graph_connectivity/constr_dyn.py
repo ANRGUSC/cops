@@ -1,4 +1,4 @@
-from itertools import product
+from itertools import product, combinations
 
 import numpy as np
 import scipy.sparse as sp
@@ -29,8 +29,9 @@ def generate_flow_dynamic_constraints(problem, static_master = True):
     c_46 = _dynamic_constraint_46(problem)
     c_47 = _dynamic_constraint_47(problem)
     c_static = _dynamic_constraint_static(problem)
+    c_agent_avoid = _dynamic_constraint_agent_avoidance(problem)
 
-    return c_45 & c_46 & c_47 & c_static
+    return c_45 & c_46 & c_47 & c_static & c_agent_avoid
 
 def generate_initial_constraints(problem):
 
@@ -213,3 +214,56 @@ def _dynamic_constraint_static(problem):
             constraint_idx += 1
     A_stat = sp.coo_matrix((A_stat_data, (A_stat_row, A_stat_col)), shape=(constraint_idx, problem.num_vars))#.toarray(
     return Constraint(A_eq=A_stat, b_eq=b_stat)
+
+def _dynamic_constraint_agent_avoidance(problem):
+    # Constructing A_iq and b_iq for agent avoidance as sp.coo matrix
+    A_row  = []
+    A_col  = []
+    A_data = []
+
+    constraint_idx = 0
+
+    # Constraint (56)
+    for t, v, (r1, r2) in product(range(problem.T+1) , problem.graph.nodes , combinations(problem.big_agents, 2)):
+
+        if problem.graph.nodes[v]['small'] and problem.graph.nodes[v]['frontiers']==0:
+
+            if not (problem.graph.agents[r1] == problem.graph.agents[r2] and problem.graph.agents[r1] == v):
+
+                A_row.append(constraint_idx)
+                A_col.append(problem.get_z_idx(r1, v, t))
+                A_data.append(1)
+
+                A_row.append(constraint_idx)
+                A_col.append(problem.get_z_idx(r2, v, t))
+                A_data.append(1)
+
+                constraint_idx += 1
+
+    # Constraint (57)
+    for t, (v1, v2), (r1, r2) in product(range(problem.T) , problem.graph.tran_edges() , combinations(problem.big_agents, 2)):
+
+        if (problem.graph.nodes[v1]['small'] and problem.graph.nodes[v1]['frontiers']==0) or (problem.graph.nodes[v2]['small'] and problem.graph.nodes[v2]['frontiers']==0):
+
+            A_row.append(constraint_idx)
+            A_col.append(problem.get_xf_idx(r1, v1, v2, t))
+            A_data.append(1)
+
+            A_row.append(constraint_idx)
+            A_col.append(problem.get_xf_idx(r2, v2, v1, t))
+            A_data.append(1)
+
+            constraint_idx += 1
+
+            A_row.append(constraint_idx)
+            A_col.append(problem.get_xf_idx(r1, v2, v1, t))
+            A_data.append(1)
+
+            A_row.append(constraint_idx)
+            A_col.append(problem.get_xf_idx(r2, v1, v2, t))
+            A_data.append(1)
+
+            constraint_idx += 1
+
+    A = sp.coo_matrix((A_data, (A_row, A_col)), shape=(constraint_idx, problem.num_vars))#.toarray(
+    return Constraint(A_iq=A, b_iq=np.ones(constraint_idx))
