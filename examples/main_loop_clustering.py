@@ -111,8 +111,10 @@ node_positions = {0: (0,0), 1: (0,1), 2: (-2,1), 3: (-2,2), 4: (-3,2), 5: (-3,1)
 G.set_node_positions(node_positions)
 
 #Set initial position of agents
-agent_positions = {r: 0 for r in range(20)}    #agent:position
+agent_positions = {r: 0 for r in range(3)}    #agent:position
 G.init_agents(agent_positions)
+#exploration agents
+eagents = [r for r in range(3)]
 
 #Set known attribute
 for v in G.nodes():
@@ -135,7 +137,6 @@ agents_home = True
 while not G.is_known() or not agents_home:
 
 #try:
-    #find frontiers
     frontiers ={v: 2 for v in G.nodes if G.is_frontier(v)}
     G.set_frontiers(frontiers)
 
@@ -154,6 +155,7 @@ while not G.is_known() or not agents_home:
     cp1.graph = g1
     cp1.master = master
     cp1.static_agents = [r for r in static_agents]
+    cp1.eagents = eagents
     cp1.graph.init_agents(agent_positions)
     cp1.solve_to_frontier_problem(verbose=True, soft = True, dead = True)
     agent_positions = {r: cp1.traj[(r, cp1.T)] for r in cp1.graph.agents}
@@ -170,6 +172,7 @@ while not G.is_known() or not agents_home:
         ep.static_agents.append(r)
 
     ep.graph.agents = agent_positions
+    ep.eagents = eagents
     ep.solve()
     problem_list.append(ep)
 
@@ -181,6 +184,7 @@ while not G.is_known() or not agents_home:
     cp2.graph = g2
     cp2.master = master
     cp2.static_agents = [r for r in static_agents]
+    cp2.eagents = eagents
     cp2.graph.init_agents(agent_positions)
     cp2.to_frontier_problem = cp1
     cp2.solve_to_base_problem(verbose=True, dead = True)

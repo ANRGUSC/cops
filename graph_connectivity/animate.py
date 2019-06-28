@@ -332,12 +332,6 @@ def animate_cluster_sequence(graph, problem_list, **kwargs):
                     for t in range(start_time[i], start_time[i] + problem.T):
                         node_colors[t, v] = clu_col[j]
 
-    # Fill in missing values with blanks
-    for i, v in enumerate(graph.nodes):
-        for t in range(T+1):
-            if (t, v) not in node_colors:
-                node_colors[t, v] = node_colors[t-1, v]
-
     ### Prepare dead nodes
     node_dead = { (0, v) : False for v in graph.nodes }
     for i, problem in enumerate(problem_list):
@@ -345,8 +339,15 @@ def animate_cluster_sequence(graph, problem_list, **kwargs):
             for t, n in product(range(T+1), graph.nodes):
                 if n in problem.original_graph.nodes and problem.original_graph.nodes[n]['dead']:
                     node_dead[start_time[i] + t, n] = True
+                    node_colors[start_time[i] + t, n] = 'white'
                 else:
                     node_dead[start_time[i] + t, n] = False
+
+    # Fill in missing values with blanks
+    for i, v in enumerate(graph.nodes):
+        for t in range(T+1):
+            if (t, v) not in node_colors:
+                node_colors[t, v] = node_colors[t-1, v]
 
     ### Prepare explored/unexplored
     node_explored = { (0, v) : False for v in graph.nodes }

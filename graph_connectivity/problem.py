@@ -14,6 +14,7 @@ from graph_connectivity.graph import Graph
 from graph_connectivity.constr_dyn import *
 from graph_connectivity.constr_flow import *
 from graph_connectivity.constr_powerset import *
+from graph_connectivity.constr_cluster import *
 
 
 from itertools import chain, combinations, product
@@ -31,6 +32,7 @@ class ConnectivityProblem(object):
         self.graph = None                    #Graph
         self.T = None                        #Time horizon
         self.static_agents = None
+        self.eagents = None
         self.final_position = None
         self.src = None
         self.snk = None
@@ -38,6 +40,7 @@ class ConnectivityProblem(object):
         self.frontier_reward = 100
         self.frontier_reward_decay = 0.4
         self.reward_dict = None
+        self.additional_constraints = None
 
         # ILP setup
         self.dict_tran = None
@@ -100,6 +103,9 @@ class ConnectivityProblem(object):
 
         if self.static_agents is None: # no static agents
             self.static_agents = []
+
+        if self.eagents is None: # if no exploration agents specified, all agents can explore
+            self.eagents = [r for r in self.graph.agents]
 
         if self.src is None: # all-to-sinks connectivity if sources undefined
             self.src = list(self.graph.agents.keys())
@@ -429,6 +435,15 @@ class ConnectivityProblem(object):
             self.constraint &= generate_flow_master_constraints(self)
         # Flow objective
         self.obj = self.generate_flow_objective(optimal, frontier_reward)
+
+        # User specified as additional constraints
+        if self.additional_constraints != None:
+            for func in self.additional_constraints:
+                try:
+                    self.constraint &= eval(func[0])(self,func[1])
+                except:
+                    print("Couldn't find constraint function", func)
+
 
         if verbose:
             print("Constraints setup time {:.2f}s".format(time.time() - t0))

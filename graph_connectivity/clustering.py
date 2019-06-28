@@ -19,6 +19,7 @@ class ClusterProblem(object):
         self.k = None                       #number of clusters
         self.master = None
         self.static_agents = None
+        self.eagents = None
         self.T = None
         self.max_problem_size = 5000
         self.to_frontier_problem = None
@@ -130,6 +131,9 @@ class ClusterProblem(object):
         if self.node_children_dict == None or self.node_parent_dict == None:
             self.create_node_children_parent_dict()
 
+        #revive
+        for v in self.graph.nodes:
+            self.graph.nodes[v]['dead'] = False
 
         # kill dead end nodes
         for v in self.graph.nodes:
@@ -370,22 +374,72 @@ class ClusterProblem(object):
 
                 small_problem_size = max(self.problem_size(verbose=verbose).values()) < self.max_problem_size
 
-            # Strategy 2: deactivate agents
+            # Strategy 2: kill parts of graph
             while not small_problem_size:
-                print("Strategy 2: Make robot static")
+                print("Strategy 2: Kill frontiers")
 
-                #find agent populated nodes and corresponding agents
+                #find frontier furthest away from master for large problems
                 cluster_size = self.problem_size()
                 for c, val in cluster_size.items():
                     if val >= self.max_problem_size:
-                        population = {v: [r for r in self.agent_clusters[c]
-                                        if r not in self.static_agents
-                                        and self.graph.agents[r]==v]
-                                        for v in self.subgraphs[c]}
-                        for r in max(population.values(), key = len):
-                            if r != self.master:
-                                self.static_agents.append(r)
-                                break
+
+                        #revive
+                        for v in self.graph.nodes:
+                            self.graph.nodes[v]['dead'] = False
+
+                        #find not occupied frontiers in large subgraphs
+                        frontiers = [v for v in self.subgraphs[c] if self.graph.nodes[v]['frontiers']!=0 and not self.graph.nodes[v]['dead']]
+                        for r in self.agent_clusters[c]:
+                            if self.graph.agents[r] in frontiers:
+                                frontiers.remove(self.graph.agents[r])
+
+                        if len(self.parent_clusters[c])>0:
+                            master_node = self.parent_clusters[c][0][1]
+                        else:
+                            master_node = self.graph.agents[self.master]
+
+                        max_length = None
+                        max_frontier = None
+                        for f in frontiers:
+                            length, path = nx.single_source_dijkstra(self.graph_tran, source=master_node, target=f)
+                            if max_length == None:
+                                max_length = length
+                                max_frontier = f
+                            elif length > max_length:
+                                max_length = length
+                                max_frontier = f
+
+                        self.graph.nodes[f]['dead'] = True
+
+                        # kill max_frontier
+                        self.graph.nodes[max_frontier]['dead'] = True
+
+                        # kill nodes with only dead children and no agents in node
+                        for v in self.node_children_first_iter():
+                            if v in self.subgraphs[c]:
+
+                                dead = True
+                                # check if node is frontier
+                                if self.graph.nodes[v]['frontiers'] != 0:
+                                    dead = False
+
+                                # check if all children are dead
+                                for child in self.node_children_dict[v]:
+                                    if child in self.subgraphs[c]:
+                                        if self.graph.nodes[child]['dead'] == False:
+                                            dead = False
+
+                                # check if exist agent in node
+                                if self.agent_in_node(v):
+                                        dead = False
+
+                                if dead:
+                                    self.graph.nodes[v]['dead'] = True
+
+                        # remove dead nodes from subgraph
+                        for v in list(self.subgraphs[c]):
+                            if self.graph.nodes[v]['dead']:
+                                self.subgraphs[c].remove(v)
 
                 small_problem_size = max(self.problem_size(verbose=verbose).values()) < self.max_problem_size
 
@@ -576,6 +630,7 @@ class ClusterProblem(object):
                     sinks.append(self.submasters[C[0]])
 
                 cp.static_agents = static_agents
+                cp.eagents = self.eagents
 
                 g = deepcopy(self.graph)
                 g.remove_nodes_from(set(self.graph.nodes) - set(self.subgraphs[c]) - set(additional_nodes))
@@ -629,6 +684,7 @@ class ClusterProblem(object):
                     sinks.append(self.submasters[C[0]])
 
                 cp.static_agents = static_agents
+                cp.eagents = self.eagents
 
                 g = deepcopy(self.graph)
                 g.remove_nodes_from(set(self.graph.nodes) - set(self.subgraphs[c]) - set(additional_nodes))
@@ -741,6 +797,8 @@ class ClusterProblem(object):
                 sources = list(set(sources))
 
                 cp.static_agents = static_agents
+                cp.eagents = self.eagents
+
                 g = deepcopy(self.graph)
                 g.remove_nodes_from(set(self.graph.nodes) - set(self.subgraphs[c]) - set(additional_nodes))
                 g.init_agents(agents)
@@ -752,6 +810,7 @@ class ClusterProblem(object):
                     norm = 1
                 cp.reward_dict = {v: self.max_centrality_reward*val/norm for v, val in cp.reward_dict.items()}
 
+                #force submasters to go back to initial positions for communication
                 if self.to_frontier_problem != None:
                     cp.final_position = {r: v for r, v in self.to_frontier_problem.graph.agents.items() if r == self.submasters[c]}
                 else:
@@ -762,6 +821,9 @@ class ClusterProblem(object):
 
                 #Submaster is sink
                 cp.snk = [self.submasters[c]]
+
+                #force master to be
+                cp.additional_constraints = [('constraint_static_master',self.submasters[c])]
 
                 cp.diameter_solve_flow(master = True, connectivity = True,
                                        optimal = True, frontier_reward = False,

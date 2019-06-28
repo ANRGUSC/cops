@@ -28,6 +28,7 @@ class ExplorationProblem(object):
         self.static_agents = None
         self.frontier_robot_dict = None
         self.graph_list = []
+        self.eagents = None
 
         #variables
         self.z = None
@@ -63,6 +64,9 @@ class ExplorationProblem(object):
 
         if self.static_agents is None: # no static agents
             self.static_agents = []
+
+        if self.eagents is None: # if no exploration agents specified, all agents can explore
+            self.eagents = [r for r in self.graph.agents]
 
         # Create dictionaries for (i,j)->k mapping for edges
         self.dict_tran = {(i,j): k for k, (i,j) in enumerate(self.graph.tran_edges())}
@@ -178,7 +182,7 @@ class ExplorationProblem(object):
     def _solve(self):
         for t in range(1,int(self.T/2)+1):
             for fr in self.frontier_robot_dict:
-                if self.frontier_robot_dict[fr] not in self.static_agents:
+                if self.frontier_robot_dict[fr] not in self.static_agents and self.frontier_robot_dict[fr] in self.eagents:
                     v_next_alt = []
                     v_prev = self.get_agent_position(fr, t-1)
                     for v1, v2 in self.graph.tran_out_edges(v_prev):
