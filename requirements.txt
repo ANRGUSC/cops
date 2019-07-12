@@ -6,3 +6,7 @@ scipy
 nose
 sklearn
 colorama
+
+
+# Require Graphviz, install PyGraphviz using: easy_install pygraphviz
+# Simulations require ffmpeg
