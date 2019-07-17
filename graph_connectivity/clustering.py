@@ -21,7 +21,7 @@ class ClusterProblem(object):
         self.static_agents = None
         self.eagents = None
         self.T = None
-        self.max_problem_size = 5000
+        self.max_problem_size = 4000
         self.to_frontier_problem = None
         self.max_centrality_reward = 20
         self.evac_reward = 100

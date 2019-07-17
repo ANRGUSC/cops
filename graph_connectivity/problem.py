@@ -495,10 +495,14 @@ class ConnectivityProblem(object):
 
             if self.solution['status'] is not 'infeasible':
                 feasible_solution = True
+            else:
+                print('infeasible')
 
             if num_frontiers > 0 and frontier_reward and feasible_solution:
                 if self.solution['primal objective'] < - self.frontier_reward_frac_demand * self.frontier_reward:
                     small_optimal_value = False
+                else:
+                    print('small optimal value')
             else:
                 small_optimal_value = False
 
