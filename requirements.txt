@@ -6,3 +6,5 @@ scipy
 nose
 sklearn
 colorama
+dataclasses
+pygraphviz #need graphviz to be installed

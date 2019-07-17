@@ -8,13 +8,13 @@ import scipy.sparse as sp
 
 from colorama import Fore, Style
 
-from graph_connectivity.optimization_wrappers import solve_ilp, Constraint
-from graph_connectivity.graph import Graph
+from cops.graph_connectivity.optimization_wrappers import solve_ilp, Constraint
+from cops.graph_connectivity.graph import Graph
 
-from graph_connectivity.constr_dyn import *
-from graph_connectivity.constr_flow import *
-from graph_connectivity.constr_powerset import *
-from graph_connectivity.constr_cluster import *
+from cops.graph_connectivity.constr_dyn import *
+from cops.graph_connectivity.constr_flow import *
+from cops.graph_connectivity.constr_powerset import *
+from cops.graph_connectivity.constr_cluster import *
 
 
 from itertools import chain, combinations, product
@@ -647,12 +647,7 @@ class ConnectivityProblem(object):
                     valid = False
             if valid == False:
                 add_S.append(S)
-                ''' PRATA MED PETTER!!!
-                for b in self.src:
-                    if (self.graph.agents[b],0) in S:
-                        S.remove((self.graph.agents[b],0))
-                add_S.append(S)
-                '''
+
 
         if len(add_S) != 0:
             return False, add_S

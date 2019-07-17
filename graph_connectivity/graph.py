@@ -11,7 +11,7 @@ class Graph(nx.MultiDiGraph):
         self.std_tran_weight = 1
         self.std_con_weight = 0.01
 
-    def plot_graph(self):
+    def plot_graph(self, filename = None):
 
         #copy graph to add plot attributes
         graph_copy = deepcopy(self)
@@ -25,7 +25,7 @@ class Graph(nx.MultiDiGraph):
 
         #Set individual attributes
         for n in graph_copy:
-            if graph_copy.nodes[n]['number_of_agents']!=0:
+            if  graph_copy.agents != None and graph_copy.nodes[n]['number_of_agents']!=0:
                 graph_copy.nodes[n]['color'] = 'black'
                 graph_copy.nodes[n]['fillcolor'] = 'red'
                 graph_copy.nodes[n]['style'] = 'filled'
@@ -50,7 +50,10 @@ class Graph(nx.MultiDiGraph):
         #Plot/save graph
         A = to_agraph(graph_copy)
         A.layout()
-        A.draw('graph.png')
+        if filename != None:
+            A.draw(filename)
+        else:
+            A.draw('graph.png')
 
     def add_transition_path(self, transition_list, w = None):
         if w == None:

@@ -4,8 +4,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-from graph_connectivity.clustering import ClusterProblem
-from graph_connectivity.explore_problem import ExplorationProblem
+from cops.graph_connectivity.clustering import ClusterProblem
+from cops.graph_connectivity.explore_problem import ExplorationProblem
 
 def animate(graph, traj, conn,
             node_colors=None,     # dict t,v : color
@@ -21,6 +21,7 @@ def animate(graph, traj, conn,
 
     # Colors for robots
     rob_col = plt.cm.rainbow(np.linspace(0, 1, len(graph.agents)))
+    rob_list = [r for r in graph.agents]
 
     # Build dictionary time -> positions
     rob_pos = {t : np.array([[graph.nodes[traj[r,t]]['x'],
@@ -35,9 +36,9 @@ def animate(graph, traj, conn,
                 if len(b)>1:
                     conn_col[t, v1, v2].append('black')
                 else:
-                    conn_col[t, v1, v2].append(rob_col[b[0]])
+                    conn_col[t, v1, v2].append(rob_col[rob_list.index(b[0])])
             else:
-                conn_col[t, v1, v2].append(rob_col[b])
+                conn_col[t, v1, v2].append(rob_col[rob_list.index(b)])
 
     # Node styling: t -> [c0 c1 ... cV]
     if node_colors is not None:
@@ -216,7 +217,6 @@ def animate(graph, traj, conn,
                                   interval=1000/FPS, blit=False)
     ani.save(filename)
 
-
 def animate_sequence(graph, problem_list, **kwargs):
 
     # Use a one to put one time step between problems
@@ -278,7 +278,6 @@ def animate_sequence(graph, problem_list, **kwargs):
 
     return animate(graph, traj, conn, node_explored=node_explored, node_dead=node_dead, titles=titles, **kwargs)
 
-
 def animate_cluster(graph, traj, conn, subgraphs, dead_color = 'grey', **kwargs):
 
     T = max(t for r,t in traj)
@@ -294,7 +293,6 @@ def animate_cluster(graph, traj, conn, subgraphs, dead_color = 'grey', **kwargs)
 
 
     return animate(graph, traj, conn, node_colors=node_colors, node_dead = node_dead, **kwargs)
-
 
 def animate_cluster_sequence(graph, problem_list, **kwargs):
 
@@ -357,6 +355,12 @@ def animate_cluster_sequence(graph, problem_list, **kwargs):
                 for n in g.nodes:
                     if g.nodes[n]['known']:
                         node_explored[start_time[i] + t, n] = True
+        # Added else for subT implementation
+        else:
+            for n in problem.graph.nodes:
+                if problem.graph.nodes[n]['known']:
+                    node_explored[start_time[i], n] = True
+
 
     # Fill in missing values with blanks
     for v in graph.nodes:
@@ -376,7 +380,6 @@ def animate_cluster_sequence(graph, problem_list, **kwargs):
     return animate(graph, traj, conn, node_colors=node_colors,
                    node_explored=node_explored, node_dead = node_dead,
                    titles=titles, **kwargs)
-
 
 def animate_cluster_buildup(graph, problem,
                             STEP_T=2, FPS=20, size=10,

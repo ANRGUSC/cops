@@ -3,7 +3,7 @@ from itertools import product
 import numpy as np
 import scipy.sparse as sp
 
-from graph_connectivity.optimization_wrappers import Constraint
+from cops.graph_connectivity.optimization_wrappers import Constraint
 
 def generate_flow_bridge_constraints(problem):
 

@@ -7,7 +7,7 @@ from itertools import product
 from sklearn.cluster import SpectralClustering
 from colorama import Fore, Style
 
-from graph_connectivity.problem import *
+from cops.graph_connectivity.problem import *
 
 class ClusterProblem(object):
 
