@@ -4,8 +4,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-from cops.graph_connectivity.clustering import ClusterProblem
-from cops.graph_connectivity.explore_problem import ExplorationProblem
+from cops.clustering import ClusterProblem
+from cops.explore_problem import ExplorationProblem
 
 def animate(graph, traj, conn,
             node_colors=None,     # dict t,v : color

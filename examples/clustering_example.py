@@ -1,5 +1,5 @@
-from graph_connectivity.clustering import *
-from graph_connectivity.animate import *
+from cops.clustering import *
+from cops.animate import *
 
 
 # Define a connectivity graph

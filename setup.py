@@ -2,8 +2,8 @@ from setuptools import setup
 
 def main():
 	setup(
-		name="graph_connectivity",
-		packages=['graph_connectivity'],
+		name="cops",
+		packages=['cops'],
 		author="Filip Klaesson, Petter Nilsson"
 	)
 

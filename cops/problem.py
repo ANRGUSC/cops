@@ -8,13 +8,13 @@ import scipy.sparse as sp
 
 from colorama import Fore, Style
 
-from cops.graph_connectivity.optimization_wrappers import solve_ilp, Constraint
-from cops.graph_connectivity.graph import Graph
+from cops.optimization_wrappers import solve_ilp, Constraint
+from cops.graph import Graph
 
-from cops.graph_connectivity.constr_dyn import *
-from cops.graph_connectivity.constr_flow import *
-from cops.graph_connectivity.constr_powerset import *
-from cops.graph_connectivity.constr_cluster import *
+from cops.constr_dyn import *
+from cops.constr_flow import *
+from cops.constr_powerset import *
+from cops.constr_cluster import *
 
 
 from itertools import chain, combinations, product

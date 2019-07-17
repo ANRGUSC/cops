@@ -1,4 +1,4 @@
-from graph_connectivity.problem import *
+from cops.problem import *
 import numpy as np
 
 def test_horiz1():

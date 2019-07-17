@@ -1,4 +1,4 @@
-from graph_connectivity.graph import *
+from cops.graph import *
 import numpy as np
 
 def test_pre_S():

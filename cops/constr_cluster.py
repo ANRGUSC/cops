@@ -3,7 +3,7 @@ from itertools import product
 import numpy as np
 import scipy.sparse as sp
 
-from cops.graph_connectivity.optimization_wrappers import Constraint
+from cops.optimization_wrappers import Constraint
 
 def constraint_static_master(problem, master):
 

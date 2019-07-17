@@ -6,10 +6,10 @@ from itertools import product
 
 from colorama import Fore, Style
 
-from graph_connectivity.animate import *
-from graph_connectivity.problem import *
-from graph_connectivity.explore_problem import *
-from graph_connectivity.clustering import *
+from cops.animate import *
+from cops.problem import *
+from cops.explore_problem import *
+from cops.clustering import *
 from copy import deepcopy
 
 #MASTERGRAPH--------------------------------------------------------------------

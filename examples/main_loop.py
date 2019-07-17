@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from itertools import product
 
-from graph_connectivity.animate import *
-from graph_connectivity.problem import *
-from graph_connectivity.explore_problem import *
+from cops.animate import *
+from cops.problem import *
+from cops.explore_problem import *
 from copy import deepcopy
 
 #MASTERGRAPH--------------------------------------------------------------------

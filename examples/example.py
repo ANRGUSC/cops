@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from itertools import product
 
-from graph_connectivity.problem import *
-from graph_connectivity.animate import *
+from cops.problem import *
+from cops.animate import *
 
 # Define a connectivity graph
 G = Graph()

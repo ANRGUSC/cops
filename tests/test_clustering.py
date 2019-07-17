@@ -1,4 +1,4 @@
-from graph_connectivity.clustering import *
+from cops.clustering import *
 import numpy as np
 
 def test_activation1():

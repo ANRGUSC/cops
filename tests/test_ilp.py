@@ -1,8 +1,8 @@
-from graph_connectivity.optimization_wrappers import *
+from cops.optimization_wrappers import *
 import numpy as np
 import scipy.sparse as sp
 
-from graph_connectivity.optimization_wrappers import Constraint, solve_ilp
+from cops.optimization_wrappers import Constraint, solve_ilp
 
 def test_int_bin():
     A_iq = sp.coo_matrix(np.array([[1, 0], [0, 1], [-1, 0], [0, -1]]))

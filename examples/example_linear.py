@@ -1,5 +1,5 @@
-from graph_connectivity.problem import *
-from graph_connectivity.animate import *
+from cops.problem import *
+from cops.animate import *
 
 n = 8  # size of graph
 

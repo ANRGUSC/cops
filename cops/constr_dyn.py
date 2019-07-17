@@ -3,7 +3,7 @@ from itertools import product, combinations
 import numpy as np
 import scipy.sparse as sp
 
-from cops.graph_connectivity.optimization_wrappers import Constraint
+from cops.optimization_wrappers import Constraint
 
 def generate_powerset_dynamic_constraints(problem):
 
