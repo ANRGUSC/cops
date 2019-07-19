@@ -32,11 +32,8 @@ def animate(graph, traj, conn,
     conn_col = { (t,v1,v2) : [] for t, conn_list in conn.items() for (v1, v2, b) in conn_list }
     for t, conn_list in conn.items():
         for (v1, v2, b) in conn_list:
-            if type(b) is tuple:
-                if len(b)>1:
-                    conn_col[t, v1, v2].append('black')
-                else:
-                    conn_col[t, v1, v2].append(rob_col[rob_list.index(b[0])])
+            if b == 'master':
+                conn_col[t, v1, v2].append('black')
             else:
                 conn_col[t, v1, v2].append(rob_col[rob_list.index(b)])
 
@@ -51,7 +48,7 @@ def animate(graph, traj, conn,
 
     # Edge styling
     tran_edge_alpha = {t : [1. for v in graph.tran_edges()] for t in range(T+1)}
-    tran_edge_color = {t : ['black' for v in graph.tran_edges()] for t in range(T+1)}
+    tran_edge_color = {t : ['gray' for v in graph.tran_edges()] for t in range(T+1)}
     tran_edge_thick = {t : [1. for v in graph.tran_edges()] for t in range(T+1)}
     conn_edge_alpha = {t : [1. for v in graph.conn_edges()] for t in range(T+1)}
 
@@ -115,9 +112,9 @@ def animate(graph, traj, conn,
                   for i, n in enumerate(graph.nodes)]
 
     coll_tran_edge = nx.draw_networkx_edges(graph, dict_pos, ax=ax, edgelist=list(graph.tran_edges()),
-                                            connectionstyle='arc', edge_color='black')
+                                            connectionstyle='arc', edge_color='gray')
     coll_conn_edge = nx.draw_networkx_edges(graph, dict_pos, ax=ax, edgelist=list(graph.conn_edges()),
-                                            edge_color='black')
+                                            edge_color='gray')
     title_field = ax.text((max(npos[:,0])+min(npos[:,0]))/2,
                           max(npos[:,1])+1, "",
                           horizontalalignment='center',
@@ -183,7 +180,7 @@ def animate(graph, traj, conn,
             # connectivity edge styling
             for i, (v1, v2) in enumerate(graph.conn_edges()):
                 coll_conn_edge[i].set_alpha(conn_edge_alpha[min(T, t)][i])
-                coll_conn_edge[i].set_color("black")
+                coll_conn_edge[i].set_color("gray")
                 coll_conn_edge[i].set_linewidth(1)
 
             # transition edge styling

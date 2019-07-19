@@ -210,7 +210,7 @@ def _dynamic_constraint_52_53(problem):
             A_eq_col.append(problem.get_fbar_idx(b, edge[0], edge[1], t))
             A_eq_data.append(-1)
 
-        if len(problem.src) <= len(problem.snk):
+        if problem.always_src or len(problem.src) <= len(problem.snk):
             # case (52)
             if t == 0:
                 A_eq_row.append(constraint_idx)

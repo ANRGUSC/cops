@@ -579,7 +579,7 @@ class ClusterProblem(object):
                 for t, conn_t in self.problems[c].conn.items():
                     for (v1, v2, b) in conn_t:
                         # save connectivity info with submaster as third element
-                        self.conn[start_time[c] + t].add((v1, v2, self.submasters[c]))
+                        self.conn[start_time[c] + t].add((v1, v2, b))
 
         # Fill out empty trajectory slots
         for r, t in product(self.graph.agents, range(self.T+1)):
@@ -608,6 +608,7 @@ class ClusterProblem(object):
 
                 #Setup connectivity problem
                 cp = ConnectivityProblem()
+                cp.always_src = True
 
                 #Master is submaster of cluster
                 cp.master = self.submasters[c]
@@ -770,6 +771,7 @@ class ClusterProblem(object):
 
                 #Setup connectivity problem
                 cp = ConnectivityProblem()
+                cp.always_src = True
 
                 if self.to_frontier_problem != None:
                     #Masters are active agents in cluster

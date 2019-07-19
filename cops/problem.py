@@ -43,6 +43,7 @@ class ConnectivityProblem(object):
         self.frontier_reward_decay = 0.4
         self.reward_dict = None
         self.additional_constraints = None
+        self.always_src = False
 
         # ILP setup
         self.dict_tran = None
@@ -72,10 +73,14 @@ class ConnectivityProblem(object):
 
     @property
     def min_src_snk(self):
+        if self.always_src:
+            return self.src
         return self.src if len(self.src) <= len(self.snk) else self.snk
 
     @property
     def num_min_src_snk(self):
+        if self.always_src:
+            return self.num_src
         return min(self.num_src, self.num_snk)
 
     @property
@@ -369,31 +374,6 @@ class ConnectivityProblem(object):
             if self.solution['x'][self.get_z_idx(r, v, t)] > 0.5:
                 self.traj[(r,t)] = v
 
-        if 'fbar' in self.vars:
-            for t, b, (v1, v2) in product(range(self.T+1), range(self.num_min_src_snk),
-                                          self.graph.conn_edges()):
-                if self.solution['x'][self.get_fbar_idx(b, v1, v2, t)] > 0.5:
-                    b_r = self.src[b] if len(self.src) <= len(self.snk) else self.snk[b]
-                    self.conn[t].add((v1, v2, b_r))
-
-        if 'mbar' in self.vars:
-            for t, (v1, v2) in product(range(self.T+1), self.graph.conn_edges()):
-                if self.solution['x'][self.get_mbar_idx(v1, v2, t)] > 0.5:
-                    self.conn[t].add((v1, v2, tuple(self.master)))
-
-
-        if 'f' in self.vars:
-            for t, b, (v1, v2) in product(range(self.T), range(self.num_min_src_snk),
-                                          self.graph.tran_edges()):
-                if self.solution['x'][self.get_f_idx(b, v1, v2, t)] > 0.5:
-                    b_r = self.src[b] if len(self.src) <= len(self.snk) else self.snk[b]
-                    self.tran[t].add((v1, v2, b_r))
-
-        if 'm' in self.vars:
-            for t, (v1, v2) in product(range(self.T), self.graph.tran_edges()):
-                if self.solution['x'][self.get_m_idx(v1, v2, t)] > 0.5:
-                    self.tran[t].add((v1, v2, tuple(self.master)))
-
     def solve_flow(self, master = False, connectivity = True, optimal = False,
                    solver=None, output=False, integer=True,
                    frontier_reward = True, verbose=False):
@@ -572,26 +552,26 @@ class ConnectivityProblem(object):
                 for t, b, (v1, v2) in product(range(self.T+1), range(self.num_min_src_snk),
                                               self.graph.conn_edges()):
                     if self.solution['x'][self.get_fbar_idx(b, v1, v2, t)] > 0.5:
-                        b_r = self.src[b] if len(self.src) <= len(self.snk) else self.snk[b]
+                        b_r = self.src[b] if self.always_src or len(self.src) <= len(self.snk) else self.snk[b]
                         self.conn[t].add((v1, v2, b_r))
 
             if 'mbar' in self.vars:
                 for t, (v1, v2) in product(range(self.T+1), self.graph.conn_edges()):
                     if self.solution['x'][self.get_mbar_idx(v1, v2, t)] > 0.5:
-                        self.conn[t].add((v1, v2, tuple(self.master)))
+                        self.conn[t].add((v1, v2, 'master'))
 
 
             if 'f' in self.vars:
                 for t, b, (v1, v2) in product(range(self.T), range(self.num_min_src_snk),
                                               self.graph.tran_edges()):
                     if self.solution['x'][self.get_f_idx(b, v1, v2, t)] > 0.5:
-                        b_r = self.src[b] if len(self.src) <= len(self.snk) else self.snk[b]
+                        b_r = self.src[b] if self.always_src or len(self.src) <= len(self.snk) else self.snk[b]
                         self.tran[t].add((v1, v2, b_r))
 
             if 'm' in self.vars:
                 for t, (v1, v2) in product(range(self.T), self.graph.tran_edges()):
                     if self.solution['x'][self.get_m_idx(v1, v2, t)] > 0.5:
-                        self.tran[t].add((v1, v2, tuple(self.master)))
+                        self.tran[t].add((v1, v2, 'master'))
 
     ##GRAPH HELPER FUNCTIONS##
 
