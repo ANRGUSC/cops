@@ -289,7 +289,7 @@ def animate_cluster(graph, traj, conn, subgraphs, dead_color = 'grey', **kwargs)
             node_colors[(t, v)] = dead_color
 
 
-    return animate(graph, traj, conn, node_colors=node_colors, node_dead = node_dead, **kwargs)
+    return animate(graph, traj, conn, node_colors=node_colors, **kwargs)
 
 def animate_cluster_sequence(graph, problem_list, **kwargs):
 
