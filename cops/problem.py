@@ -39,7 +39,7 @@ class ConnectivityProblem(object):
         self.snk = None
         self.master = None
         self.frontier_reward = 100
-        self.frontier_reward_frac_demand = 0.8
+        self.frontier_reward_frac_demand = 0.4
         self.frontier_reward_decay = 0.4
         self.reward_dict = None
         self.additional_constraints = None

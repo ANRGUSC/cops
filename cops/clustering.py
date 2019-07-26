@@ -489,7 +489,7 @@ class ClusterProblem(object):
             # connectivity activated nodes
             for t, conn_t in self.problems[c].conn.items():
                 for (v1, v2, b) in conn_t:
-                    if type(b) is tuple:    #if b is a tuple then b is a master (by the construction of conn)
+                    if b == 'master':    #if b is a tuple then b is a master (by the construction of conn)
                         for r in agents:
                             if self.graph.agents[r] == v2:
                                 if r not in self.active_agents[c]:
@@ -503,7 +503,7 @@ class ClusterProblem(object):
             # transition activated nodes
             for t, tran_t in self.problems[c].tran.items():
                 for (v1, v2, b) in tran_t:
-                    if type(b) is tuple:    #if b is a tuple then b is a master (by the construction of tran)
+                    if b == 'master':    #if b is a tuple then b is a master (by the construction of tran)
                         for r in agents:
                             if self.graph.agents[r] == v2 and r not in self.active_agents[c]:
                                     self.active_agents[c].append(r)
@@ -663,6 +663,7 @@ class ClusterProblem(object):
 
                 #Setup connectivity problem
                 cp = ConnectivityProblem()
+                cp.always_src = True
 
                 #Master is submaster of cluster
                 cp.master = self.submasters[c]
@@ -720,14 +721,14 @@ class ClusterProblem(object):
                 for t, conn_t in self.problems[c].conn.items():
                     for child in self.child_clusters[c]:
                         for (v1, v2, b) in conn_t:
-                            if type(b) is tuple and v2 == child[1] and child[0] in self.problems:    #if b is a tuple then b is a master (by the construction of conn)
+                            if b == 'master' and v2 == child[1] and child[0] in self.problems:    #if b is a tuple then b is a master (by the construction of conn)
                                 activated_subgraphs.add(child[0])
 
                 # transition activated nodes
                 for t, tran_t in self.problems[c].conn.items():
                     for child in self.child_clusters[c]:
                         for (v1, v2, b) in tran_t:
-                            if type(b) is tuple and v2 == child[1] and child[0] in self.problems:    #if b is a tuple then b is a master (by the construction of conn)
+                            if b == 'master' and v2 == child[1] and child[0] in self.problems:    #if b is a tuple then b is a master (by the construction of conn)
                                 activated_subgraphs.add(child[0])
 
                 for child in self.child_clusters[c]:
