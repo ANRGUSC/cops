@@ -750,8 +750,6 @@ class ClusterProblem(object):
         self.find_dead_nodes()
         self.original_graph = self.graph
         self.graph = deepcopy(self.graph)
-        dead_nodes = [v for v in self.graph.nodes if self.graph.nodes[v]['dead']]
-        self.graph.remove_nodes_from(dead_nodes)
 
         # if previous to_frontier_problem specified, use same clusters
         if self.to_frontier_problem != None:
@@ -762,9 +760,13 @@ class ClusterProblem(object):
             self.submasters = self.to_frontier_problem.submasters
             self.subsinks = self.to_frontier_problem.subsinks
             self.active_subgraphs = self.to_frontier_problem.active_subgraphs
+            dead_nodes = [v for v in self.to_frontier_problem.graph.nodes if self.to_frontier_problem.graph.nodes[v]['dead']]
+            self.graph.remove_nodes_from(dead_nodes)
         else:
             self.create_subgraphs(verbose=verbose)
             self.active_subgraphs = self.frontier_clusters()
+            dead_nodes = [v for v in self.graph.nodes if self.graph.nodes[v]['dead']]
+            self.graph.remove_nodes_from(dead_nodes)
 
         for c in self.children_first_iter():
 

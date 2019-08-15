@@ -116,10 +116,10 @@ small_nodes.remove(0)
 G.set_small_node(small_nodes)
 
 #Set initial position of agents
-agent_positions = {r: 0 for r in range(10)}    #agent:position
+agent_positions = {r: 0 for r in range(1)}    #agent:position
 G.init_agents(agent_positions)
 #exploration agents
-eagents = [r for r in range(5)]
+eagents = [r for r in range(1)]
 
 #Set known attribute
 for v in G.nodes():
@@ -133,7 +133,7 @@ problem_list = []
 
 master = 0
 master_node = agent_positions[master]
-static_agents = [0]
+static_agents = []
 MAXITER = 10000
 i_iter = 0
 
