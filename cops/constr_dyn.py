@@ -226,7 +226,7 @@ def _dynamic_constraint_agent_avoidance(problem):
     # Constraint (56)
     for t, v, (r1, r2) in product(range(problem.T+1) , problem.graph.nodes , combinations(problem.big_agents, 2)):
 
-        if problem.graph.nodes[v]['small'] and problem.graph.nodes[v]['frontiers']==0:
+        if problem.graph.nodes[v]['small']: # and problem.graph.nodes[v]['frontiers']==0:
 
             if not (problem.graph.agents[r1] == problem.graph.agents[r2] and problem.graph.agents[r1] == v):
 
