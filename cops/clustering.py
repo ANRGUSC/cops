@@ -20,6 +20,7 @@ class ClusterProblem(object):
         self.master = None
         self.static_agents = None
         self.eagents = None
+        self.big_agents = None
         self.T = None
         self.max_problem_size = 4000
         self.to_frontier_problem = None
@@ -632,6 +633,7 @@ class ClusterProblem(object):
 
                 cp.static_agents = static_agents
                 cp.eagents = self.eagents
+                cp.big_agents = self.big_agents
 
                 g = deepcopy(self.graph)
                 g.remove_nodes_from(set(self.graph.nodes) - set(self.subgraphs[c]) - set(additional_nodes))
@@ -807,6 +809,7 @@ class ClusterProblem(object):
 
                 cp.static_agents = static_agents
                 cp.eagents = self.eagents
+                cp.big_agents = self.big_agents
 
                 g = deepcopy(self.graph)
                 g.remove_nodes_from(set(self.graph.nodes) - set(self.subgraphs[c]) - set(additional_nodes))
