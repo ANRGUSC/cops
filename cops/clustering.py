@@ -632,8 +632,8 @@ class ClusterProblem(object):
                     sinks.append(self.submasters[C[0]])
 
                 cp.static_agents = static_agents
-                cp.eagents = self.eagents
-                cp.big_agents = self.big_agents
+                cp.eagents = [r for r in self.eagents if r in agents]
+                cp.big_agents = [r for r in self.big_agents if r in agents]
 
                 g = deepcopy(self.graph)
                 g.remove_nodes_from(set(self.graph.nodes) - set(self.subgraphs[c]) - set(additional_nodes))
@@ -808,8 +808,8 @@ class ClusterProblem(object):
                 sources = list(set(sources))
 
                 cp.static_agents = static_agents
-                cp.eagents = self.eagents
-                cp.big_agents = self.big_agents
+                cp.eagents = [r for r in self.eagents if r in agents]
+                cp.big_agents = [r for r in self.big_agents if r in agents]
 
                 g = deepcopy(self.graph)
                 g.remove_nodes_from(set(self.graph.nodes) - set(self.subgraphs[c]) - set(additional_nodes))

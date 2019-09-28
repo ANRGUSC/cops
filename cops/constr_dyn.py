@@ -228,6 +228,7 @@ def _dynamic_constraint_agent_avoidance(problem):
 
         if problem.graph.nodes[v]['small']:
 
+
             if not (problem.graph.agents[r1] == problem.graph.agents[r2] and problem.graph.agents[r1] == v):
 
                 A_row.append(constraint_idx)
@@ -244,7 +245,7 @@ def _dynamic_constraint_agent_avoidance(problem):
     for t, (v1, v2), (r1, r2) in product(range(problem.T) , problem.graph.tran_edges() , combinations(problem.big_agents, 2)):
 
         if (problem.graph.nodes[v1]['small']) or (problem.graph.nodes[v2]['small']):
-            
+
             A_row.append(constraint_idx)
             A_col.append(problem.get_xf_idx(r1, v1, v2, t))
             A_data.append(1)
