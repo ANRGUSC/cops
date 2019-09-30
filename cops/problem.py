@@ -376,7 +376,7 @@ class ConnectivityProblem(object):
 
     def solve_flow(self, master = False, connectivity = True, optimal = False,
                    solver=None, output=False, integer=True,
-                   frontier_reward = True, verbose=False):
+                   frontier_reward = True, verbose=False, cut = True):
 
         self.prepare_problem()
 
@@ -432,7 +432,7 @@ class ConnectivityProblem(object):
         if verbose:
             print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
-        self._solve(solver=None, output=False, integer=True, verbose=verbose)
+        self._solve(solver=None, output=False, integer=True, verbose=verbose, cut = cut)
 
     def diameter_solve_flow(self, master = False, connectivity = True,
                             optimal = False, solver=None, output=False,
@@ -504,7 +504,7 @@ class ConnectivityProblem(object):
 
             T += 1
 
-    def _solve(self, solver=None, output=False, integer=True, verbose=False, adaptive = False):
+    def _solve(self, solver=None, output=False, integer=True, verbose=False, adaptive = False, cut = True):
 
         obj = self.obj
 
@@ -522,11 +522,13 @@ class ConnectivityProblem(object):
         # Solve it
         t0 = time.time()
         self.solution = solve_ilp(obj, self.constraint, J_int, J_bin, solver, output)
+        print(self.solution['primal objective'])
 
         if verbose:
             print("Solver time {:.2f}s".format(time.time() - t0))
 
 
+        print(self.solution['status'] )
         if self.solution['status'] == 'infeasible':
             if verbose:
                 print("Problem infeasible")
@@ -535,7 +537,7 @@ class ConnectivityProblem(object):
             self.conn = {}
             self.tran = {}
         else:
-            if not adaptive:
+            if not adaptive and cut:
                 #cut static part of solution
                 self.cut_solution()
 

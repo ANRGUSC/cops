@@ -28,7 +28,7 @@ def generate_flow_master_constraints(problem):
     c_58 = _dynamic_constraint_58(problem)
     c_59 = _dynamic_constraint_outflow_bound(problem)
 
-    return c_48 & c_49 & c_54 & c_55 & c_58 #& c_59
+    return c_48 & c_49 & c_54 & c_55 & c_58 & c_59
 
 ##########################################################
 ##########################################################
