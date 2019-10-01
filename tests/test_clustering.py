@@ -29,9 +29,8 @@ def test_activation1():
     np.testing.assert_equal(cs.child_clusters["c1"], set())
     np.testing.assert_equal(cs.child_clusters["c2"], set())
 
-    np.testing.assert_equal(cs.parent_clusters["c0"], set())
-    np.testing.assert_equal(cs.parent_clusters["c1"], {("c0", 0)})
-    np.testing.assert_equal(cs.parent_clusters["c2"], {("c0", 0)})
+    np.testing.assert_equal(cs.parent_clusters["c1"], ("c0", 0))
+    np.testing.assert_equal(cs.parent_clusters["c2"], ("c0", 0))
 
 
 def test_activation2():
@@ -63,9 +62,8 @@ def test_activation2():
     np.testing.assert_equal(cs.child_clusters["c1"], {("c2", 8)})
     np.testing.assert_equal(cs.child_clusters["c2"], set())
 
-    np.testing.assert_equal(cs.parent_clusters["c0"], set())
-    np.testing.assert_equal(cs.parent_clusters["c1"], {("c0", 3)})
-    np.testing.assert_equal(cs.parent_clusters["c2"], {("c1", 6)})
+    np.testing.assert_equal(cs.parent_clusters["c1"], ("c0", 3))
+    np.testing.assert_equal(cs.parent_clusters["c2"], ("c1", 6))
 
 
 def test_solve_cluster():

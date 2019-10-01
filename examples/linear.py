@@ -1,19 +1,14 @@
 from cops.problem import *
 from cops.animate import *
 
-n = 8  # size of graph
+from graph_examples import get_linear_graph
 
-# Define a connectivity graph
-G = Graph()
-G.add_transition_path(list(range(n)))
-G.add_connectivity_path(list(range(n)))
-G.set_node_positions({i: (0, i) for i in range(n)})
+G = get_linear_graph(8)
 
 frontiers = {5: 1}
 G.set_frontiers(frontiers)
 
 agent_positions = {0: 0, 1: 1, 2: 3}
-# agent_positions = {0: 0, 1: n//2, 2: n-1}
 G.init_agents(agent_positions)
 
 # Set up the connectivity problem
@@ -24,7 +19,7 @@ cp.static_agents = [0]
 cp.master = 0
 
 # Solve
-cp.solve_flow(optimal=True, frontier_reward=True)
+cp.solve_flow(frontier_reward=True)
 
 # Plot Graph (saves image as graph.png)ß
 # plot_solution(cp)

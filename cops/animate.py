@@ -355,6 +355,11 @@ def animate_cluster(graph, traj, conn, subgraphs, dead_color="grey", **kwargs):
         if (t, v) not in node_colors:
             node_colors[(t, v)] = dead_color
 
+    # Fill in missing values with blanks
+    for r, t in product(graph.agents, range(T + 1)):
+        if not (r, t) in traj:
+            traj[r, t] = traj[r, t - 1]
+
     return animate(graph, traj, conn, node_colors=node_colors, **kwargs)
 
 

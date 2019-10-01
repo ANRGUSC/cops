@@ -40,9 +40,7 @@ class AbstractConnectivityProblem(object):
         # OBJECTIVE FUNCTION
         self.eagents = None  # set(r) of agents that can explore frontiers
         self.frontier_reward = 100  # reward to end at frontier node
-        self.frontier_reward_decay = (
-            0.4
-        )  # decay factor for additional robots at node
+        self.frontier_reward_decay = 0.4  # decay factor for additional robots at node
         self.reward_dict = None  # dict(v: n) user-defined additional rewards
 
         if "graph" in kwargs:
