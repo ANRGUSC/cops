@@ -78,9 +78,6 @@ G.set_frontiers(frontiers)
 agent_positions = {0: 0, 1: 1, 2: 1}  # agent:position
 G.init_agents(agent_positions)
 
-# Plot Graph (saves image as graph.png)
-G.plot_graph()
-
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 cp.graph = G  # graph

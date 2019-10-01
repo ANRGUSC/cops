@@ -16,8 +16,6 @@ agent_positions = {0: 0, 1: 1, 2: 3}
 # agent_positions = {0: 0, 1: n//2, 2: n-1}
 G.init_agents(agent_positions)
 
-G.plot_graph()
-
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 cp.graph = G

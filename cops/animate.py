@@ -286,7 +286,7 @@ def animate(
 def animate_sequence(graph, problem_list, **kwargs):
 
     # Use a one to put one time step between problems
-    start_time = [0] + list(accumulate([problem.T + 1 for problem in problem_list]))
+    start_time = [0] + list(accumulate([problem.T_sol + 1 for problem in problem_list]))
 
     T = start_time[-1]
 
@@ -361,7 +361,7 @@ def animate_cluster(graph, traj, conn, subgraphs, dead_color="grey", **kwargs):
 def animate_cluster_sequence(graph, problem_list, **kwargs):
 
     # Use a one to put one time step between problems
-    start_time = [0] + list(accumulate([problem.T + 1 for problem in problem_list]))
+    start_time = [0] + list(accumulate([problem.T_sol + 1 for problem in problem_list]))
 
     T = start_time[-1]
 
@@ -395,7 +395,7 @@ def animate_cluster_sequence(graph, problem_list, **kwargs):
         if isinstance(problem, ClusterProblem):
             for j, v_list in enumerate(problem.subgraphs.values()):
                 for v in v_list:
-                    for t in range(start_time[i], start_time[i] + problem.T):
+                    for t in range(start_time[i], start_time[i] + problem.T_sol):
                         node_colors[t, v] = clu_col[j]
 
     ### Prepare dead nodes
@@ -403,10 +403,7 @@ def animate_cluster_sequence(graph, problem_list, **kwargs):
     for i, problem in enumerate(problem_list):
         if isinstance(problem, ClusterProblem):
             for t, n in product(range(T + 1), graph.nodes):
-                if (
-                    n in problem.original_graph.nodes
-                    and problem.original_graph.nodes[n]["dead"]
-                ):
+                if n in problem.graph.nodes and problem.graph.nodes[n]["dead"]:
                     node_dead[start_time[i] + t, n] = True
                     node_colors[start_time[i] + t, n] = "white"
                 else:

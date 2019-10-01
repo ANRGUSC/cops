@@ -25,28 +25,34 @@ class Variable(object):
 
 
 class AbstractConnectivityProblem(object):
-    def __init__(self):
+    def __init__(self, other=None):
 
-        # BASIC PROBLEM DEFINITON
-        self.graph = None  # mobility-communication graph with initial conditions
+        if other is None:
+            # BASIC PROBLEM DEFINITON
+            self.graph = None  # mobility-communication graph with initial conditions
 
-        self.static_agents = None  # set(r) of agents that don't move
-        self.big_agents = None  # set(r) of agents that can't pass each other
-        self.final_position = None  # dict(r: v) of constraints on final position
+            self.static_agents = None  # set(r) of agents that don't move
+            self.big_agents = None  # set(r) of agents that can't pass each other
+            self.final_position = None  # dict(r: v) of constraints on final position
 
-        # MASTER CONSTRAINTS
-        self.master = None  # list(r) of master agents
+            # MASTER CONSTRAINTS
+            self.master = None  # list(r) of master agents
 
-        # OBJECTIVE FUNCTION
-        self.eagents = None  # set(r) of agents that can explore frontiers
-        self.frontier_reward = 100  # reward to end at frontier node
-        self.frontier_reward_decay = 0.4  # decay factor for additional robots at node
-        self.reward_dict = None  # dict(v: n) user-defined additional rewards
+            # OBJECTIVE FUNCTION
+            self.eagents = None  # set(r) of agents that can explore frontiers
+            self.frontier_reward = 100  # reward to end at frontier node
+            self.frontier_reward_decay = (
+                0.4
+            )  # decay factor for additional robots at node
+            self.reward_dict = None  # dict(v: n) user-defined additional rewards
 
-        # SOLUTION
-        self.traj = None  # dict(r,t: v) of robot positions
-        self.conn = None  # dict(t: set(v1,v2,b)) of flow over communication edges
-        self.tran = None  # dict(t: set(v1,v2,b)) of flow over transition edges
+            # STORED SOLUTION
+            self.T_sol = None  # length of solution
+            self.traj = None  # dict(r,t: v) of robot positions
+            self.conn = None  # dict(t: set(v1,v2,b)) of flow over communication edges
+            self.tran = None  # dict(t: set(v1,v2,b)) of flow over transition edges
+        else:
+            self = copy.deepcopy(other)
 
     def prepare_problem(self):
 
@@ -64,9 +70,10 @@ class AbstractConnectivityProblem(object):
 
 
 class ConnectivityProblem(AbstractConnectivityProblem):
-    def __init__(self):
-        super(ConnectivityProblem, self).__init__()
+    def __init__(self, other=None):
+        super(ConnectivityProblem, self).__init__(other)
 
+        # BASIC PROBLEM DEFINITON
         self.T = None  # time horizon
 
         # CONNECTIVITY
@@ -75,25 +82,18 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         self.always_src = False  # if true, always use source->sink type constraint
 
         self.reward_demand = 0.4  # fraction of total reward demanded
-        self.additional_constraints = (
-            None
-        )  # additional constraints on the form A x \leq b
+        self.extra_constr = None  # additional constraints
 
         ##########################
         #### INTERNAL MEMORY #####
         ##########################
 
         # ILP SETUP
+        self.vars = None
         self.dict_tran = None
         self.dict_conn = None
         self.dict_node = None
         self.dict_agent = None
-        self.vars = None
-        self.constraint = None
-        self.obj = []
-
-        # ILP SOLUTION
-        self.solution = None
 
     ##PROPERTIES##
     @property
@@ -135,7 +135,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         super(ConnectivityProblem, self).prepare_problem()
 
         # reset contraints
-        self.constraint = Constraint()
+        constraint = Constraint()
 
         if self.T is None:
             raise Exception("Can not solve problem without horizon 'T'")
@@ -239,106 +239,101 @@ class ConnectivityProblem(AbstractConnectivityProblem):
 
     ##OBJECTIVE FUNCTION##
 
-    def generate_powerset_objective(self, optimal):
+    def generate_powerset_objective(self,):
 
         obj = np.zeros(self.num_vars)
 
-        if optimal:
+        # add user-defined rewards
+        if self.reward_dict != None:
+            for t, r in product(range(self.T + 1), self.agents):
+                for v, R in self.reward_dict.items():
+                    obj[self.get_z_idx(r, v, t)] = -(0.9 ** t) * R
 
-            # add user-defined rewards
-            if self.reward_dict != None:
-                for t, r in product(range(self.T + 1), self.agents):
-                    for v, R in self.reward_dict.items():
-                        obj[self.get_z_idx(r, v, t)] = -(0.9 ** t) * R
+        # add frontier rewards
+        for t, r, v in product(range(self.T + 1), self.graph.agents, self.graph.nodes):
+            if (
+                "frontiers" in self.graph.nodes[v]
+                and self.graph.nodes[v]["frontiers"] != 0
+            ):
+                obj[self.get_z_idx(r, v, t)] -= (0.9 ** t) * self.frontier_reward
 
-            # add frontier rewards
-            if "frontiers" in self.graph.nodes[0]:
-                for t, r, v in product(
-                    range(self.T + 1), self.agents, self.graph.nodes
-                ):
-                    if self.graph.nodes[v]["frontiers"] != 0:
-                        obj[self.get_z_idx(r, v, t)] -= (
-                            0.9 ** t
-                        ) * self.frontier_reward
-
-            # add transition weights
-            for e, t in product(self.graph.edges(data=True), range(self.T)):
-                if e[2]["type"] == "transition":
-                    obj[self.get_e_idx(e[0], e[1], t)] = (1.01 ** t) * e[2]["weight"]
+        # add transition weights
+        for e, t in product(self.graph.edges(data=True), range(self.T)):
+            if e[2]["type"] == "transition":
+                obj[self.get_e_idx(e[0], e[1], t)] = (1.01 ** t) * e[2]["weight"]
 
         return obj
 
-    def generate_flow_objective(self, optimal, frontier_reward=True):
+    def generate_flow_objective(self, add_frontier_rewards):
 
         obj = np.zeros(self.num_vars)
 
-        if optimal:
+        # add user-defined rewards
+        if self.reward_dict != None:
+            for v, r in self.reward_dict.items():
+                obj[self.get_y_idx(v, 1)] -= r
 
-            # add user-defined rewards
-            if self.reward_dict != None:
-                for v, r in self.reward_dict.items():
-                    obj[self.get_y_idx(v, 1)] -= r
+        # add frontier rewards
+        if add_frontier_rewards:
+            for v in self.graph.nodes:
+                if (
+                    "frontiers" in self.graph.nodes[v]
+                    and self.graph.nodes[v]["frontiers"] > 0
+                ):
+                    for k in range(1, self.num_r + 1):
+                        obj[self.get_y_idx(v, k)] -= (
+                            self.frontier_reward_decay ** (k - 1)
+                        ) * self.frontier_reward
 
-            # add frontier rewards
-            if frontier_reward:
-                for v in self.graph.nodes:
-                    if self.graph.nodes[v]["frontiers"] > 0:
-                        for k in range(1, self.num_r + 1):
-                            obj[self.get_y_idx(v, k)] -= (
-                                self.frontier_reward_decay ** (k - 1)
-                            ) * self.frontier_reward
+        # add transition weights
+        for e, t, r in product(
+            self.graph.edges(data=True), range(self.T), self.graph.agents
+        ):
+            if e[2]["type"] == "transition":
+                obj[self.get_xf_idx(r, e[0], e[1], t)] = (1.01 ** t) * e[2]["weight"]
 
-            # add transition weights
-            for e, t, r in product(
-                self.graph.edges(data=True), range(self.T), self.graph.agents
+        # add regular communication weights
+        if "fbar" in self.vars:
+            for b, e, t in product(
+                range(len(self.min_src_snk)),
+                self.graph.edges(data=True),
+                range(self.T + 1),
             ):
-                if e[2]["type"] == "transition":
-                    obj[self.get_xf_idx(r, e[0], e[1], t)] = (1.01 ** t) * e[2][
+                if e[2]["type"] == "connectivity":
+                    obj[self.get_fbar_idx(b, e[0], e[1], t)] = (1.01 ** t) * e[2][
                         "weight"
                     ]
 
-            # add connectivity weights
-            if "fbar" in self.vars:
-                for b, e, t in product(
-                    range(len(self.min_src_snk)),
-                    self.graph.edges(data=True),
-                    range(self.T + 1),
-                ):
-                    if e[2]["type"] == "connectivity":
-                        obj[self.get_fbar_idx(b, e[0], e[1], t)] = (1.01 ** t) * e[2][
-                            "weight"
-                        ]
-
-            # add master connectivity weights (prevents unnecessary passing of masterplan)
-            if "mbar" in self.vars:
-                for e, t in product(self.graph.edges(data=True), range(self.T + 1)):
-                    if e[2]["type"] == "connectivity":
-                        obj[self.get_mbar_idx(e[0], e[1], t)] = (1.01 ** t) * e[2][
-                            "weight"
-                        ]
+        # add master communication weights
+        if "mbar" in self.vars:
+            for e, t in product(self.graph.edges(data=True), range(self.T + 1)):
+                if e[2]["type"] == "connectivity":
+                    obj[self.get_mbar_idx(e[0], e[1], t)] = (1.01 ** t) * e[2]["weight"]
 
         return obj
 
     ##SOLVER FUNCTIONS##
 
-    def cut_solution(self):
+    def cut_solution(self, solution):
         t = self.T
         cut = True
         while cut and t > 0:
             for r, v in product(self.graph.agents, self.graph.nodes):
                 if (
                     abs(
-                        self.solution["x"][self.get_z_idx(r, v, t)]
-                        - self.solution["x"][self.get_z_idx(r, v, t - 1)]
+                        solution["x"][self.get_z_idx(r, v, t)]
+                        - solution["x"][self.get_z_idx(r, v, t - 1)]
                     )
                     > 0.5
                 ):
                     cut = False
             if cut:
                 t -= 1
-        self.T = t
+        self.T_sol = t
 
-    def solve_powerset(self, optimal=False, solver=None, output=False, integer=True):
+        return solution
+
+    def solve_powerset(self, **kwargs):
 
         if self.snk is not None:
             print(
@@ -376,21 +371,21 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         t0 = time.time()
 
         # Initial constraints on z
-        self.constraint &= generate_initial_constraints(self)
+        constraint = generate_initial_constraints(self)
         # Dynamic constraints on z, e
-        self.constraint &= generate_powerset_dynamic_constraints(self)
+        constraint &= generate_powerset_dynamic_constraints(self)
         # Bridge z, e to x, xbar, yb
-        self.constraint &= generate_powerset_bridge_constraints(self)
+        constraint &= generate_powerset_bridge_constraints(self)
         # Connectivity constraints on x, xbar, yb
-        self.constraint &= generate_connectivity_constraint_all(self)
+        constraint &= generate_connectivity_constraint_all(self)
         # Objective
-        self.obj = self.generate_powerset_objective(optimal)
+        obj = self.generate_powerset_objective()
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
-        self._solve(solver=None, output=False, integer=True)
+        self._solve(obj, constraint, **kwargs)
 
-    def solve_adaptive(self, optimal=False, solver=None, output=False, integer=True):
+    def solve_adaptive(self, **kwargs):
 
         self.prepare_problem()
 
@@ -422,27 +417,27 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         t0 = time.time()
 
         # Initial constraints on z
-        self.constraint &= generate_initial_constraints(self)
+        constraint = generate_initial_constraints(self)
         # Dynamic constraints on z, e
-        self.constraint &= generate_powerset_dynamic_constraints(self)
+        constraint &= generate_powerset_dynamic_constraints(self)
         # Bridge z, e to x, xbar, yb
-        self.constraint &= generate_powerset_bridge_constraints(self)
+        constraint &= generate_powerset_bridge_constraints(self)
         # Objective
-        self.obj = self.generate_powerset_objective(optimal)
+        obj = self.generate_powerset_objective()
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
         valid_solution = False
         while not valid_solution:
-            self._solve(solver, output, integer, adaptive=True)
-            if self.solution["status"] == "infeasible":
+            solution = self._solve(obj, constraint, cut=False, **kwargs)
+            if solution["status"] == "infeasible":
                 break
-            valid_solution, add_S = self.test_solution()
-            self.constraint &= generate_connectivity_constraint(
+            valid_solution, add_S = self.test_solution(solution)
+            constraint &= generate_connectivity_constraint(
                 self, range(self.num_src), add_S
             )
         # cut static part of solution
-        self.cut_solution()
+        solution = self.cut_solution(solution)
 
         # save info
         self.traj = {}
@@ -450,20 +445,11 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         self.tran = {t: set() for t in range(self.T)}
 
         for r, v, t in product(self.graph.agents, self.graph.nodes, range(self.T + 1)):
-            if self.solution["x"][self.get_z_idx(r, v, t)] > 0.5:
+            if solution["x"][self.get_z_idx(r, v, t)] > 0.5:
                 self.traj[(r, t)] = v
 
     def solve_flow(
-        self,
-        master=False,
-        connectivity=True,
-        optimal=False,
-        solver=None,
-        output=False,
-        integer=True,
-        frontier_reward=True,
-        verbose=False,
-        cut=True,
+        self, master=False, connectivity=True, frontier_reward=True, **kwargs
     ):
 
         self.prepare_problem()
@@ -512,50 +498,37 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         t0 = time.time()
 
         # Initial Constraints on z
-        self.constraint &= generate_initial_constraints(self)
+        constraint = generate_initial_constraints(self)
         # Dynamic Constraints on z, e
-        self.constraint &= generate_flow_dynamic_constraints(self)
+        constraint &= generate_flow_dynamic_constraints(self)
         # Bridge z, f, fbar to x, xbar, yb
-        self.constraint &= generate_flow_bridge_constraints(self)
-        # Flow connectivity constraints on z, e, f, fbar
-        if connectivity:
-            self.constraint &= generate_flow_connectivity_constraints(self)
+        constraint &= generate_flow_bridge_constraints(self)
         # Flow master constraints on z, e, m, mbar
         if master:
-            self.constraint &= generate_flow_master_constraints(self)
+            constraint &= generate_flow_master_constraints(self)
+        # Flow connectivity constraints on z, e, f, fbar
+        if connectivity:
+            constraint &= generate_flow_connectivity_constraints(self)
         # Flow objective
-        self.obj = self.generate_flow_objective(optimal, frontier_reward)
+        obj = self.generate_flow_objective(frontier_reward)
 
         # User specified as additional constraints
-        if self.additional_constraints != None:
-            for func in self.additional_constraints:
+        if self.extra_constr != None:
+            for func in self.extra_constr:
                 try:
-                    self.constraint &= eval(func[0])(self, func[1])
+                    constraint &= eval(func[0])(self, func[1])
                 except:
                     print("Couldn't find constraint function", func)
 
-        if verbose:
+        if "verbose" in kwargs and kwargs["verbose"]:
             print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
-        self._solve(solver=None, output=False, integer=True, verbose=verbose, cut=cut)
+        return self._solve(obj, constraint, **kwargs)
 
-    def diameter_solve_flow(
-        self,
-        master=False,
-        connectivity=True,
-        optimal=False,
-        solver=None,
-        output=False,
-        integer=True,
-        frontier_reward=True,
-        verbose=False,
-    ):
+    def diameter_solve_flow(self, **kwargs):
 
         num_frontiers = len(
             [v for v in self.graph.nodes if self.graph.nodes[v]["frontiers"] != 0]
-        )
-        num_dyn_agents = len(
-            [r for r in self.graph.agents if r not in self.static_agents]
         )
 
         D = nx.diameter(self.graph)
@@ -567,7 +540,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         feasible_solution = False
         small_optimal_value = True
 
-        if verbose:
+        if "verbose" in kwargs and kwargs["verbose"]:
             print(
                 Fore.GREEN
                 + "Solving flow [R={}, V={}, Et={}, Ec={}, static={}]".format(
@@ -583,31 +556,24 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         while not feasible_solution or small_optimal_value:
             self.T = T
 
-            if verbose:
+            if "verbose" in kwargs and kwargs["verbose"]:
                 print(
                     "Trying" + Style.BRIGHT + " T={}".format(self.T) + Style.RESET_ALL
                 )
 
             # Solve
-            self.solve_flow(
-                master,
-                connectivity,
-                optimal,
-                solver,
-                output,
-                integer,
-                frontier_reward,
-                verbose=verbose,
-            )
+            solution = self.solve_flow(**kwargs)
 
-            if self.solution["status"] is not "infeasible":
+            if solution["status"] is not "infeasible":
                 feasible_solution = True
-            else:
-                print("infeasible")
 
-            if num_frontiers > 0 and frontier_reward and feasible_solution:
+            if (
+                num_frontiers > 0
+                and ("frontier_reward" in kwargs and kwargs["frontier_reward"])
+                and feasible_solution
+            ):
                 if (
-                    self.solution["primal objective"]
+                    solution["primal objective"]
                     < -self.reward_demand * self.frontier_reward
                 ):
                     small_optimal_value = False
@@ -617,17 +583,9 @@ class ConnectivityProblem(AbstractConnectivityProblem):
                 small_optimal_value = False
 
             T += 1
+        return solution
 
-    def linear_search_solve_flow(
-        self,
-        master=False,
-        connectivity=True,
-        optimal=False,
-        solver=None,
-        output=False,
-        integer=True,
-        frontier_reward=True,
-    ):
+    def linear_search_solve_flow(self, **kwargs):
 
         T = 0
         feasible_solution = False
@@ -636,24 +594,14 @@ class ConnectivityProblem(AbstractConnectivityProblem):
             self.T = T
 
             # Solve
-            self.solve_flow(
-                master, connectivity, optimal, solver, output, integer, frontier_reward
-            )
+            solution = self.solve_flow(**kwargs)
 
-            if self.solution["status"] is not "infeasible":
+            if solution["status"] is not "infeasible":
                 feasible_solution = True
 
             T += 1
 
-    def _solve(
-        self,
-        solver=None,
-        output=False,
-        integer=True,
-        verbose=False,
-        adaptive=False,
-        cut=True,
-    ):
+    def _solve(self, obj, constraint, cut=True, solver=None, verbose=False):
 
         J_int = sum(
             [
@@ -678,49 +626,47 @@ class ConnectivityProblem(AbstractConnectivityProblem):
                     self.num_vars,
                     len(J_bin),
                     len(J_int),
-                    self.constraint.A_eq.shape[0] + self.constraint.A_iq.shape[0],
+                    constraint.A_eq.shape[0] + constraint.A_iq.shape[0],
                 )
             )
 
         # Solve it
         t0 = time.time()
-        self.solution = solve_ilp(
-            self.obj, self.constraint, J_int, J_bin, solver, output
-        )
+        solution = solve_ilp(obj, constraint, J_int, J_bin, solver)
 
         if verbose:
             print("Solver time {:.2f}s".format(time.time() - t0))
 
-        if self.solution["status"] == "infeasible":
+        if solution["status"] == "infeasible":
             if verbose:
                 print("Problem infeasible")
-
+            self.T_sol = 0
             self.traj = {}
             self.conn = {}
             self.tran = {}
         else:
-            if not adaptive and cut:
-                # cut static part of solution
-                self.cut_solution()
+            self.T_sol = self.T
+            if cut:
+                solution = self.cut_solution(solution)
 
             # save info
             self.traj = {}
-            self.conn = {t: set() for t in range(self.T + 1)}
-            self.tran = {t: set() for t in range(self.T)}
+            self.conn = {t: set() for t in range(self.T_sol + 1)}
+            self.tran = {t: set() for t in range(self.T_sol)}
 
             for r, v, t in product(
                 self.graph.agents, self.graph.nodes, range(self.T + 1)
             ):
-                if self.solution["x"][self.get_z_idx(r, v, t)] > 0.5:
+                if solution["x"][self.get_z_idx(r, v, t)] > 0.5:
                     self.traj[(r, t)] = v
 
             if "fbar" in self.vars:
                 for t, b, (v1, v2) in product(
-                    range(self.T + 1),
+                    range(self.T_sol + 1),
                     range(self.num_min_src_snk),
                     self.graph.conn_edges(),
                 ):
-                    if self.solution["x"][self.get_fbar_idx(b, v1, v2, t)] > 0.5:
+                    if solution["x"][self.get_fbar_idx(b, v1, v2, t)] > 0.5:
                         b_r = (
                             self.src[b]
                             if self.always_src or len(self.src) <= len(self.snk)
@@ -729,15 +675,19 @@ class ConnectivityProblem(AbstractConnectivityProblem):
                         self.conn[t].add((v1, v2, b_r))
 
             if "mbar" in self.vars:
-                for t, (v1, v2) in product(range(self.T + 1), self.graph.conn_edges()):
-                    if self.solution["x"][self.get_mbar_idx(v1, v2, t)] > 0.5:
+                for t, (v1, v2) in product(
+                    range(self.T_sol + 1), self.graph.conn_edges()
+                ):
+                    if solution["x"][self.get_mbar_idx(v1, v2, t)] > 0.5:
                         self.conn[t].add((v1, v2, "master"))
 
             if "f" in self.vars:
                 for t, b, (v1, v2) in product(
-                    range(self.T), range(self.num_min_src_snk), self.graph.tran_edges()
+                    range(self.T_sol),
+                    range(self.num_min_src_snk),
+                    self.graph.tran_edges(),
                 ):
-                    if self.solution["x"][self.get_f_idx(b, v1, v2, t)] > 0.5:
+                    if solution["x"][self.get_f_idx(b, v1, v2, t)] > 0.5:
                         b_r = (
                             self.src[b]
                             if self.always_src or len(self.src) <= len(self.snk)
@@ -746,9 +696,10 @@ class ConnectivityProblem(AbstractConnectivityProblem):
                         self.tran[t].add((v1, v2, b_r))
 
             if "m" in self.vars:
-                for t, (v1, v2) in product(range(self.T), self.graph.tran_edges()):
-                    if self.solution["x"][self.get_m_idx(v1, v2, t)] > 0.5:
+                for t, (v1, v2) in product(range(self.T_sol), self.graph.tran_edges()):
+                    if solution["x"][self.get_m_idx(v1, v2, t)] > 0.5:
                         self.tran[t].add((v1, v2, "master"))
+        return solution
 
     ##GRAPH HELPER FUNCTIONS##
 
@@ -768,15 +719,14 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         s.remove(self.get_time_augmented_id(self.graph.agents[b], 0))
         return chain.from_iterable(combinations(s, r) for r in range(1, len(s) + 1))
 
-    def test_solution(self):
-        solution = self.solution["x"]
+    def test_solution(self, solution):
         add_S = []
         for r in self.snk:
             S = []
             # Find end position of agent r and set as V
             for v in self.graph.nodes:
                 z_idx = self.get_z_idx(r, v, self.T)
-                if solution[z_idx] == 1:
+                if solution["x"][z_idx] == 1:
                     S.append((v, self.T))
 
             # Backwards reachability
@@ -788,7 +738,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
                     occupied = False
                     for robot in self.graph.agents:
                         z_idx = self.get_z_idx(robot, v0, t)
-                        if solution[z_idx] == 1:
+                        if solution["x"][z_idx] == 1:
                             occupied = True
                     if occupied == True and (v0, t) not in S:
                         S.append((v0, t))
@@ -796,7 +746,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
                     occupied = False
                     for robot in self.graph.agents:
                         z_idx = self.get_z_idx(robot, v0, t)
-                        if solution[z_idx] == 1:
+                        if solution["x"][z_idx] == 1:
                             occupied = True
                     if occupied == True and (v0, t) not in S:
                         S.append((v0, t))

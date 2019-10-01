@@ -11,13 +11,12 @@ def test_activation1():
     agent_positions = {0: 0, 1: 1, 2: 2}
     G.init_agents(agent_positions)
 
-    cp = ClusterProblem()
+    agent_clusters = {"c0": [0], "c1": [1], "c2": [2]}
+    master = 0
 
-    cp.graph = G
-    cp.agent_clusters = {"c0": [0], "c1": [1], "c2": [2]}
-    cp.master = 0
-
-    clusters, child_clusters, parent_clusters = cp.inflate_clusters()
+    clusters, child_clusters, parent_clusters = inflate_clusters(
+        G, agent_clusters, master
+    )
 
     np.testing.assert_equal(clusters["c0"], set([0]))
     np.testing.assert_equal(clusters["c1"], set([1]))
@@ -42,13 +41,13 @@ def test_activation2():
     agent_positions = {0: 0, 1: 1, 2: 4, 3: 6, 4: 8, 5: 10}
     G.init_agents(agent_positions)
 
-    cp = ClusterProblem()
+    graph = G
+    agent_clusters = {"c0": [0, 1], "c1": [2, 3], "c2": [4, 5]}
+    master = 0
 
-    cp.graph = G
-    cp.agent_clusters = {"c0": [0, 1], "c1": [2, 3], "c2": [4, 5]}
-    cp.master = 0
-
-    clusters, child_clusters, parent_clusters = cp.inflate_clusters()
+    clusters, child_clusters, parent_clusters = inflate_clusters(
+        G, agent_clusters, master
+    )
 
     np.testing.assert_equal(clusters["c0"], set([0, 1, 2, 3]))
     np.testing.assert_equal(clusters["c1"], set([4, 5, 6, 7]))
@@ -132,7 +131,7 @@ def test_solve_cluster():
     cp.static_agents = [0]
     cp.solve_to_frontier_problem(soft=True)
 
-    end_pos = set([cp.traj[r, cp.T] for r in range(4)])
+    end_pos = set([cp.traj[r, cp.T_sol] for r in range(4)])
     num_front = len(end_pos & set(frontiers.keys()))
 
     np.testing.assert_array_less(3, num_front + 0.5)  # all three frontiers

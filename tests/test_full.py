@@ -30,16 +30,16 @@ def test_horiz1():
     cp.solve_powerset()
 
     # positions of robot 0
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(0, 0, 0)], 1)
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(0, 1, 1)], 1)
+    np.testing.assert_equal(cp.traj[0, 0], 0)
+    np.testing.assert_equal(cp.traj[0, 1], 1)
 
     # positions of robot 1
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(1, 1, 0)], 1)
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(1, 2, 1)], 1)
+    np.testing.assert_equal(cp.traj[1, 0], 1)
+    np.testing.assert_equal(cp.traj[1, 1], 2)
 
     # positions of robot 2 (fixed)
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(2, 3, 0)], 1)
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(2, 3, 1)], 1)
+    np.testing.assert_equal(cp.traj[2, 0], 3)
+    np.testing.assert_equal(cp.traj[2, 1], 3)
 
 
 def test_horiz2():
@@ -70,16 +70,16 @@ def test_horiz2():
     cp.solve_powerset()
 
     # positions of robot 0
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(0, 0, 0)], 1)
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(0, 0, 1)], 1)
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(0, 0, 2)], 1)
+    np.testing.assert_equal(cp.traj[0, 0], 0)
+    np.testing.assert_equal(cp.traj[0, 1], 0)
+    np.testing.assert_equal(cp.traj[0, 2], 0)
 
     # positions of robot 1
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(1, 1, 0)], 1)
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(1, 2, 1)], 1)
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(1, 1, 2)], 1)
+    np.testing.assert_equal(cp.traj[1, 0], 1)
+    np.testing.assert_equal(cp.traj[1, 1], 2)
+    np.testing.assert_equal(cp.traj[1, 2], 1)
 
     # positions of robot 2 (fixed)
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(2, 3, 0)], 1)
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(2, 3, 1)], 1)
-    np.testing.assert_equal(cp.solution["x"][cp.get_z_idx(2, 3, 2)], 1)
+    np.testing.assert_equal(cp.traj[2, 0], 3)
+    np.testing.assert_equal(cp.traj[2, 1], 3)
+    np.testing.assert_equal(cp.traj[2, 2], 3)

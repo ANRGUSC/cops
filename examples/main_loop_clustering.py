@@ -211,8 +211,6 @@ for v in G.nodes():
 for r, v in agent_positions.items():
     G.nodes[v]["known"] = True
 
-G.plot_graph()
-
 problem_list = []
 
 master = 0
@@ -252,8 +250,10 @@ while not G.is_known() or not agents_home:
     cp1.big_agents = eagents
     cp1.eagents = eagents
     cp1.graph.init_agents(agent_positions)
-    cp1.solve_to_frontier_problem(verbose=True, soft=True, dead=True)
-    agent_positions = {r: cp1.traj[(r, cp1.T)] for r in cp1.graph.agents}
+    tofront_data = cp1.solve_to_frontier_problem(verbose=True, soft=True, dead=True)
+    agent_positions = {r: cp1.traj[(r, cp1.T_sol)] for r in cp1.graph.agents}
+
+    cp1.subgraphs = tofront_data.clusterstructure.subgraphs  # hack for animate..
     problem_list.append(cp1)
 
     # Process2-EXPLORE FRONTIERS---------------------------------------------
@@ -263,7 +263,7 @@ while not G.is_known() or not agents_home:
 
     ep.static_agents = [r for r in static_agents]  # static agents
     nonactivated_agents = set(agent_positions.keys()) - set(
-        r for r_list in cp1.active_agents.values() for r in r_list
+        r for r_list in tofront_data.active_agents.values() for r in r_list
     )
     for r in nonactivated_agents:
         ep.static_agents.append(r)
@@ -285,8 +285,10 @@ while not G.is_known() or not agents_home:
     cp2.eagents = eagents
     cp2.graph.init_agents(agent_positions)
     cp2.to_frontier_problem = cp1
-    cp2.solve_to_base_problem(verbose=True, dead=True)
-    agent_positions = {r: cp2.traj[(r, cp2.T)] for r in cp2.graph.agents}
+    cp2.solve_to_base_problem(tofront_data, verbose=True, dead=True)
+    agent_positions = {r: cp2.traj[(r, cp2.T_sol)] for r in cp2.graph.agents}
+
+    cp2.subgraphs = tofront_data.clusterstructure.subgraphs  # hack for animate..
     problem_list.append(cp2)
 
     # check if all agents are home-------------------------------------------

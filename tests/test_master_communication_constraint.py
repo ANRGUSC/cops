@@ -24,9 +24,9 @@ def test_master_comm():
     cp.snk = [1]
 
     # Solve with master, without frontier rewards
-    cp.solve_flow(
-        optimal=True, frontier_reward=False, master=True, connectivity=True, cut=False
-    )
+    cp.solve_flow(frontier_reward=False, master=True, connectivity=True, cut=False)
+    print(cp.traj)
+    print(cp.conn)
 
     # Check solution
     for t in range(6):
@@ -39,9 +39,7 @@ def test_master_comm():
         )
 
     # Solve with master, with frontier rewards
-    cp.solve_flow(
-        optimal=True, frontier_reward=True, master=True, connectivity=True, cut=False
-    )
+    cp.solve_flow(frontier_reward=True, master=True, connectivity=True, cut=False)
 
     # Check solution
     for t in range(6):
@@ -53,9 +51,7 @@ def test_master_comm():
         )
 
     # Solve without master, without frontier rewards
-    cp.solve_flow(
-        optimal=True, frontier_reward=False, master=False, connectivity=True, cut=False
-    )
+    cp.solve_flow(frontier_reward=False, master=False, connectivity=True, cut=False)
 
     # Check solution
     for t in range(6):
@@ -65,9 +61,7 @@ def test_master_comm():
         np.testing.assert_equal(cp.conn[t], set([(3, 2, 2)]) if t == 0 else set())
 
     # Solve without master, with frontier rewards
-    cp.solve_flow(
-        optimal=True, frontier_reward=True, master=False, connectivity=True, cut=False
-    )
+    cp.solve_flow(frontier_reward=True, master=False, connectivity=True, cut=False)
 
     # Check solution
     for t in range(6):

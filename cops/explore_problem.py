@@ -34,6 +34,7 @@ class ExplorationProblem(object):
         self.k = None
 
         # Heuristic solution
+        self.T_sol = 0
         self.traj = {}
         self.conn = {}
 
@@ -189,6 +190,7 @@ class ExplorationProblem(object):
                     self.traj[(r, t)] = self.graph.agents[r]
 
     def _solve(self):
+        self.T_sol = self.T
         for t in range(1, int(self.T / 2) + 1):
             for fr in self.frontier_robot_dict:
                 if (
