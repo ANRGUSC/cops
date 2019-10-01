@@ -3,16 +3,17 @@ import scipy.sparse as sp
 import numpy as np
 from dataclasses import dataclass
 
-default_solver = 'gurobi'
+default_solver = "gurobi"
 
 # Try to import gurobi
 try:
     from gurobipy import *
+
     TIME_LIMIT = 10 * 3600
 
 except Exception as e:
     print("warning: gurobi not found")
-    default_solver = 'mosek'
+    default_solver = "mosek"
 
 # Try to import mosek/cvxopt
 try:
@@ -20,11 +21,12 @@ try:
 
 except Exception as e:
     print("warning: mosek not found")
-    default_solver = 'gurobi'
+    default_solver = "gurobi"
 
-return_codes = {1: 'unknown', 2: 'optimal', 3: 'infeasible', 5: 'dual infeasible'}
+return_codes = {1: "unknown", 2: "optimal", 3: "infeasible", 5: "dual infeasible"}
 
-#Class for constraints----------------------------------------------------------
+# Class for constraints----------------------------------------------------------
+
 
 @dataclass
 class Constraint(object):
@@ -74,6 +76,7 @@ class Constraint(object):
 
         return self
 
+
 def solve_ilp(c, constraint, J_int=None, J_bin=None, solver=default_solver, output=0):
     """
     Solve the ILP
@@ -103,10 +106,10 @@ def solve_ilp(c, constraint, J_int=None, J_bin=None, solver=default_solver, outp
         J_bin = []
 
     if len(set(J_bin) & set(J_int)):
-        raise Exception('J_int and J_bin overlap')
+        raise Exception("J_int and J_bin overlap")
 
     if (len(J_bin) + len(J_int)) != len(c):
-        raise Exception('J_int and J_bin not fully specified')
+        raise Exception("J_int and J_bin not fully specified")
 
     if constraint.has_eq and not constraint.has_iq:
         constraint.A_iq = sp.coo_matrix((0, constraint.A_eq.shape[1]))
@@ -116,17 +119,32 @@ def solve_ilp(c, constraint, J_int=None, J_bin=None, solver=default_solver, outp
         constraint.A_eq = sp.coo_matrix((0, constraint.A_iq.shape[1]))
         constraint.b_eq = np.array([])
 
-    if solver == 'gurobi':
-        sol = _solve_gurobi(c, constraint.A_iq, constraint.b_iq,
-                             constraint.A_eq, constraint.b_eq,
-                             J_int, J_bin, output)
-    elif solver == 'mosek':
-        sol = _solve_mosek(c, constraint.A_iq, constraint.b_iq,
-                            constraint.A_eq, constraint.b_eq,
-                            J_int, J_bin, output)
+    if solver == "gurobi":
+        sol = _solve_gurobi(
+            c,
+            constraint.A_iq,
+            constraint.b_iq,
+            constraint.A_eq,
+            constraint.b_eq,
+            J_int,
+            J_bin,
+            output,
+        )
+    elif solver == "mosek":
+        sol = _solve_mosek(
+            c,
+            constraint.A_iq,
+            constraint.b_iq,
+            constraint.A_eq,
+            constraint.b_eq,
+            J_int,
+            J_bin,
+            output,
+        )
 
-    sol['status'] = return_codes[sol['rcode']]
+    sol["status"] = return_codes[sol["rcode"]]
     return sol
+
 
 def _solve_mosek(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
     """
@@ -138,6 +156,7 @@ def _solve_mosek(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
              x >= 0
         using the Mosek ILP solver
     """
+
     def streamprinter(text):
         sys.stdout.write(text)
         sys.stdout.flush()
@@ -162,58 +181,56 @@ def _solve_mosek(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
     task.putcslice(0, num_var, c)
 
     # Positivity
-    task.putvarboundslice(0, num_var, [mosek.boundkey.lo] * num_var,
-                                      [0.] * num_var,
-                                      [+inf] * num_var)
+    task.putvarboundslice(
+        0, num_var, [mosek.boundkey.lo] * num_var, [0.0] * num_var, [+inf] * num_var
+    )
 
     # Constrain binary to [0, 1]
-    task.putvarboundlist(J_bin, [mosek.boundkey.ra] * len(J_bin),
-                         [0.] * len(J_bin),
-                         [1.] * len(J_bin))
+    task.putvarboundlist(
+        J_bin, [mosek.boundkey.ra] * len(J_bin), [0.0] * len(J_bin), [1.0] * len(J_bin)
+    )
 
     # Integers
-    task.putvartypelist(J_int+J_bin, [mosek.variabletype.type_int] * len(J_int+J_bin))
+    task.putvartypelist(
+        J_int + J_bin, [mosek.variabletype.type_int] * len(J_int + J_bin)
+    )
 
     # Inequality constraints
     task.putaijlist(Aiq.row, Aiq.col, Aiq.data)
-    task.putconboundslice(0, num_iq,
-                          [mosek.boundkey.up] * num_iq,
-                          [-inf] * num_iq,
-                          biq)
+    task.putconboundslice(0, num_iq, [mosek.boundkey.up] * num_iq, [-inf] * num_iq, biq)
 
     # Equality constraints
     task.putaijlist(num_iq + Aeq.row, Aeq.col, Aeq.data)
-    task.putconboundslice(num_iq, num_iq + num_eq,
-                          [mosek.boundkey.fx] * num_eq,
-                          beq,
-                          beq)
+    task.putconboundslice(
+        num_iq, num_iq + num_eq, [mosek.boundkey.fx] * num_eq, beq, beq
+    )
 
     task.putobjsense(mosek.objsense.minimize)
     task.optimize()
 
     sol = {}
-    sol['x'] = np.zeros(num_var, float)
+    sol["x"] = np.zeros(num_var, float)
 
-    if len(J_int+J_bin) > 0:
+    if len(J_int + J_bin) > 0:
         solsta = task.getsolsta(mosek.soltype.itg)
-        task.getxx(mosek.soltype.itg, sol['x'])
+        task.getxx(mosek.soltype.itg, sol["x"])
     else:
         solsta = task.getsolsta(mosek.soltype.bas)
-        task.getxx(mosek.soltype.bas, sol['x'])
+        task.getxx(mosek.soltype.bas, sol["x"])
 
-    if solsta in [solsta.optimal,
-                  solsta.near_optimal,
-                  solsta.integer_optimal,
-                  solsta.near_integer_optimal]:
-        sol['rcode'] = 2
-    elif solsta in [solsta.dual_infeas_cer,
-                    solsta.near_dual_infeas_cer]:
-        sol['rcode'] = 5
-    elif solsta in [solsta.prim_infeas_cer,
-                    solsta.near_prim_infeas_cer]:
-        sol['rcode'] = 3
+    if solsta in [
+        solsta.optimal,
+        solsta.near_optimal,
+        solsta.integer_optimal,
+        solsta.near_integer_optimal,
+    ]:
+        sol["rcode"] = 2
+    elif solsta in [solsta.dual_infeas_cer, solsta.near_dual_infeas_cer]:
+        sol["rcode"] = 5
+    elif solsta in [solsta.prim_infeas_cer, solsta.near_prim_infeas_cer]:
+        sol["rcode"] = 3
     elif solsta == solsta.unknown:
-        sol['rcode'] = 1
+        sol["rcode"] = 1
 
     return sol
 
@@ -282,11 +299,11 @@ def _solve_gurobi(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
 
     sol = {}
     if m.status == gurobipy.GRB.status.OPTIMAL:
-        sol['x'] = np.array([var.x for var in x])
-        sol['primal objective'] = m.objVal
-    if m.status in [2,3,5]:
-        sol['rcode'] = m.status
+        sol["x"] = np.array([var.x for var in x])
+        sol["primal objective"] = m.objVal
+    if m.status in [2, 3, 5]:
+        sol["rcode"] = m.status
     else:
-        sol['rcode'] = 1
+        sol["rcode"] = 1
 
     return sol

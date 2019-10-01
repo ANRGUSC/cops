@@ -9,25 +9,30 @@ from colorama import Fore, Style
 
 from cops.problem import *
 
-class ClusterProblem(object):
 
+class ClusterProblem(AbstractConnectivityProblem):
     def __init__(self):
-        # Problem definition
+        super(ClusterProblem, self).__init__()
+
+        ##########################
+        ### PROBLEM DEFINITION ###
+        ##########################
+
+        # CLUSTERING
+        self.k = None  # desired number of clusters
+        self.max_problem_size = 4000  # max problem size
+
+        ##########################
+        #### INTERNAL MEMORY #####
+        ##########################
+
         self.original_graph = None
-        self.graph = None                   #Graph
-        self.graph_tran = None              #Transition-only graph
-        self.k = None                       #number of clusters
-        self.master = None
-        self.static_agents = None
-        self.eagents = None
-        self.big_agents = None
-        self.T = None
-        self.max_problem_size = 4000
+        self.graph_tran = None
         self.to_frontier_problem = None
         self.max_centrality_reward = 20
         self.evac_reward = 100
 
-        #Clusters
+        # Clusters
         self.cluster_builup = None
         self.agent_clusters = None
         self.child_clusters = None
@@ -38,17 +43,15 @@ class ClusterProblem(object):
         self.active_agents = None
         self.active_subgraphs = None
 
-        #Graph
+        # Graph
         self.node_children_dict = None
         self.node_parent_dict = None
 
-        #Problems/Solutions
+        # Problems/Solutions
         self.problems = {}
         self.evac = {}
-        self.traj = {}
-        self.conn = {}
 
-    #=== HELPER FUNCTIONS======================================================
+    # === HELPER FUNCTIONS======================================================
 
     @property
     def master_cluster(self):
@@ -58,8 +61,12 @@ class ClusterProblem(object):
         print("Warning: no master cluster found")
         return None
 
+    def prepare_problem(self):
+
+        super(ClusterProblem, self).prepare_problem()
+
     def parent_first_iter(self):
-        '''iterate over clusters s.t. parents come before children'''
+        """iterate over clusters s.t. parents come before children"""
         active = [self.master_cluster]
         while len(active) > 0:
             c = active.pop(0)
@@ -69,7 +76,7 @@ class ClusterProblem(object):
             yield c
 
     def children_first_iter(self):
-        '''iterate over clusters s.t. children come before parents'''
+        """iterate over clusters s.t. children come before parents"""
         for c in reversed(list(self.parent_first_iter())):
             yield c
 
@@ -79,39 +86,61 @@ class ClusterProblem(object):
         self.graph_tran.remove_edges_from(list(self.graph.conn_edges()))
 
     def create_dynamic_agent_graph(self):
-
         g = nx.Graph()
 
-        dynamic_agent_nodes = set(v for r, v in self.graph.agents.items() if r not in self.static_agents)
-        agents = [(tuple([r for r in self.graph.agents if self.graph.agents[r] == v and r not in self.static_agents]), v) for v in dynamic_agent_nodes]
-        for r,v in agents:
+        dynamic_agent_nodes = set(
+            v for r, v in self.graph.agents.items() if r not in self.static_agents
+        )
+        agents = [
+            (
+                tuple(
+                    [
+                        r
+                        for r in self.graph.agents
+                        if self.graph.agents[r] == v and r not in self.static_agents
+                    ]
+                ),
+                v,
+            )
+            for v in dynamic_agent_nodes
+        ]
+        for r, v in agents:
             g.add_node(r)
 
-        for (r1,v1), (r2,v2) in product(agents, agents):
+        for (r1, v1), (r2, v2) in product(agents, agents):
             if r1 == r2:
                 add_path = False
             else:
                 add_path = True
-                shortest_path = nx.shortest_path(self.graph_tran, source=v1, target=v2, weight='weight')
+                shortest_path = nx.shortest_path(
+                    self.graph_tran, source=v1, target=v2, weight="weight"
+                )
                 for v in shortest_path:
                     if v in dynamic_agent_nodes and v != v1 and v != v2:
                         add_path = False
             if add_path:
-                w = nx.shortest_path_length(self.graph_tran, source=v1, target=v2, weight='weight')
+                w = nx.shortest_path_length(
+                    self.graph_tran, source=v1, target=v2, weight="weight"
+                )
                 g.add_edge(r1, r2, weight=w)
 
-        #add small weight to every edge to prevent divide by zero. (w += 0.1 -> agents in same node has 10 similarity)
+        # add small weight to every edge to prevent divide by zero. (w += 0.1 -> agents in same node has 10 similarity)
         for edge in g.edges:
-            g.edges[edge]['weight'] += 0.1
+            g.edges[edge]["weight"] += 0.1
 
-        #inverting edge weights as spectral_clustering use them as similarity measure
+        # inverting edge weights as spectral_clustering use them as similarity measure
         for edge in g.edges:
-            g.edges[edge]['weight'] = 1/g.edges[edge]['weight']
+            g.edges[edge]["weight"] = 1 / g.edges[edge]["weight"]
         return g
 
     def create_node_children_parent_dict(self):
 
-        length_to_master = nx.shortest_path_length(self.graph_tran, source=None, target=self.graph.agents[self.master], weight=None)
+        length_to_master = nx.shortest_path_length(
+            self.graph_tran,
+            source=None,
+            target=self.graph.agents[self.master],
+            weight=None,
+        )
 
         self.node_children_dict = {v: [] for v in self.graph.nodes}
         self.node_parent_dict = {v: [] for v in self.graph.nodes}
@@ -119,7 +148,7 @@ class ClusterProblem(object):
         for v in self.graph.nodes:
             nbrs = self.graph_tran.neighbors(v)
             for nbr in nbrs:
-                if length_to_master[nbr]>length_to_master[v]:
+                if length_to_master[nbr] > length_to_master[v]:
                     self.node_children_dict[v].append(nbr)
                     self.node_parent_dict[nbr].append(v)
 
@@ -128,42 +157,49 @@ class ClusterProblem(object):
         if self.graph_tran is None:
             self.create_graph_tran()
 
-        #create node children dict
+        # create node children dict
         if self.node_children_dict == None or self.node_parent_dict == None:
             self.create_node_children_parent_dict()
 
-        #revive
+        # revive
         for v in self.graph.nodes:
-            self.graph.nodes[v]['dead'] = False
+            self.graph.nodes[v]["dead"] = False
 
         # kill dead end nodes
         for v in self.graph.nodes:
-            if (len(self.node_children_dict[v]) == 0
-            and self.graph.nodes[v]['frontiers'] == 0
-            and not self.agent_in_node(v)):
-                self.graph.nodes[v]['dead'] = True
+            if (
+                len(self.node_children_dict[v]) == 0
+                and self.graph.nodes[v]["frontiers"] == 0
+                and not self.agent_in_node(v)
+            ):
+                self.graph.nodes[v]["dead"] = True
 
         # kill nodes with only dead children and no agents in node
         for v in self.node_children_first_iter():
             dead = True
             # check if node is frontier
-            if self.graph.nodes[v]['frontiers'] != 0:
+            if self.graph.nodes[v]["frontiers"] != 0:
                 dead = False
 
             # check if all children are dead
             for child in self.node_children_dict[v]:
-                if self.graph.nodes[child]['dead'] == False:
+                if self.graph.nodes[child]["dead"] == False:
                     dead = False
 
             # check if exist agent in node
             if self.agent_in_node(v):
-                    dead = False
+                dead = False
 
             if dead:
-                self.graph.nodes[v]['dead'] = True
+                self.graph.nodes[v]["dead"] = True
 
     def node_children_first_iter(self):
-        length_to_master = nx.shortest_path_length(self.graph_tran, source=None, target=self.graph.agents[self.master], weight=None)
+        length_to_master = nx.shortest_path_length(
+            self.graph_tran,
+            source=None,
+            target=self.graph.agents[self.master],
+            weight=None,
+        )
         children_first = sorted(length_to_master.items(), key=lambda v: v[1])
         for c in reversed(children_first):
             yield c[0]
@@ -173,24 +209,28 @@ class ClusterProblem(object):
         for r in self.graph.agents:
             if self.graph.agents[r] == v:
                 exist = True
-        return(exist)
+        return exist
 
     def find_evac_path(self, c):
 
         master_nodes = set(v for r, v in self.graph.agents.items() if r == self.master)
-        active_nodes = set(v for C in self.active_subgraphs for v in self.subgraphs[C]).union(master_nodes)
+        active_nodes = set(
+            v for C in self.active_subgraphs for v in self.subgraphs[C]
+        ).union(master_nodes)
 
         evac = {}
 
         for r, v in self.graph.agents.items():
             if r in self.agent_clusters[c]:
-                length, path = nx.multi_source_dijkstra(self.graph_tran, sources = active_nodes, target = v, weight='weight')
+                length, path = nx.multi_source_dijkstra(
+                    self.graph_tran, sources=active_nodes, target=v, weight="weight"
+                )
                 path = path[::-1]
                 evac[r] = path
 
         return evac
 
-    #===CLUSTER FUNCTIONS=======================================================
+    # ===CLUSTER FUNCTIONS=======================================================
 
     def problem_size(self, verbose=False):
 
@@ -198,12 +238,17 @@ class ClusterProblem(object):
         for c in self.subgraphs:
 
             # number of robots
-            R  = len(self.agent_clusters[c]) + len(self.child_clusters[c])
+            R = len(self.agent_clusters[c]) + len(self.child_clusters[c])
             # number of nodes
             V = len(self.subgraphs[c]) + len(self.child_clusters[c])
             # number of occupied nodes
-            Rp = len(set(v for r, v in self.graph.agents.items()
-                         if r in self.agent_clusters[c]))
+            Rp = len(
+                set(
+                    v
+                    for r, v in self.graph.agents.items()
+                    if r in self.agent_clusters[c]
+                )
+            )
             # number of transition edges
             Et = self.graph.number_of_tran_edges(self.subgraphs[c])
             # number of connectivity edges
@@ -211,13 +256,16 @@ class ClusterProblem(object):
             # graph diameter
             D = nx.diameter(nx.subgraph(self.graph, self.subgraphs[c]))
 
-            T = int(max(D/2, D - int(Rp/2)))
+            T = int(max(D / 2, D - int(Rp / 2)))
 
             size = R * Et * T
 
             if verbose:
-                print("{} size={} [R={}, V={}, Et={}, Ec={}, D={}, Rp={}]"\
-                      .format(c, size, R, V, Et, Ec, D, Rp))
+                print(
+                    "{} size={} [R={}, V={}, Et={}, Ec={}, D={}, Rp={}]".format(
+                        c, size, R, V, Et, Ec, D, Rp
+                    )
+                )
 
             cluster_size[c] = size
 
@@ -229,10 +277,10 @@ class ClusterProblem(object):
         adj = nx.to_numpy_matrix(dynamic_agent_graph)
 
         # Cluster (uses weights as similarity measure)
-        sc = SpectralClustering(self.k, affinity='precomputed')
+        sc = SpectralClustering(self.k, affinity="precomputed")
         sc.fit(adj)
 
-        #construct dynamic agent clusters
+        # construct dynamic agent clusters
         self.agent_clusters = {}
         c_group = []
 
@@ -241,27 +289,31 @@ class ClusterProblem(object):
             for i, r_list in enumerate(dynamic_agent_graph):
                 if sc.labels_[i] == c:
                     c_group += r_list
-            self.agent_clusters['cluster' + str(c)] = c_group
+            self.agent_clusters["cluster" + str(c)] = c_group
             c_group = []
 
-        dynamic_agent_nodes = set(v for r, v in self.graph.agents.items() if r not in self.static_agents)
-        #add static agents to nearest cluster
-        for (r,v) in self.graph.agents.items():
+        dynamic_agent_nodes = set(
+            v for r, v in self.graph.agents.items() if r not in self.static_agents
+        )
+        # add static agents to nearest cluster
+        for (r, v) in self.graph.agents.items():
             added = False
             if r in self.static_agents:
-                start_node = nx.multi_source_dijkstra(self.graph_tran, sources = dynamic_agent_nodes, target = v )[1][0]
+                start_node = nx.multi_source_dijkstra(
+                    self.graph_tran, sources=dynamic_agent_nodes, target=v
+                )[1][0]
                 for c in self.agent_clusters:
                     for rc in self.agent_clusters[c]:
                         if start_node == self.graph.agents[rc] and not added:
                             self.agent_clusters[c].append(r)
                             added = True
 
-    def inflate_clusters(self, save_buildup = False):
-        '''
+    def inflate_clusters(self, save_buildup=False):
+        """
         Requires: self.graph
                   self.agent_clusters { 'c' : [r0, r1] ...}
                   self.master
-        '''
+        """
 
         if save_buildup and self.cluster_builup == None:
             self.cluster_builup = []
@@ -270,24 +322,29 @@ class ClusterProblem(object):
             self.create_graph_tran()
 
         # node clusters with agent positions
-        clusters = {c : set(self.graph.agents[r] for r in r_list)
-                    for c, r_list in self.agent_clusters.items()}
+        clusters = {
+            c: set(self.graph.agents[r] for r in r_list)
+            for c, r_list in self.agent_clusters.items()
+        }
 
-        child_clusters = {c : [] for c in self.agent_clusters.keys()}
-        parent_clusters = {c : [] for c in self.agent_clusters.keys()}
+        child_clusters = {c: [] for c in self.agent_clusters.keys()}
+        parent_clusters = {c: [] for c in self.agent_clusters.keys()}
 
         # start with master cluster active
-        active_clusters = [c for c, r_list in self.agent_clusters.items()
-                           if self.master in r_list]
+        active_clusters = [
+            c for c, r_list in self.agent_clusters.items() if self.master in r_list
+        ]
 
         if save_buildup:
-            self.cluster_builup.append((deepcopy(clusters), deepcopy(active_clusters), None, None))
+            self.cluster_builup.append(
+                (deepcopy(clusters), deepcopy(active_clusters), None, None)
+            )
 
         while True:
 
             # check if active cluster can activate other clusters directly
             found_new = True
-            while (found_new):
+            while found_new:
                 found_new = False
                 for c0, c1 in product(active_clusters, clusters.keys()):
                     if c0 == c1 or c1 in active_clusters:
@@ -308,23 +365,28 @@ class ClusterProblem(object):
                 c_subg = self.graph_tran.subgraph(v_set | free_nodes).to_undirected()
 
                 comps = nx.connected_components(c_subg)
-                comp_dict = { i: [r for r in self.agent_clusters[c]
-                                  if self.graph.agents[r] in comp]
-                              for i, comp in enumerate(comps)}
+                comp_dict = {
+                    i: [
+                        r
+                        for r in self.agent_clusters[c]
+                        if self.graph.agents[r] in comp
+                    ]
+                    for i, comp in enumerate(comps)
+                }
 
-                comp_dict = {i:l for i,l in comp_dict.items() if len(l) > 0}
+                comp_dict = {i: l for i, l in comp_dict.items() if len(l) > 0}
 
                 if len(comp_dict) > 1:
                     # split and restart
                     del self.agent_clusters[c]
                     for i, r_list in comp_dict.items():
-                        self.agent_clusters["{}_{}".format(c, i+1)] = r_list
-                    return self.inflate_clusters() # recursive call
+                        self.agent_clusters["{}_{}".format(c, i + 1)] = r_list
+                    return self.inflate_clusters()  # recursive call
 
             # find closest neighbor and activate it
             neighbors = self.graph.post_tran(active_nodes) - active_nodes
 
-            if (len(neighbors) == 0):
+            if len(neighbors) == 0:
                 break  # nothing more to do
 
             new_cluster, new_node, min_dist, min_path = -1, -1, 99999, None
@@ -335,20 +397,27 @@ class ClusterProblem(object):
 
                 for n in neighbors & c_neighbors:
 
-                    dist, path = nx.multi_source_dijkstra(self.graph_tran,
-                                                    sources=agent_positions,
-                                                    target=n)
+                    dist, path = nx.multi_source_dijkstra(
+                        self.graph_tran, sources=agent_positions, target=n
+                    )
                     if dist < min_dist:
                         min_dist, new_node, new_cluster, min_path = dist, n, c, path
 
             clusters[new_cluster].add(new_node)
 
             if save_buildup:
-                self.cluster_builup.append((deepcopy(clusters), deepcopy(active_clusters), deepcopy(new_node), min_path))
+                self.cluster_builup.append(
+                    (
+                        deepcopy(clusters),
+                        deepcopy(active_clusters),
+                        deepcopy(new_node),
+                        min_path,
+                    )
+                )
 
         return clusters, child_clusters, parent_clusters
 
-    def create_subgraphs(self, verbose=False, save_buildup = False):
+    def create_subgraphs(self, verbose=False, save_buildup=False):
 
         small_problem_size = False
 
@@ -359,42 +428,56 @@ class ClusterProblem(object):
 
         if self.k == None:
             self.k = 1
-            self.agent_clusters = {'cluster0': [r for r in self.graph.agents]}
-            self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters(save_buildup)
-            small_problem_size = max(self.problem_size().values()) < self.max_problem_size
+            self.agent_clusters = {"cluster0": [r for r in self.graph.agents]}
+            self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters(
+                save_buildup
+            )
+            small_problem_size = (
+                max(self.problem_size().values()) < self.max_problem_size
+            )
 
             # Strategy 1: cluster
             while not small_problem_size and self.k < len(dynamic_agent_graph):
                 self.k += 1
 
-                print('Strategy 1: clustering with k={}'.format(self.k))
-                #detect agent clusters
+                print("Strategy 1: clustering with k={}".format(self.k))
+                # detect agent clusters
                 self.spectral_clustering(dynamic_agent_graph)
-                #dictionary mapping cluster to nodes
-                self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters(save_buildup)
+                # dictionary mapping cluster to nodes
+                self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters(
+                    save_buildup
+                )
 
-                small_problem_size = max(self.problem_size(verbose=verbose).values()) < self.max_problem_size
+                small_problem_size = (
+                    max(self.problem_size(verbose=verbose).values())
+                    < self.max_problem_size
+                )
 
             # Strategy 2: kill parts of graph
             while not small_problem_size:
                 print("Strategy 2: Kill frontiers")
 
-                #find frontier furthest away from master for large problems
+                # find frontier furthest away from master for large problems
                 cluster_size = self.problem_size()
                 for c, val in cluster_size.items():
                     if val >= self.max_problem_size:
 
-                        #revive
+                        # revive
                         for v in self.graph.nodes:
-                            self.graph.nodes[v]['dead'] = False
+                            self.graph.nodes[v]["dead"] = False
 
-                        #find not occupied frontiers in large subgraphs
-                        frontiers = [v for v in self.subgraphs[c] if self.graph.nodes[v]['frontiers']!=0 and not self.graph.nodes[v]['dead']]
+                        # find not occupied frontiers in large subgraphs
+                        frontiers = [
+                            v
+                            for v in self.subgraphs[c]
+                            if self.graph.nodes[v]["frontiers"] != 0
+                            and not self.graph.nodes[v]["dead"]
+                        ]
                         for r in self.agent_clusters[c]:
                             if self.graph.agents[r] in frontiers:
                                 frontiers.remove(self.graph.agents[r])
 
-                        if len(self.parent_clusters[c])>0:
+                        if len(self.parent_clusters[c]) > 0:
                             master_node = self.parent_clusters[c][0][1]
                         else:
                             master_node = self.graph.agents[self.master]
@@ -402,7 +485,9 @@ class ClusterProblem(object):
                         max_length = None
                         max_frontier = None
                         for f in frontiers:
-                            length, path = nx.single_source_dijkstra(self.graph_tran, source=master_node, target=f)
+                            length, path = nx.single_source_dijkstra(
+                                self.graph_tran, source=master_node, target=f
+                            )
                             if max_length == None:
                                 max_length = length
                                 max_frontier = f
@@ -410,10 +495,10 @@ class ClusterProblem(object):
                                 max_length = length
                                 max_frontier = f
 
-                        self.graph.nodes[f]['dead'] = True
+                        self.graph.nodes[f]["dead"] = True
 
                         # kill max_frontier
-                        self.graph.nodes[max_frontier]['dead'] = True
+                        self.graph.nodes[max_frontier]["dead"] = True
 
                         # kill nodes with only dead children and no agents in node
                         for v in self.node_children_first_iter():
@@ -421,39 +506,44 @@ class ClusterProblem(object):
 
                                 dead = True
                                 # check if node is frontier
-                                if self.graph.nodes[v]['frontiers'] != 0:
+                                if self.graph.nodes[v]["frontiers"] != 0:
                                     dead = False
 
                                 # check if all children are dead
                                 for child in self.node_children_dict[v]:
                                     if child in self.subgraphs[c]:
-                                        if self.graph.nodes[child]['dead'] == False:
+                                        if self.graph.nodes[child]["dead"] == False:
                                             dead = False
 
                                 # check if exist agent in node
                                 if self.agent_in_node(v):
-                                        dead = False
+                                    dead = False
 
                                 if dead:
-                                    self.graph.nodes[v]['dead'] = True
+                                    self.graph.nodes[v]["dead"] = True
 
                         # remove dead nodes from subgraph
                         for v in list(self.subgraphs[c]):
-                            if self.graph.nodes[v]['dead']:
+                            if self.graph.nodes[v]["dead"]:
                                 self.subgraphs[c].remove(v)
 
-                small_problem_size = max(self.problem_size(verbose=verbose).values()) < self.max_problem_size
+                small_problem_size = (
+                    max(self.problem_size(verbose=verbose).values())
+                    < self.max_problem_size
+                )
 
         else:
-            #detect agent clusters
+            # detect agent clusters
             self.spectral_clustering(dynamic_agent_graph)
 
-            #dictionary mapping cluster to nodes
-            self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters(save_buildup)
+            # dictionary mapping cluster to nodes
+            self.subgraphs, self.child_clusters, self.parent_clusters = self.inflate_clusters(
+                save_buildup
+            )
 
         # create dictionaries mapping cluster to submaster, subsinks
         self.submasters = {self.master_cluster: self.master}
-        self.subsinks = {c : [] for c in self.subgraphs}
+        self.subsinks = {c: [] for c in self.subgraphs}
 
         for c in self.parent_first_iter():
             for child, r in product(self.child_clusters[c], self.graph.agents):
@@ -463,17 +553,21 @@ class ClusterProblem(object):
                     if r not in self.subsinks[c]:
                         self.subsinks[c].append(r)
 
-    #===SOLVE FUNCTIONS=========================================================
+    # ===SOLVE FUNCTIONS=========================================================
 
     def frontier_clusters(self):
-        #set clusters with frontiers as active
-        frontier_clusters = set(c for c in self.subgraphs
-                              if any(self.graph.node[v]['frontiers'] != 0
-                                     for v in self.subgraphs[c]))
+        # set clusters with frontiers as active
+        frontier_clusters = set(
+            c
+            for c in self.subgraphs
+            if any(self.graph.node[v]["frontiers"] != 0 for v in self.subgraphs[c])
+        )
 
         for c in self.children_first_iter():
-            if any(child_c in frontier_clusters for child_c,_ in self.child_clusters[c]):
-               frontier_clusters.add(c)
+            if any(
+                child_c in frontier_clusters for child_c, _ in self.child_clusters[c]
+            ):
+                frontier_clusters.add(c)
 
         return frontier_clusters
 
@@ -481,16 +575,23 @@ class ClusterProblem(object):
         self.active_agents = {}
         for c in self.problems:
 
-            agents = set(r for r in self.agent_clusters[c]).union(self.submasters[child[0]] for child in self.child_clusters[c])
+            agents = set(r for r in self.agent_clusters[c]).union(
+                self.submasters[child[0]] for child in self.child_clusters[c]
+            )
 
             # initial position activated nodes
-            self.active_agents[c] = [r for r in self.graph.agents
-                                    if (self.graph.agents[r] == self.graph.agents[self.submasters[c]])]
+            self.active_agents[c] = [
+                r
+                for r in self.graph.agents
+                if (self.graph.agents[r] == self.graph.agents[self.submasters[c]])
+            ]
 
             # connectivity activated nodes
             for t, conn_t in self.problems[c].conn.items():
                 for (v1, v2, b) in conn_t:
-                    if b == 'master':    #if b is a tuple then b is a master (by the construction of conn)
+                    if (
+                        b == "master"
+                    ):  # if b is a tuple then b is a master (by the construction of conn)
                         for r in agents:
                             if self.graph.agents[r] == v2:
                                 if r not in self.active_agents[c]:
@@ -504,20 +605,28 @@ class ClusterProblem(object):
             # transition activated nodes
             for t, tran_t in self.problems[c].tran.items():
                 for (v1, v2, b) in tran_t:
-                    if b == 'master':    #if b is a tuple then b is a master (by the construction of tran)
+                    if (
+                        b == "master"
+                    ):  # if b is a tuple then b is a master (by the construction of tran)
                         for r in agents:
-                            if self.graph.agents[r] == v2 and r not in self.active_agents[c]:
-                                    self.active_agents[c].append(r)
+                            if (
+                                self.graph.agents[r] == v2
+                                and r not in self.active_agents[c]
+                            ):
+                                self.active_agents[c].append(r)
                     elif b == self.submasters[c]:
                         for r in agents:
-                            if self.graph.agents[r] == v2 and r not in self.active_agents[c]:
-                                    self.active_agents[c].append(r)
+                            if (
+                                self.graph.agents[r] == v2
+                                and r not in self.active_agents[c]
+                            ):
+                                self.active_agents[c].append(r)
 
-    def merge_solutions(self, order = 'forward'):
+    def merge_solutions(self, order="forward"):
 
-        #Find start and end times for each cluster
-        fwd_start_time = {self.master_cluster : 0}
-        rev_end_time = {self.master_cluster : 0}
+        # Find start and end times for each cluster
+        fwd_start_time = {self.master_cluster: 0}
+        rev_end_time = {self.master_cluster: 0}
 
         for c in self.parent_first_iter():
             if c not in self.problems:
@@ -528,23 +637,32 @@ class ClusterProblem(object):
                 submaster_node = self.problems[c].graph.agents[submaster]
 
                 # first time when c has finished communicating with submaster of child
-                t_cut = next( (t for t in range(self.problems[c].T, 0, -1)
-                               if self.problems[c].traj[(submaster, t)]
-                                  != self.problems[c].traj[(submaster, t - 1)]
-                               or any(submaster_node in conn_t[0:2]
-                                      for conn_t in self.problems[c].conn[t])),
-                              0)
+                t_cut = next(
+                    (
+                        t
+                        for t in range(self.problems[c].T, 0, -1)
+                        if self.problems[c].traj[(submaster, t)]
+                        != self.problems[c].traj[(submaster, t - 1)]
+                        or any(
+                            submaster_node in conn_t[0:2]
+                            for conn_t in self.problems[c].conn[t]
+                        )
+                    ),
+                    0,
+                )
 
                 fwd_start_time[child] = fwd_start_time[c] + t_cut
                 rev_end_time[child] = rev_end_time[c] - self.problems[c].T + t_cut
 
-        if order == 'reversed' and len(self.problems)>0:
+        if order == "reversed" and len(self.problems) > 0:
             min_t = min(rev_end_time[c] - self.problems[c].T for c in self.problems)
-            start_time = {c: rev_end_time[c] - self.problems[c].T - min_t for c in self.problems}
+            start_time = {
+                c: rev_end_time[c] - self.problems[c].T - min_t for c in self.problems
+            }
         else:
             start_time = fwd_start_time
 
-        #Find maximal evac time
+        # Find maximal evac time
         max_evac_time = 0
         for c in self.evac:
             max_evac_c = max(len(path) for r, path in self.evac[c].items())
@@ -552,8 +670,11 @@ class ClusterProblem(object):
                 max_evac_time = max_evac_c
 
         # Cluster problem total time
-        if len(self.problems)>0:
-            self.T = max(max_evac_time,max(start_time[c] + self.problems[c].T for c in self.problems))
+        if len(self.problems) > 0:
+            self.T = max(
+                max_evac_time,
+                max(start_time[c] + self.problems[c].T for c in self.problems),
+            )
         else:
             self.T = max_evac_time
 
@@ -563,7 +684,7 @@ class ClusterProblem(object):
             if c in self.problems:
                 for (r, t), v in self.problems[c].traj.items():
                     if r not in self.subsinks[c]:
-                         self.traj[r, start_time[c] + t] = v
+                        self.traj[r, start_time[c] + t] = v
 
         # Trajectories for evac
         if self.evac != None:
@@ -572,9 +693,8 @@ class ClusterProblem(object):
                     for i, v in enumerate(path):
                         self.traj[r, i] = v
 
-
         # Communication dictionary for cluster problem
-        self.conn = {t : set() for t in range(self.T+1)}
+        self.conn = {t: set() for t in range(self.T + 1)}
         for c in self.parent_first_iter():
             if c in self.problems:
                 for t, conn_t in self.problems[c].conn.items():
@@ -583,18 +703,20 @@ class ClusterProblem(object):
                         self.conn[start_time[c] + t].add((v1, v2, b))
 
         # Fill out empty trajectory slots
-        for r, t in product(self.graph.agents, range(self.T+1)):
+        for r, t in product(self.graph.agents, range(self.T + 1)):
             if t == 0:
-                self.traj[(r,t)] = self.graph.agents[r]
-            if (r,t) not in self.traj:
-                self.traj[(r,t)] = self.traj[(r,t-1)]
+                self.traj[(r, t)] = self.graph.agents[r]
+            if (r, t) not in self.traj:
+                self.traj[(r, t)] = self.traj[(r, t - 1)]
 
-    def solve_to_frontier_problem(self, verbose=False, soft = False, dead = False):
+    def solve_to_frontier_problem(self, verbose=False, soft=False, dead=False):
+
+        self.prepare_problem()
 
         self.find_dead_nodes()
         self.original_graph = self.graph
         self.graph = deepcopy(self.graph)
-        dead_nodes = [v for v in self.graph.nodes if self.graph.nodes[v]['dead']]
+        dead_nodes = [v for v in self.graph.nodes if self.graph.nodes[v]["dead"]]
         self.graph.remove_nodes_from(dead_nodes)
 
         self.create_subgraphs(verbose=verbose)
@@ -607,14 +729,14 @@ class ClusterProblem(object):
 
             if c in self.active_subgraphs:
 
-                #Setup connectivity problem
+                # Setup connectivity problem
                 cp = ConnectivityProblem()
                 cp.always_src = True
 
-                #Master is submaster of cluster
+                # Master is submaster of cluster
                 cp.master = self.submasters[c]
 
-                #Setup agents and static agents in subgraph
+                # Setup agents and static agents in subgraph
                 agents = {}
                 static_agents = []
                 sinks = []
@@ -636,7 +758,11 @@ class ClusterProblem(object):
                 cp.big_agents = [r for r in self.big_agents if r in agents]
 
                 g = deepcopy(self.graph)
-                g.remove_nodes_from(set(self.graph.nodes) - set(self.subgraphs[c]) - set(additional_nodes))
+                g.remove_nodes_from(
+                    set(self.graph.nodes)
+                    - set(self.subgraphs[c])
+                    - set(additional_nodes)
+                )
                 g.init_agents(agents)
                 cp.graph = g
 
@@ -644,33 +770,35 @@ class ClusterProblem(object):
                 norm = max(cp.reward_dict.values())
                 if norm == 0:
                     norm = 1
-                cp.reward_dict = {v: 20*val/norm for v, val in cp.reward_dict.items()}
+                cp.reward_dict = {
+                    v: 20 * val / norm for v, val in cp.reward_dict.items()
+                }
 
                 if soft:
-                    #add reward for k = 1 for at subsinks instead of hard flow contraints
+                    # add reward for k = 1 for at subsinks instead of hard flow contraints
                     for c_child, v_child in self.child_clusters[c]:
                         cp.reward_dict[v_child] -= cluster_reward[c_child]
                 else:
-                    #Source is submaster
+                    # Source is submaster
                     cp.src = [self.submasters[c]]
-                    #Sinks are submaster in active higher ranked subgraphs
+                    # Sinks are submaster in active higher ranked subgraphs
                     cp.snk = sinks
 
-                cp.diameter_solve_flow(master = True, connectivity = not soft,
-                                       optimal = True, verbose = verbose)
+                cp.diameter_solve_flow(
+                    master=True, connectivity=not soft, optimal=True, verbose=verbose
+                )
                 self.problems[c] = cp
-
 
             elif dead:
 
-                #Setup connectivity problem
+                # Setup connectivity problem
                 cp = ConnectivityProblem()
                 cp.always_src = True
 
-                #Master is submaster of cluster
+                # Master is submaster of cluster
                 cp.master = self.submasters[c]
 
-                #Setup agents and static agents in subgraph
+                # Setup agents and static agents in subgraph
                 agents = {}
                 static_agents = []
                 sinks = []
@@ -691,46 +819,59 @@ class ClusterProblem(object):
                 cp.eagents = self.eagents
 
                 g = deepcopy(self.graph)
-                g.remove_nodes_from(set(self.graph.nodes) - set(self.subgraphs[c]) - set(additional_nodes))
+                g.remove_nodes_from(
+                    set(self.graph.nodes)
+                    - set(self.subgraphs[c])
+                    - set(additional_nodes)
+                )
                 g.init_agents(agents)
                 cp.graph = g
 
                 cp.reward_dict = {v: self.evac_reward for v in g.nodes}
 
                 if soft:
-                    #add reward for k = 1 for at subsinks instead of hard flow contraints
+                    # add reward for k = 1 for at subsinks instead of hard flow contraints
                     for c_child, v_child in self.child_clusters[c]:
                         cp.reward_dict[v_child] -= cluster_reward[c_child]
 
                 else:
-                    #Source is submaster
+                    # Source is submaster
                     cp.src = [self.submasters[c]]
-                    #Sinks are submaster in active higher ranked subgraphs
+                    # Sinks are submaster in active higher ranked subgraphs
                     cp.snk = sinks
 
-                cp.diameter_solve_flow(master = True, connectivity = not soft,
-                                       optimal = True, frontier_reward = False,
-                                       verbose = verbose)
+                cp.diameter_solve_flow(
+                    master=True,
+                    connectivity=not soft,
+                    optimal=True,
+                    frontier_reward=False,
+                    verbose=verbose,
+                )
                 self.problems[c] = cp
 
-
-
-
             if soft:
-                #find activated subgraphs
+                # find activated subgraphs
                 activated_subgraphs = set()
                 # connectivity activated nodes
                 for t, conn_t in self.problems[c].conn.items():
                     for child in self.child_clusters[c]:
                         for (v1, v2, b) in conn_t:
-                            if b == 'master' and v2 == child[1] and child[0] in self.problems:    #if b is a tuple then b is a master (by the construction of conn)
+                            if (
+                                b == "master"
+                                and v2 == child[1]
+                                and child[0] in self.problems
+                            ):  # if b is a tuple then b is a master (by the construction of conn)
                                 activated_subgraphs.add(child[0])
 
                 # transition activated nodes
                 for t, tran_t in self.problems[c].conn.items():
                     for child in self.child_clusters[c]:
                         for (v1, v2, b) in tran_t:
-                            if b == 'master' and v2 == child[1] and child[0] in self.problems:    #if b is a tuple then b is a master (by the construction of conn)
+                            if (
+                                b == "master"
+                                and v2 == child[1]
+                                and child[0] in self.problems
+                            ):  # if b is a tuple then b is a master (by the construction of conn)
                                 activated_subgraphs.add(child[0])
 
                 for child in self.child_clusters[c]:
@@ -739,15 +880,19 @@ class ClusterProblem(object):
 
                 cp.reward_dict = {v: self.evac_reward for v in g.nodes}
 
-                initial_centrality_reward = sum(cp.reward_dict[self.graph.agents[r]] for r in self.agent_clusters[c])
-                cluster_reward[c] = cp.solution['primal objective'] - initial_centrality_reward
+                initial_centrality_reward = sum(
+                    cp.reward_dict[self.graph.agents[r]] for r in self.agent_clusters[c]
+                )
+                cluster_reward[c] = (
+                    cp.solution["primal objective"] - initial_centrality_reward
+                )
 
-        self.merge_solutions(order = 'forward')
+        self.merge_solutions(order="forward")
 
         # find activated agents
         self.activate_agents()
 
-    def solve_to_base_problem(self, verbose=False, dead = True):
+    def solve_to_base_problem(self, verbose=False, dead=True):
 
         self.find_dead_nodes()
         self.original_graph = self.graph
@@ -762,31 +907,42 @@ class ClusterProblem(object):
             self.submasters = self.to_frontier_problem.submasters
             self.subsinks = self.to_frontier_problem.subsinks
             self.active_subgraphs = self.to_frontier_problem.active_subgraphs
-            dead_nodes = [v for v in self.to_frontier_problem.graph.nodes if self.to_frontier_problem.graph.nodes[v]['dead']]
+            dead_nodes = [
+                v
+                for v in self.to_frontier_problem.graph.nodes
+                if self.to_frontier_problem.graph.nodes[v]["dead"]
+            ]
             self.graph.remove_nodes_from(dead_nodes)
         else:
             self.create_subgraphs(verbose=verbose)
             self.active_subgraphs = self.frontier_clusters()
-            dead_nodes = [v for v in self.graph.nodes if self.graph.nodes[v]['dead']]
+            dead_nodes = [v for v in self.graph.nodes if self.graph.nodes[v]["dead"]]
             self.graph.remove_nodes_from(dead_nodes)
 
         for c in self.children_first_iter():
 
             if c in self.active_subgraphs:
 
-                #Setup connectivity problem
+                # Setup connectivity problem
                 cp = ConnectivityProblem()
                 cp.always_src = True
 
                 if self.to_frontier_problem != None:
-                    #Masters are active agents in cluster
-                    dead_agents = [self.submasters[child[0]] for child in self.child_clusters[c] if child[0] not in self.active_subgraphs]
-                    cp.master = [r for r in self.to_frontier_problem.active_agents[c] if r not in dead_agents]
+                    # Masters are active agents in cluster
+                    dead_agents = [
+                        self.submasters[child[0]]
+                        for child in self.child_clusters[c]
+                        if child[0] not in self.active_subgraphs
+                    ]
+                    cp.master = [
+                        r
+                        for r in self.to_frontier_problem.active_agents[c]
+                        if r not in dead_agents
+                    ]
                 else:
                     cp.master = [self.submasters[c]]
 
-
-                #Setup agents and static agents in subgraph
+                # Setup agents and static agents in subgraph
                 agents = {}
                 static_agents = []
                 sources = []
@@ -796,7 +952,7 @@ class ClusterProblem(object):
                     agents[r] = self.graph.agents[r]
                     if r in self.static_agents:
                         static_agents.append(r)
-                    if self.graph.nodes[self.graph.agents[r]]['frontiers'] != 0:
+                    if self.graph.nodes[self.graph.agents[r]]["frontiers"] != 0:
                         sources.append(r)
 
                 for C in self.child_clusters[c]:
@@ -812,7 +968,11 @@ class ClusterProblem(object):
                 cp.big_agents = [r for r in self.big_agents if r in agents]
 
                 g = deepcopy(self.graph)
-                g.remove_nodes_from(set(self.graph.nodes) - set(self.subgraphs[c]) - set(additional_nodes))
+                g.remove_nodes_from(
+                    set(self.graph.nodes)
+                    - set(self.subgraphs[c])
+                    - set(additional_nodes)
+                )
                 g.init_agents(agents)
                 cp.graph = g
 
@@ -820,26 +980,43 @@ class ClusterProblem(object):
                 norm = max(cp.reward_dict.values())
                 if norm == 0:
                     norm = 1
-                cp.reward_dict = {v: self.max_centrality_reward*val/norm for v, val in cp.reward_dict.items()}
+                cp.reward_dict = {
+                    v: self.max_centrality_reward * val / norm
+                    for v, val in cp.reward_dict.items()
+                }
 
-                #force submasters to go back to initial positions for communication
+                # force submasters to go back to initial positions for communication
                 if self.to_frontier_problem != None:
-                    cp.final_position = {r: v for r, v in self.to_frontier_problem.graph.agents.items() if r == self.submasters[c]}
+                    cp.final_position = {
+                        r: v
+                        for r, v in self.to_frontier_problem.graph.agents.items()
+                        if r == self.submasters[c]
+                    }
                 else:
-                    cp.final_position = {r: v for r,v in self.graph.agents.items() if r == self.submasters[c]}
+                    cp.final_position = {
+                        r: v
+                        for r, v in self.graph.agents.items()
+                        if r == self.submasters[c]
+                    }
 
-                #Sources are submaster in active higher ranked subgraphs
+                # Sources are submaster in active higher ranked subgraphs
                 cp.src = sources
 
-                #Submaster is sink
+                # Submaster is sink
                 cp.snk = [self.submasters[c]]
 
-                #force master to be
-                cp.additional_constraints = [('constraint_static_master',self.submasters[c])]
+                # force master to be
+                cp.additional_constraints = [
+                    ("constraint_static_master", self.submasters[c])
+                ]
 
-                cp.diameter_solve_flow(master = True, connectivity = True,
-                                       optimal = True, frontier_reward = False,
-                                       verbose = verbose)
+                cp.diameter_solve_flow(
+                    master=True,
+                    connectivity=True,
+                    optimal=True,
+                    frontier_reward=False,
+                    verbose=verbose,
+                )
 
                 self.problems[c] = cp
 
@@ -849,4 +1026,4 @@ class ClusterProblem(object):
 
                 self.evac[c] = evac
 
-        self.merge_solutions(order = 'reversed')
+        self.merge_solutions(order="reversed")
