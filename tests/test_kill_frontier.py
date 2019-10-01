@@ -25,7 +25,7 @@ def test_strategy2():
 
     cs = ClusterStructure(agent_clusters=agent_clustering(cp, 3))
 
-    cs = inflate_clusters(cp, cs)
+    cs = inflate_agent_clusters(cp, cs)
     kill_list = kill_largest_frontiers(cp, cs)
 
     np.testing.assert_equal(kill_list, set(range(48, 50)) | set(range(9, 25)))
