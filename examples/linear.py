@@ -3,25 +3,29 @@ from cops.animate import *
 
 from graph_examples import get_linear_graph
 
-G = get_linear_graph(8)
+n = 4
 
-frontiers = {5: 1}
+G = get_linear_graph(n)
+
+frontiers = {i : 1 for i in range(3)}
 G.set_frontiers(frontiers)
 
-agent_positions = {0: 0, 1: 1, 2: 3}
+agent_positions = {0: 0, 1: 2, 2: 3}
 G.init_agents(agent_positions)
 
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 cp.graph = G
 cp.T = 6
-cp.static_agents = [0]
+cp.static_agents = []
 cp.master = 0
+cp.src = [2]
+cp.snk = [1]
 
 # Solve
-cp.solve_flow(frontier_reward=True)
+cp.solve_flow(master= True, frontier_reward=True, connectivity = True, cut = False)
 
-# Plot Graph (saves image as graph.png)ß
+# Plot Graph (saves image as graph.png)
 # plot_solution(cp)
 
 # Animate solution

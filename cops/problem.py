@@ -680,7 +680,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
             self.tran = {t: set() for t in range(self.T_sol)}
 
             for r, v, t in product(
-                self.graph.agents, self.graph.nodes, range(self.T + 1)
+                self.graph.agents, self.graph.nodes, range(self.T_sol + 1)
             ):
                 if solution["x"][self.get_z_idx(r, v, t)] > 0.5:
                     self.traj[(r, t)] = v

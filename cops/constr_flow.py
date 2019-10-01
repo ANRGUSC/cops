@@ -368,28 +368,41 @@ def _dynamic_constraint_58(problem):
     A_iq_col = []
     A_iq_data = []
 
+    m_v0 = [problem.graph.agents[r] for r in problem.master]
+
     constraint_idx = 0
     for v, k in product(problem.graph.nodes, range(1, problem.num_r + 1)):
+
+        if v in m_v0:
+            continue
 
         A_iq_row.append(constraint_idx)
         A_iq_col.append(problem.get_y_idx(v, k))
         A_iq_data.append(1)
 
-        if problem.T > 0:
-            for edge in problem.graph.tran_in_edges(v):
+        for tau in range(problem.T + 1):
+
+            if tau > 0:
+                for edge in problem.graph.tran_in_edges(v):
+                    A_iq_row.append(constraint_idx)
+                    A_iq_col.append(problem.get_m_idx(edge[0], edge[1], tau - 1))
+                    A_iq_data.append(-1)
+
+            for edge in problem.graph.conn_in_edges(v):
                 A_iq_row.append(constraint_idx)
-                A_iq_col.append(problem.get_m_idx(edge[0], edge[1], problem.T - 1))
+                A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], tau))
                 A_iq_data.append(-1)
 
-        for edge in problem.graph.conn_in_edges(v):
-            A_iq_row.append(constraint_idx)
-            A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], problem.T))
-            A_iq_data.append(-1)
+            if tau < problem.T:
+                for edge in problem.graph.tran_out_edges(v):
+                    A_iq_row.append(constraint_idx)
+                    A_iq_col.append(problem.get_m_idx(edge[0], edge[1], tau))
+                    A_iq_data.append(1)
 
-        for edge in problem.graph.conn_out_edges(v):
-            A_iq_row.append(constraint_idx)
-            A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], problem.T))
-            A_iq_data.append(1)
+            for edge in problem.graph.conn_out_edges(v):
+                A_iq_row.append(constraint_idx)
+                A_iq_col.append(problem.get_mbar_idx(edge[0], edge[1], tau))
+                A_iq_data.append(1)
 
         constraint_idx += 1
 
