@@ -247,13 +247,13 @@ while not G.is_known() or not agents_home:
     cp1.graph = g1
     cp1.master = master
     cp1.static_agents = [r for r in static_agents]
-    cp1.big_agents = eagents
+    # cp1.big_agents = eagents
     cp1.eagents = eagents
     cp1.graph.init_agents(agent_positions)
     tofront_data = cp1.solve_to_frontier_problem(verbose=True, soft=True, dead=True)
     agent_positions = {r: cp1.traj[(r, cp1.T_sol)] for r in cp1.graph.agents}
 
-    cp1.subgraphs = tofront_data.clusterstructure.subgraphs  # hack for animate..
+    cp1.subgraphs = tofront_data.cs.subgraphs  # hack for animate..
     problem_list.append(cp1)
 
     # Process2-EXPLORE FRONTIERS---------------------------------------------
@@ -281,14 +281,14 @@ while not G.is_known() or not agents_home:
     cp2.graph = g2
     cp2.master = master
     cp2.static_agents = [r for r in static_agents]
-    cp2.big_agents = eagents
+    # cp2.big_agents = eagents
     cp2.eagents = eagents
     cp2.graph.init_agents(agent_positions)
     cp2.to_frontier_problem = cp1
     cp2.solve_to_base_problem(tofront_data, verbose=True, dead=True)
     agent_positions = {r: cp2.traj[(r, cp2.T_sol)] for r in cp2.graph.agents}
 
-    cp2.subgraphs = tofront_data.clusterstructure.subgraphs  # hack for animate..
+    cp2.subgraphs = tofront_data.cs.subgraphs  # hack for animate..
     problem_list.append(cp2)
 
     # check if all agents are home-------------------------------------------

@@ -25,34 +25,50 @@ class Variable(object):
 
 
 class AbstractConnectivityProblem(object):
-    def __init__(self, other=None):
+    def __init__(self, **kwargs):
 
-        if other is None:
-            # BASIC PROBLEM DEFINITON
-            self.graph = None  # mobility-communication graph with initial conditions
+        # BASIC PROBLEM DEFINITON
+        self.graph = None  # mobility-communication graph with initial conditions
 
-            self.static_agents = None  # set(r) of agents that don't move
-            self.big_agents = None  # set(r) of agents that can't pass each other
-            self.final_position = None  # dict(r: v) of constraints on final position
+        self.static_agents = None  # set(r) of agents that don't move
+        self.big_agents = None  # set(r) of agents that can't pass each other
+        self.final_position = None  # dict(r: v) of constraints on final position
 
-            # MASTER CONSTRAINTS
-            self.master = None  # list(r) of master agents
+        # MASTER CONSTRAINTS
+        self.master = None  # list(r) of master agents
 
-            # OBJECTIVE FUNCTION
-            self.eagents = None  # set(r) of agents that can explore frontiers
-            self.frontier_reward = 100  # reward to end at frontier node
-            self.frontier_reward_decay = (
-                0.4
-            )  # decay factor for additional robots at node
-            self.reward_dict = None  # dict(v: n) user-defined additional rewards
+        # OBJECTIVE FUNCTION
+        self.eagents = None  # set(r) of agents that can explore frontiers
+        self.frontier_reward = 100  # reward to end at frontier node
+        self.frontier_reward_decay = (
+            0.4
+        )  # decay factor for additional robots at node
+        self.reward_dict = None  # dict(v: n) user-defined additional rewards
 
-            # STORED SOLUTION
-            self.T_sol = None  # length of solution
-            self.traj = None  # dict(r,t: v) of robot positions
-            self.conn = None  # dict(t: set(v1,v2,b)) of flow over communication edges
-            self.tran = None  # dict(t: set(v1,v2,b)) of flow over transition edges
-        else:
-            self = copy.deepcopy(other)
+        if "graph" in kwargs:
+            self.graph = kwargs["graph"]
+        if "static_agents" in kwargs:
+            self.static_agents = kwargs["static_agents"]
+        if "big_agents" in kwargs:
+            self.big_agents = kwargs["big_agents"]
+        if "final_position" in kwargs:
+            self.final_position = kwargs["final_position"]
+        if "master" in kwargs:
+            self.master = kwargs["master"]
+        if "eagents" in kwargs:
+            self.eagents = kwargs["eagents"]
+        if "frontier_reward" in kwargs:
+            self.frontier_reward = kwargs["frontier_reward"]
+        if "frontier_reward_decay" in kwargs:
+            self.frontier_reward_decay = kwargs["frontier_reward_decay"]
+        if "reward_dict" in kwargs:
+            self.reward_dict = kwargs["reward_dict"]
+
+        # STORED SOLUTION
+        self.T_sol = None  # length of solution
+        self.traj = None  # dict(r,t: v) of robot positions
+        self.conn = None  # dict(t: set(v1,v2,b)) of flow over communication edges
+        self.tran = None  # dict(t: set(v1,v2,b)) of flow over transition edges
 
     def prepare_problem(self):
 
@@ -70,8 +86,8 @@ class AbstractConnectivityProblem(object):
 
 
 class ConnectivityProblem(AbstractConnectivityProblem):
-    def __init__(self, other=None):
-        super(ConnectivityProblem, self).__init__(other)
+    def __init__(self, **kwargs):
+        super(ConnectivityProblem, self).__init__(**kwargs)
 
         # BASIC PROBLEM DEFINITON
         self.T = None  # time horizon
@@ -83,6 +99,17 @@ class ConnectivityProblem(AbstractConnectivityProblem):
 
         self.reward_demand = 0.4  # fraction of total reward demanded
         self.extra_constr = None  # additional constraints
+
+        if "src" in kwargs:
+            self.src = kwargs["src"]
+        if "snk" in kwargs:
+            self.snk = kwargs["snk"]
+        if "always_src" in kwargs:
+            self.always_src = kwargs["always_src"]
+        if "reward_demand" in kwargs:
+            self.reward_demand = kwargs["reward_demand"]
+        if "extra_constr" in kwargs:
+            self.extra_constr = kwargs["extra_constr"]
 
         ##########################
         #### INTERNAL MEMORY #####

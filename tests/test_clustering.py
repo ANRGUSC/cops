@@ -14,21 +14,24 @@ def test_activation1():
     agent_clusters = {"c0": [0], "c1": [1], "c2": [2]}
     master = 0
 
-    clusters, child_clusters, parent_clusters = inflate_clusters(
-        G, agent_clusters, master
-    )
+    cp = ClusterProblem()
+    cp.graph = G
+    cp.master = master
+    cp.prepare_problem(remove_dead=False)
 
-    np.testing.assert_equal(clusters["c0"], set([0]))
-    np.testing.assert_equal(clusters["c1"], set([1]))
-    np.testing.assert_equal(clusters["c2"], set([2]))
+    cs = inflate_clusters(cp, agent_clusters)
 
-    np.testing.assert_equal(child_clusters["c0"], [("c1", 1), ("c2", 2)])
-    np.testing.assert_equal(child_clusters["c1"], [])
-    np.testing.assert_equal(child_clusters["c2"], [])
+    np.testing.assert_equal(cs.subgraphs["c0"], set([0]))
+    np.testing.assert_equal(cs.subgraphs["c1"], set([1]))
+    np.testing.assert_equal(cs.subgraphs["c2"], set([2]))
 
-    np.testing.assert_equal(parent_clusters["c0"], [])
-    np.testing.assert_equal(parent_clusters["c1"], [("c0", 0)])
-    np.testing.assert_equal(parent_clusters["c2"], [("c0", 0)])
+    np.testing.assert_equal(cs.child_clusters["c0"], {("c1", 1), ("c2", 2)})
+    np.testing.assert_equal(cs.child_clusters["c1"], set())
+    np.testing.assert_equal(cs.child_clusters["c2"], set())
+
+    np.testing.assert_equal(cs.parent_clusters["c0"], set())
+    np.testing.assert_equal(cs.parent_clusters["c1"], {("c0", 0)})
+    np.testing.assert_equal(cs.parent_clusters["c2"], {("c0", 0)})
 
 
 def test_activation2():
@@ -45,21 +48,24 @@ def test_activation2():
     agent_clusters = {"c0": [0, 1], "c1": [2, 3], "c2": [4, 5]}
     master = 0
 
-    clusters, child_clusters, parent_clusters = inflate_clusters(
-        G, agent_clusters, master
-    )
+    cp = ClusterProblem()
+    cp.graph = G
+    cp.master = master
+    cp.prepare_problem(remove_dead=False)
 
-    np.testing.assert_equal(clusters["c0"], set([0, 1, 2, 3]))
-    np.testing.assert_equal(clusters["c1"], set([4, 5, 6, 7]))
-    np.testing.assert_equal(clusters["c2"], set([8, 9, 10, 11]))
+    cs = inflate_clusters(cp, agent_clusters)
 
-    np.testing.assert_equal(child_clusters["c0"], [("c1", 4)])
-    np.testing.assert_equal(child_clusters["c1"], [("c2", 8)])
-    np.testing.assert_equal(child_clusters["c2"], [])
+    np.testing.assert_equal(cs.subgraphs["c0"], set([0, 1, 2, 3]))
+    np.testing.assert_equal(cs.subgraphs["c1"], set([4, 5, 6, 7]))
+    np.testing.assert_equal(cs.subgraphs["c2"], set([8, 9, 10, 11]))
 
-    np.testing.assert_equal(parent_clusters["c0"], [])
-    np.testing.assert_equal(parent_clusters["c1"], [("c0", 3)])
-    np.testing.assert_equal(parent_clusters["c2"], [("c1", 6)])
+    np.testing.assert_equal(cs.child_clusters["c0"], {("c1", 4)})
+    np.testing.assert_equal(cs.child_clusters["c1"], {("c2", 8)})
+    np.testing.assert_equal(cs.child_clusters["c2"], set())
+
+    np.testing.assert_equal(cs.parent_clusters["c0"], set())
+    np.testing.assert_equal(cs.parent_clusters["c1"], {("c0", 3)})
+    np.testing.assert_equal(cs.parent_clusters["c2"], {("c1", 6)})
 
 
 def test_solve_cluster():
