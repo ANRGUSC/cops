@@ -23,9 +23,9 @@ def test_strategy2():
 
     cp.prepare_problem(remove_dead=False)
 
-    agent_clusters = spectral_clustering(cp, 3)
+    cs = ClusterStructure(agent_clusters=agent_clustering(cp, 3))
 
-    cs = inflate_clusters(cp, agent_clusters)
+    cs = inflate_clusters(cp, cs)
     kill_list = kill_largest_frontiers(cp, cs)
 
     np.testing.assert_equal(kill_list, set(range(48, 50)) | set(range(9, 25)))

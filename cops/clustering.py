@@ -1,10 +1,8 @@
 import networkx as nx
 from networkx.algorithms.centrality import betweenness_centrality
-import time
 from copy import deepcopy
 from itertools import product
 from sklearn.cluster import SpectralClustering
-from colorama import Fore, Style
 
 from cops.problem import *
 
@@ -17,10 +15,12 @@ class ClusterStructure(object):
     parent_clusters: dict = None
     submasters: dict = None
     subsinks: dict = None
+    dead_nodes: set = None
 
     def subproblem(self, c, clusterproblem):
-        # return basic connectivityproblem (graph, agents, eagents, big_agents, reward_dict)
-        # sinduced by cluster c
+        # return basic connectivityproblem
+        #  (graph, agents, eagents, big_agents, reward_dict)
+        # induced by cluster c
 
         agents = {r: clusterproblem.graph.agents[r] for r in self.agent_clusters[c]}
 
@@ -83,7 +83,6 @@ class ClusterProblem(AbstractConnectivityProblem):
 
         super(ClusterProblem, self).prepare_problem()
 
-        # delete dead nodes, and compute and store the following things:
         #  1. graph_tran: graph with only mobility edges
         #  2. node_children_dict: tree based on length_to_master
         #  3. length_to_master: distance from each robot to master node
@@ -109,31 +108,10 @@ class ClusterProblem(AbstractConnectivityProblem):
                 if self.length_to_master[nbr] > self.length_to_master[v]:
                     self.node_children_dict[v].add(nbr)
 
-        # identify and delete "dead" nodes that are not on the way to a frontier
-        if remove_dead:
-            initial_dead = set(
-                [
-                    v
-                    for v in self.graph.nodes
-                    if len(self.node_children_dict[v]) == 0
-                    and (
-                        "frontiers" not in self.graph.nodes[v]
-                        or self.graph.nodes[v]["frontiers"] == 0
-                    )
-                    and v not in self.graph.agents.values()
-                ]
-            )
-            self.remove_nodes(self.expand_dead_nodes(initial_dead))
-
-    def remove_nodes(self, dead_nodes):
-        print("Removing {} dead nodes".format(len(dead_nodes)))
-        self.graph.remove_nodes_from(dead_nodes)
-        self.graph_tran.remove_nodes_from(dead_nodes)
-
-    def expand_dead_nodes(self, initial_dead):
+    def expand_from_leaves(self, initial_set):
         """
-        traverse graph from outside to in, add nodes to dead set
-        if all their children are dead
+        traverse graph from outside to in, add nodes to set
+        if all their children are in set
         """
 
         node_order = reversed(sorted(self.length_to_master.items(), key=lambda v: v[1]))
@@ -146,11 +124,11 @@ class ClusterProblem(AbstractConnectivityProblem):
                     or self.graph_tran.nodes[v]["frontiers"] == 0
                 )
                 and v not in self.graph_tran.agents.values()
-                and self.node_children_dict[v] <= initial_dead
+                and self.node_children_dict[v] <= initial_set
             ):
-                initial_dead.add(v)
+                initial_set.add(v)
 
-        return initial_dead
+        return initial_set
 
     def find_evac_path(self, c, tofront_data):
         """evacuate a cluster by finding shortest path from each robot in cluster to origin"""
@@ -342,7 +320,8 @@ class ClusterProblem(AbstractConnectivityProblem):
 
         self.prepare_problem(remove_dead=True)
 
-        cs = cluster(self, verbose=verbose)
+        cs = clustering(self, verbose=verbose)
+
         frontier_clusters = self.frontier_clusters(cs)
 
         problems = {}
@@ -456,7 +435,7 @@ class ClusterProblem(AbstractConnectivityProblem):
         self.merge_solutions(problems, tofront_data.cs, evac=evac, order="reversed")
 
 
-def spectral_clustering(cp, num_clusters):
+def agent_clustering(cp, num_clusters):
     """
     cluster agents into k clusters 
 
@@ -481,18 +460,10 @@ def spectral_clustering(cp, num_clusters):
     dynamic_agent_nodes = set(cp.graph_tran.agents[r] for r in dynamic_agents)
 
     da_agents = [
-        (
-            tuple(
-                [
-                    r
-                    for r in cp.graph_tran.agents
-                    if cp.graph_tran.agents[r] == v and r not in cp.static_agents
-                ]
-            ),
-            v,
-        )
+        (tuple([r for r in dynamic_agents if cp.graph_tran.agents[r] == v]), v)
         for v in dynamic_agent_nodes
     ]
+
     for r, v in da_agents:
         da_graph.add_node(r)
 
@@ -517,7 +488,7 @@ def spectral_clustering(cp, num_clusters):
     for edge in da_graph.edges:
         da_graph.edges[edge]["weight"] += 0.1
 
-    # inverting edge weights as spectral_clustering use them as similarity measure
+    # inverting edge weights as agent_clustering use them as similarity measure
     for edge in da_graph.edges:
         da_graph.edges[edge]["weight"] = 1 / da_graph.edges[edge]["weight"]
 
@@ -554,34 +525,37 @@ def spectral_clustering(cp, num_clusters):
     return agent_clusters
 
 
-def inflate_clusters(cp, agent_clusters):
+def inflate_agent_clusters(cp, cs):
     """
     inflate a clustering of agents to return a clustering of nodes
     
-    INPUTS
-    ======
+    REQUIRES
+    ========
         cp
-        agent_clusters
+        cs.agent_clusters
+        cs.dead_nodes      (optional)
 
-    RETURNS
-    =======
-        clusters  : dict(c: set(v))
-        child_clusters  : dict(c0 : (c1,v1))
-        parent_clusters : dict(c1 : (c0,v0))
+    WRITES TO
+    =========
+        cs.subgraphs  : dict(c: set(v))
+        cs.child_clusters  : dict(c0 : (c1,v1))
+        cs.parent_clusters : dict(c1 : (c0,v0))
 
     """
 
     # node clusters with agent positions
     clusters = {
         c: set(cp.graph.agents[r] for r in r_list)
-        for c, r_list in agent_clusters.items()
+        for c, r_list in cs.agent_clusters.items()
     }
 
-    child_clusters = {c: set() for c in agent_clusters.keys()}
+    child_clusters = {c: set() for c in cs.agent_clusters.keys()}
     parent_clusters = {}
 
     # start with master cluster active
-    active_clusters = [c for c, r_list in agent_clusters.items() if cp.master in r_list]
+    active_clusters = [
+        c for c, r_list in cs.agent_clusters.items() if cp.master in r_list
+    ]
 
     while True:
         # check if active cluster can activate other clusters directly
@@ -601,6 +575,8 @@ def inflate_clusters(cp, agent_clusters):
         # all active nodes
         active_nodes = set.union(*[clusters[c] for c in active_clusters])
         free_nodes = set(cp.graph.nodes) - set.union(*clusters.values())
+        if cs.dead_nodes is not None:
+            free_nodes -= cs.dead_nodes
 
         # make sure clusters are connected via transitions, if not split
         for c, v_set in clusters.items():
@@ -608,7 +584,7 @@ def inflate_clusters(cp, agent_clusters):
 
             comps = nx.connected_components(c_subg)
             comp_dict = {
-                i: [r for r in agent_clusters[c] if cp.graph.agents[r] in comp]
+                i: [r for r in cs.agent_clusters[c] if cp.graph.agents[r] in comp]
                 for i, comp in enumerate(comps)
             }
 
@@ -616,13 +592,15 @@ def inflate_clusters(cp, agent_clusters):
 
             if len(comp_dict) > 1:
                 # split and restart
-                del agent_clusters[c]
+                del cs.agent_clusters[c]
                 for i, r_list in comp_dict.items():
-                    agent_clusters["{}_{}".format(c, i + 1)] = r_list
-                return inflate_clusters(cp, agent_clusters)  # recursive call
+                    cs.agent_clusters["{}_{}".format(c, i + 1)] = r_list
+                return inflate_agent_clusters(cp, cs)  # recursive call
 
         # find closest neighbor and activate it
         neighbors = cp.graph.post_tran(active_nodes) - active_nodes
+        if cs.dead_nodes is not None:
+            neighbors -= cs.dead_nodes
 
         if len(neighbors) == 0:
             break  # nothing more to do
@@ -631,7 +609,7 @@ def inflate_clusters(cp, agent_clusters):
         for c in active_clusters:
             c_neighbors = cp.graph.post_tran(clusters[c])
 
-            agent_positions = [cp.graph.agents[r] for r in agent_clusters[c]]
+            agent_positions = [cp.graph.agents[r] for r in cs.agent_clusters[c]]
 
             for n in neighbors & c_neighbors:
 
@@ -643,36 +621,85 @@ def inflate_clusters(cp, agent_clusters):
 
         clusters[new_cluster].add(new_node)
 
-    return ClusterStructure(
-        subgraphs=clusters,
-        agent_clusters=agent_clusters,
-        child_clusters=child_clusters,
-        parent_clusters=parent_clusters,
+    cs.subgraphs = clusters
+    cs.child_clusters = child_clusters
+    cs.parent_clusters = parent_clusters
+
+    return cs
+
+
+def clustering(cp, verbose=False):
+    """main clustering loop"""
+
+    done = False
+
+    initial_dead = set()
+    for v in cp.graph.nodes:
+        if len(cp.node_children_dict[v]) != 0:
+            continue  # it has children
+        if cp.graph.is_local_frontier(v):
+            continue  # it's a frontier
+        if v in cp.graph.agents.values():
+            continue  # an agent is standing there
+        initial_dead.add(v)
+
+    cs = ClusterStructure(dead_nodes=cp.expand_from_leaves(initial_dead))
+
+    max_num_cluster = len(set(cp.graph.agents.values())) - 1
+    max_num_cluster -= len(set(cp.graph.agents[r] for r in cp.static_agents))
+
+    if cp.num_clusters == None:
+        num_clusters = 1
+        cs.agent_clusters = {"cluster0": [r for r in cp.graph.agents]}
+        cs = inflate_agent_clusters(cp, cs)
+        done = max(problem_size(cp.graph, cs).values()) < cp.max_problem_size
+
+        # Strategy 1: cluster
+        while not done and num_clusters < max_num_cluster:
+            num_clusters += 1
+
+            print("Strategy 1: clustering with k={}".format(num_clusters))
+            cs.agent_clusters = agent_clustering(cp, num_clusters)
+            cs = inflate_agent_clusters(cp, cs)
+
+            done = (
+                max(problem_size(cp.graph, cs, verbose=True).values())
+                < cp.max_problem_size
+            )
+
+        # Strategy 2: kill parts of graph
+        while not done:
+            print("Strategy 2: Kill frontiers")
+
+            new_dead_nodes = kill_largest_frontiers(cp, cs)
+            if len(new_dead_nodes) > 0:
+                cs.dead_nodes |= new_dead_nodes
+                cs = inflate_agent_clusters(cp, cs)
+                done = max(problem_size(cp.graph, cs).values()) < cp.max_problem_size
+            else:
+                print("Strategy 2: didn't find any frontier to delete, returning...")
+                break
+    else:
+        # create exactly cp.num_clusters clusters
+        cs.agent_clusters = agent_clustering(cp, num_clusters=cp.num_clusters)
+        cs = inflate_agent_clusters(cp, cs)
+
+    # create dictionaries mapping cluster to submaster, subsinks
+    master_cluster = next(
+        c for c in cs.agent_clusters if cp.master in cs.agent_clusters[c]
     )
+    cs.submasters = {master_cluster: cp.master}
+    cs.subsinks = {c: [] for c in cs.subgraphs}
 
+    for c in parent_first_iter(cs.child_clusters):
+        for child, r in product(cs.child_clusters[c], cp.graph.agents):
+            if cp.graph.agents[r] == child[1]:
+                if child[0] not in cs.submasters:
+                    cs.submasters[child[0]] = r
+                if r not in cs.subsinks[c]:
+                    cs.subsinks[c].append(r)
 
-def parent_first_iter(child_clusters):
-    """iterate over clusters s.t. parents come before children"""
-
-    # find master cluster: the one that is not a child
-    active = set(child_clusters.keys())
-    for children in child_clusters.values():
-        for child in children:
-            active.remove(child[0])
-    active = list(active)
-
-    while len(active) > 0:
-        c = active.pop(0)
-        if c in child_clusters:
-            for child in child_clusters[c]:
-                active.append(child[0])
-        yield c
-
-
-def children_first_iter(child_clusters):
-    """iterate over clusters s.t. children come before parents"""
-    for c in reversed(list(parent_first_iter(child_clusters))):
-        yield c
+    return cs
 
 
 def problem_size(graph, cs, verbose=False):
@@ -756,76 +783,28 @@ def kill_largest_frontiers(cp, cs):
             initial_dead.add(max_frontier)
 
     # kill nodes with only dead children and no agents in node
-    return cp.expand_dead_nodes(initial_dead)
+    return cp.expand_from_leaves(initial_dead)
 
 
-def cluster(cp, verbose=False):
-    """main clustering loop"""
+def parent_first_iter(child_clusters):
+    """iterate over clusters s.t. parents come before children"""
 
-    small_psize = False
+    # find master cluster: the one that is not a child
+    active = set(child_clusters.keys())
+    for children in child_clusters.values():
+        for child in children:
+            active.remove(child[0])
+    active = list(active)
 
-    max_num_cluster = (
-        len(
-            set(
-                cp.graph.agents[r] for r in cp.graph.agents if r not in cp.static_agents
-            )
-        )
-        - 1
-    )
+    while len(active) > 0:
+        c = active.pop(0)
+        if c in child_clusters:
+            for child in child_clusters[c]:
+                active.append(child[0])
+        yield c
 
-    if cp.num_clusters == None:
-        num_clusters = 1
-        agent_clusters = {"cluster0": [r for r in cp.graph.agents]}
-        cs = inflate_clusters(cp, agent_clusters)
-        small_psize = max(problem_size(cp.graph, cs).values()) < cp.max_problem_size
 
-        # Strategy 1: cluster
-        while not small_psize and num_clusters < max_num_cluster:
-            num_clusters += 1
-
-            print("Strategy 1: clustering with k={}".format(num_clusters))
-            # detect agent clusters
-            agent_clusters = spectral_clustering(cp, num_clusters)
-
-            # dictionary mapping cluster to nodes
-            cs = inflate_clusters(cp, agent_clusters)
-
-            small_psize = (
-                max(problem_size(cp.graph, cs, verbose=True).values())
-                < cp.max_problem_size
-            )
-
-        # Strategy 2: kill parts of graph
-        while not small_psize:
-            print("Strategy 2: Kill frontiers")
-
-            dead_nodes = kill_largest_frontiers(cp, cs)
-            if len(dead_nodes) > 0:
-                cp.remove_nodes(dead_nodes)
-                cs = inflate_clusters(cp, agent_clusters)
-
-                small_psize = (
-                    max(problem_size(cp.graph, cs).values()) < cp.max_problem_size
-                )
-            else:
-                print("Strategy 2: didn't find any frontier to delete, returning...")
-                break
-    else:
-        # create exactly cp.num_clusters clusters
-        agent_clusters = spectral_clustering(cp, num_clusters=cp.num_clusters)
-        cs = inflate_clusters(cp, agent_clusters)
-
-    # create dictionaries mapping cluster to submaster, subsinks
-    master_cluster = next(c for c in agent_clusters if cp.master in agent_clusters[c])
-    cs.submasters = {master_cluster: cp.master}
-    cs.subsinks = {c: [] for c in cs.subgraphs}
-
-    for c in parent_first_iter(cs.child_clusters):
-        for child, r in product(cs.child_clusters[c], cp.graph.agents):
-            if cp.graph.agents[r] == child[1]:
-                if child[0] not in cs.submasters:
-                    cs.submasters[child[0]] = r
-                if r not in cs.subsinks[c]:
-                    cs.subsinks[c].append(r)
-
-    return cs
+def children_first_iter(child_clusters):
+    """iterate over clusters s.t. children come before parents"""
+    for c in reversed(list(parent_first_iter(child_clusters))):
+        yield c

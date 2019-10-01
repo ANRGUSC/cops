@@ -2,7 +2,7 @@ from cops.clustering import *
 import numpy as np
 
 
-def test_spectral_clustering():
+def test_agent_clustering():
     G = Graph()
     G.add_transition_path(list(range(0, 50)))
     G.add_connectivity_path(list(range(0, 50)))
@@ -16,13 +16,13 @@ def test_spectral_clustering():
 
     cp.prepare_problem(remove_dead=False)
 
-    agent_clusters = spectral_clustering(cp, 2)
+    agent_clusters = agent_clustering(cp, 2)
 
     np.testing.assert_equal({0, 1} in map(set, agent_clusters.values()), True)
     np.testing.assert_equal({2, 3, 4} in map(set, agent_clusters.values()), True)
 
 
-def test_spectral_clustering():
+def test_agent_clustering():
     G = Graph()
     G.add_transition_path(list(range(0, 25)))
     G.add_transition_path(list(range(26, 50)))
@@ -37,7 +37,7 @@ def test_spectral_clustering():
 
     cp.prepare_problem(remove_dead=False)
 
-    agent_clusters = spectral_clustering(cp, 3)
+    agent_clusters = agent_clustering(cp, 3)
 
     np.testing.assert_equal({0, 1, 2} in map(set, agent_clusters.values()), True)
     np.testing.assert_equal({3, 4} in map(set, agent_clusters.values()), True)
