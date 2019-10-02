@@ -25,12 +25,11 @@ def constraint_static_master(problem, master):
         while len(active) > 0:
             v = active.pop(0)
             connected_nodes.append(v)
-            for v0, v1 in problem.graph.conn_out_edges(v):
+            for _, v1 in problem.graph.conn_out_edges(v):
                 if v1 not in connected_nodes:
                     connected_nodes.append(v1)
 
                     # check if any static agent in nbr
-                    static_occupied = False
                     for r in problem.static_agents:
                         if problem.graph.agents[r] == v1:
                             active.append(v1)

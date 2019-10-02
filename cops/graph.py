@@ -224,7 +224,7 @@ class Graph(nx.MultiDiGraph):
             self.node[n]["agents"] = []
             self.node[n]["known"] = False
 
-        for r, n in self.agents.items():
+        for _, n in self.agents.items():
             self.node[n]["known"] = True
 
         for agent, position in agent_dictionary.items():

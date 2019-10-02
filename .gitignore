@@ -9,6 +9,8 @@
 *.egg-info
 
 *.sublime-*
+.vscode
+*.code-workspace
 
 *.DS_STORE
 
@@ -17,3 +19,4 @@
 
 *.csv
 *.txt
+.noseids

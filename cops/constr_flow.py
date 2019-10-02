@@ -171,8 +171,6 @@ def _dynamic_constraint_50(problem):
     A_iq_col = []
     A_iq_data = []
 
-    N = len(problem.graph.agents)
-
     frontier_nodes = filter(
         lambda v: "frontiers" in problem.graph.nodes[v]
         and problem.graph.nodes[v]["frontiers"] != 0,
@@ -422,7 +420,7 @@ def _dynamic_constraint_outflow_bound(problem):
     m_v0 = [problem.graph.agents[r] for r in problem.master]
 
     constraint_idx = 0
-    for r, (b, b_r), t in product(
+    for r, (b, _), t in product(
         problem.graph.agents, enumerate(problem.min_src_snk), range(problem.T + 1)
     ):
 

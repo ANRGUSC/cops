@@ -1,5 +1,7 @@
-from cops.clustering import *
 import numpy as np
+
+from cops.graph import Graph
+from cops.clustering import ClusterProblem
 
 
 def test_to_frontier():

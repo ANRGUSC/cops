@@ -1,4 +1,6 @@
-from cops.clustering import *
+import numpy as np
+from cops.graph import Graph
+from cops.clustering import ClusterProblem, ClusterStructure, inflate_agent_clusters
 
 
 def test_activationinflate1():
@@ -42,7 +44,6 @@ def test_inflate2():
     agent_positions = {0: 0, 1: 1, 2: 4, 3: 6, 4: 8, 5: 10}
     G.init_agents(agent_positions)
 
-    graph = G
     cs = ClusterStructure(agent_clusters={"c0": [0, 1], "c1": [2, 3], "c2": [4, 5]})
     master = 0
 

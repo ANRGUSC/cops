@@ -199,7 +199,7 @@ class ExplorationProblem(object):
                 ):
                     v_next_alt = []
                     v_prev = self.get_agent_position(fr, t - 1)
-                    for v1, v2 in self.graph.tran_out_edges(v_prev):
+                    for _, v2 in self.graph.tran_out_edges(v_prev):
                         if self.k[self.get_k_idx(fr, v2)] == 0:
                             v_next_alt.append(v2)
                     if len(v_next_alt) == 0:

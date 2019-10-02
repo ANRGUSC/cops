@@ -224,7 +224,7 @@ def animate(
     FRAMES_PER_STEP = max(2, int(STEP_T * FPS))
     total_time = T + 2
 
-    def animate(i):
+    def animate_fcn(i):
         t = int(i / FRAMES_PER_STEP)
         anim_idx = i % FRAMES_PER_STEP
         alpha = anim_idx / FRAMES_PER_STEP
@@ -238,7 +238,7 @@ def animate(
             coll_npos.set_edgecolor(nod_ecol[min(T, t)])
             coll_npos.set_linewidth(nod_thick[min(T, t)])
 
-            for i, n in enumerate(graph.nodes):
+            for i, _ in enumerate(graph.nodes):
                 coll_ntext[i].set_color(nod_lcol[min(T, t)][i])
 
             # connectivity edge styling
@@ -275,7 +275,7 @@ def animate(
 
     ani = animation.FuncAnimation(
         fig,
-        animate,
+        animate_fcn,
         range(total_time * FRAMES_PER_STEP),
         interval=1000 / FPS,
         blit=False,
@@ -499,7 +499,6 @@ def animate_cluster_buildup(
             (c_parent, v_parent) = problem.parent_clusters[c][0]
             for (c1, v1) in problem.child_clusters[c_parent]:
                 if c == c1:
-                    c_child = c1
                     v_child = v1
             conn_activate[i].append((v_parent, v_child))
 
@@ -519,28 +518,12 @@ def animate_cluster_buildup(
             if (t, v) not in node_colors:
                 node_colors[t, v] = "white"
 
-    # Colors for robots
-    rob_col = plt.cm.rainbow(np.linspace(0, 1, len(graph.agents)))
-
-    # Build dictionary time -> positions
-    rob_pos = {
-        t: np.array(
-            [
-                [graph.nodes[v]["x"], graph.nodes[v]["y"]]
-                for r, v in graph.agents.items()
-            ]
-        )
-        for t in range(T + 1)
-    }
-
     # Node styling: t -> [c0 c1 ... cV]
     if node_colors is not None:
         nod_col = {t: [node_colors[t, v] for v in graph.nodes] for t in range(T + 1)}
     else:
         nod_col = {t: ["white" for v in graph.nodes] for t in range(T + 1)}
     nod_ecol = {t: ["black" for v in graph.nodes] for t in range(T + 1)}
-    nod_lcol = {t: ["black" for v in graph.nodes] for t in range(T + 1)}
-    nod_thick = {t: [1.0 for v in graph.nodes] for t in range(T + 1)}
 
     # Edge styling
     tran_edge_alpha = {t: [1.0 for v in graph.tran_edges()] for t in range(T + 1)}
@@ -604,44 +587,14 @@ def animate_cluster_buildup(
             cedge.set_linestyle("dashed")
 
     # initial colors
-    for i, (v1, v2) in enumerate(graph.conn_edges()):
+    for i, _ in enumerate(graph.conn_edges()):
         coll_conn_edge[i].set_alpha(conn_edge_alpha[0][i])
-    for i, (v1, v2) in enumerate(graph.tran_edges()):
+    for i, _ in enumerate(graph.tran_edges()):
         coll_tran_edge[i].set_alpha(tran_edge_alpha[0][i])
     coll_npos.set_facecolor(nod_col[0])
     coll_npos.set_edgecolor(nod_ecol[0])
     for i, n in enumerate(graph.nodes):
         coll_ntext[i].set_color(nod_ecol[0][i])
-
-    # robot nodes
-    coll_rpos = ax.scatter(
-        rob_pos[0][:, 0],
-        rob_pos[0][:, 1],
-        s=140,
-        marker="o",
-        c=rob_col,
-        zorder=7,
-        alpha=1,
-        linewidths=2,
-        edgecolors="black",
-    )
-    # robot labels
-    coll_rtext = [
-        ax.text(
-            rob_pos[0][i, 0],
-            rob_pos[0][i, 1],
-            str(r),
-            horizontalalignment="center",
-            verticalalignment="center",
-            zorder=10,
-            size=8,
-            color="k",
-            family="sans-serif",
-            weight="bold",
-            alpha=1.0,
-        )
-        for i, r in enumerate(graph.agents)
-    ]
 
     ########## LOOP #############
 
@@ -651,7 +604,6 @@ def animate_cluster_buildup(
     def animate(i):
         t = int(i / FRAMES_PER_STEP)
         anim_idx = i % FRAMES_PER_STEP
-        alpha = anim_idx / FRAMES_PER_STEP
 
         if anim_idx == 1:
             print("Animating step {}/{}".format(t + 1, total_time))

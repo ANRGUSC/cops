@@ -1,8 +1,10 @@
-from cops.clustering import *
 import numpy as np
 
+from cops.graph import Graph
+from cops.clustering import ClusterProblem, agent_clustering
 
-def test_agent_clustering():
+
+def test_agent_clustering1():
     G = Graph()
     G.add_transition_path(list(range(0, 50)))
     G.add_connectivity_path(list(range(0, 50)))
@@ -22,7 +24,7 @@ def test_agent_clustering():
     np.testing.assert_equal({2, 3, 4} in map(set, agent_clusters.values()), True)
 
 
-def test_agent_clustering():
+def test_agent_clustering2():
     G = Graph()
     G.add_transition_path(list(range(0, 25)))
     G.add_transition_path(list(range(26, 50)))

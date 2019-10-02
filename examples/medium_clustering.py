@@ -1,5 +1,5 @@
-from cops.clustering import *
-from cops.animate import *
+from cops.clustering import ClusterProblem
+from cops.animate import animate_cluster
 
 from graph_examples import get_medium_graph
 

@@ -1,4 +1,4 @@
-from cops.optimization_wrappers import *
+from cops.optimization_wrappers import Constraint, solve_ilp
 import numpy as np
 import scipy.sparse as sp
 

@@ -1,9 +1,9 @@
 from colorama import Fore, Style
 
-from cops.animate import *
-from cops.explore_problem import *
-from cops.clustering import *
+from cops.clustering import ClusterProblem
+from cops.explore_problem import ExplorationProblem
 from copy import deepcopy
+from cops.animate import animate_cluster_sequence
 
 from graph_examples import get_huge_graph
 

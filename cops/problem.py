@@ -11,10 +11,22 @@ from colorama import Fore, Style
 from cops.optimization_wrappers import solve_ilp, Constraint
 from cops.graph import Graph
 
-from cops.constr_dyn import *
-from cops.constr_flow import *
-from cops.constr_powerset import *
-from cops.constr_cluster import *
+from cops.constr_dyn import (
+    generate_powerset_dynamic_constraints,
+    generate_flow_dynamic_constraints,
+    generate_initial_constraints,
+)
+from cops.constr_flow import (
+    generate_flow_bridge_constraints,
+    generate_flow_connectivity_constraints,
+    generate_flow_master_constraints,
+)
+from cops.constr_powerset import (
+    generate_powerset_bridge_constraints,
+    generate_connectivity_constraint,
+    generate_connectivity_constraint_all,
+)
+from cops.constr_cluster import constraint_static_master
 
 
 @dataclass
@@ -264,23 +276,26 @@ class ConnectivityProblem(AbstractConnectivityProblem):
 
     ##OBJECTIVE FUNCTION##
 
-    def generate_powerset_objective(self,):
+    def generate_powerset_objective(self, add_frontier_rewards):
 
         obj = np.zeros(self.num_vars)
 
         # add user-defined rewards
         if self.reward_dict != None:
-            for t, r in product(range(self.T + 1), self.agents):
+            for t, r in product(range(self.T + 1), self.graph.agents):
                 for v, R in self.reward_dict.items():
                     obj[self.get_z_idx(r, v, t)] = -(0.9 ** t) * R
 
         # add frontier rewards
-        for t, r, v in product(range(self.T + 1), self.graph.agents, self.graph.nodes):
-            if (
-                "frontiers" in self.graph.nodes[v]
-                and self.graph.nodes[v]["frontiers"] != 0
+        if add_frontier_rewards:
+            for t, r, v in product(
+                range(self.T + 1), self.graph.agents, self.graph.nodes
             ):
-                obj[self.get_z_idx(r, v, t)] -= (0.9 ** t) * self.frontier_reward
+                if (
+                    "frontiers" in self.graph.nodes[v]
+                    and self.graph.nodes[v]["frontiers"] != 0
+                ):
+                    obj[self.get_z_idx(r, v, t)] -= (0.9 ** t) * self.frontier_reward
 
         # add transition weights
         for e, t in product(self.graph.edges(data=True), range(self.T)):
@@ -404,7 +419,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         # Connectivity constraints on x, xbar, yb
         constraint &= generate_connectivity_constraint_all(self)
         # Objective
-        obj = self.generate_powerset_objective()
+        obj = self.generate_powerset_objective(add_frontier_rewards=True)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
@@ -448,7 +463,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         # Bridge z, e to x, xbar, yb
         constraint &= generate_powerset_bridge_constraints(self)
         # Objective
-        obj = self.generate_powerset_objective()
+        obj = self.generate_powerset_objective(add_frontier_rewards=True)
 
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
@@ -558,7 +573,6 @@ class ConnectivityProblem(AbstractConnectivityProblem):
 
         D = nx.diameter(self.graph)
         Rp = len(set(v for r, v in self.graph.agents.items()))
-        V = self.graph.number_of_nodes()
 
         T = int(max(D / 2, D - int(Rp / 2)))
 
@@ -732,8 +746,8 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         return np.ravel_multi_index((t, n), (self.T + 1, self.num_v))
 
     def get_time_augmented_n_t(self, id):
-        t, n = np.unravel_index(id, (self.T + 1, self.num_v))
-        return n, t
+        midx = np.unravel_index(id, (self.T + 1, self.num_v))
+        return midx[1], midx[0]
 
     def powerset_exclude_agent(self, b):
         time_augmented_nodes = []
@@ -759,7 +773,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
             while idx < len(S):
                 pre_Svt_transition = self.graph.pre_tran_vt([S[idx]])
                 pre_Svt_connectivity = self.graph.pre_conn_vt([S[idx]])
-                for v0, v1, t in pre_Svt_transition:
+                for v0, _, t in pre_Svt_transition:
                     occupied = False
                     for robot in self.graph.agents:
                         z_idx = self.get_z_idx(robot, v0, t)
@@ -767,7 +781,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
                             occupied = True
                     if occupied == True and (v0, t) not in S:
                         S.append((v0, t))
-                for v0, v1, t in pre_Svt_connectivity:
+                for v0, _, t in pre_Svt_connectivity:
                     occupied = False
                     for robot in self.graph.agents:
                         z_idx = self.get_z_idx(robot, v0, t)

@@ -1,10 +1,13 @@
+from dataclasses import dataclass
+
 import networkx as nx
 from networkx.algorithms.centrality import betweenness_centrality
 from copy import deepcopy
 from itertools import product
 from sklearn.cluster import SpectralClustering
 
-from cops.problem import *
+from cops.graph import Graph
+from cops.problem import AbstractConnectivityProblem, ConnectivityProblem
 
 
 @dataclass
@@ -144,7 +147,7 @@ class ClusterProblem(AbstractConnectivityProblem):
 
         for r, v in self.graph.agents.items():
             if r in tofront_data.cs.agent_clusters[c]:
-                length, path = nx.multi_source_dijkstra(
+                _, path = nx.multi_source_dijkstra(
                     self.graph_tran, sources=active_nodes, target=v, weight="weight"
                 )
                 path = path[::-1]
@@ -186,8 +189,8 @@ class ClusterProblem(AbstractConnectivityProblem):
             ]
 
             # connectivity activated nodes
-            for t, conn_t in problems[c].conn.items():
-                for (v1, v2, b) in conn_t:
+            for _, conn_t in problems[c].conn.items():
+                for (_, v2, b) in conn_t:
                     if (
                         b == "master"
                     ):  # if b is a tuple then b is a master (by the construction of conn)
@@ -202,8 +205,8 @@ class ClusterProblem(AbstractConnectivityProblem):
                                     active_agents[c].append(r)
 
             # transition activated nodes
-            for t, tran_t in problems[c].tran.items():
-                for (v1, v2, b) in tran_t:
+            for _, tran_t in problems[c].tran.items():
+                for (_, v2, b) in tran_t:
                     if (
                         b == "master"
                     ):  # if b is a tuple then b is a master (by the construction of tran)
@@ -605,7 +608,7 @@ def inflate_agent_clusters(cp, cs):
         if len(neighbors) == 0:
             break  # nothing more to do
 
-        new_cluster, new_node, min_dist, min_path = -1, -1, 99999, None
+        new_cluster, new_node, min_dist = -1, -1, 99999
         for c in active_clusters:
             c_neighbors = cp.graph.post_tran(clusters[c])
 
@@ -613,11 +616,11 @@ def inflate_agent_clusters(cp, cs):
 
             for n in neighbors & c_neighbors:
 
-                dist, path = nx.multi_source_dijkstra(
+                dist, _ = nx.multi_source_dijkstra(
                     cp.graph_tran, sources=agent_positions, target=n
                 )
                 if dist < min_dist:
-                    min_dist, new_node, new_cluster, min_path = dist, n, c, path
+                    min_dist, new_node, new_cluster = dist, n, c
 
         clusters[new_cluster].add(new_node)
 
@@ -769,7 +772,7 @@ def kill_largest_frontiers(cp, cs):
         max_length = None
         max_frontier = None
         for f in frontiers:
-            length, path = nx.single_source_dijkstra(
+            length, _ = nx.single_source_dijkstra(
                 cp.graph_tran, source=master_node, target=f
             )
             if max_length == None:

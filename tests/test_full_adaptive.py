@@ -1,5 +1,7 @@
-from cops.problem import *
 import numpy as np
+
+from cops.graph import Graph
+from cops.problem import ConnectivityProblem
 
 
 def test_horiz1():

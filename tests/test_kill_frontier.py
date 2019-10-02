@@ -1,5 +1,13 @@
-from cops.clustering import *
 import numpy as np
+
+from cops.graph import Graph
+from cops.clustering import (
+    ClusterProblem,
+    ClusterStructure,
+    agent_clustering,
+    inflate_agent_clusters,
+    kill_largest_frontiers,
+)
 
 
 def test_strategy2():

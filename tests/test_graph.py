@@ -1,5 +1,6 @@
-from cops.graph import *
 import numpy as np
+
+from cops.graph import Graph
 
 
 def test_pre_S():

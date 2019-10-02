@@ -1,5 +1,5 @@
-from cops.problem import *
-from cops.animate import *
+from cops.problem import ConnectivityProblem
+from cops.animate import animate
 
 from graph_examples import get_medium_graph
 

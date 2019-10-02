@@ -1,35 +1,15 @@
 import sys
-import scipy.sparse as sp
-import numpy as np
 from dataclasses import dataclass
 
-default_solver = "gurobi"
+import scipy.sparse as sp
+import numpy as np
 
-# Try to import gurobi
-try:
-    from gurobipy import *
 
-    TIME_LIMIT = 10 * 3600
-
-except Exception as e:
-    print("warning: gurobi not found")
-    default_solver = "mosek"
-
-# Try to import mosek/cvxopt
-try:
-    import mosek
-
-except Exception as e:
-    print("warning: mosek not found")
-    default_solver = "gurobi"
-
-return_codes = {1: "unknown", 2: "optimal", 3: "infeasible", 5: "dual infeasible"}
-
-# Class for constraints----------------------------------------------------------
+RETURN_CODES = {1: "unknown", 2: "optimal", 3: "infeasible", 5: "dual infeasible"}
 
 
 @dataclass
-class Constraint(object):
+class Constraint:
     A_eq: sp.coo_matrix = None
     b_eq: np.array = None
     A_iq: sp.coo_matrix = None
@@ -77,7 +57,7 @@ class Constraint(object):
         return self
 
 
-def solve_ilp(c, constraint, J_int=None, J_bin=None, solver=default_solver, output=0):
+def solve_ilp(c, constraint, J_int=None, J_bin=None, solver="gurobi", output=0):
     """
     Solve the ILP
         min c' x
@@ -94,22 +74,20 @@ def solve_ilp(c, constraint, J_int=None, J_bin=None, solver=default_solver, outp
       'rcode': return code (2: optimal, 3: infeasible, 5: dual infeasible, 1: unknown)
       'x': the primary solution
     """
+
     if solver is None:
-        solver = default_solver
+        solver = "gurobi"
 
     if J_int is None and J_bin is None:
-        J_int = range(Aiq.shape[1])
+        J_int = range(constraint.Aiq.shape[1])
         J_bin = []
     elif J_int is None:
         J_int = []
     elif J_bin is None:
         J_bin = []
 
-    if len(set(J_bin) & set(J_int)):
+    if set(J_bin) & set(J_int):
         raise Exception("J_int and J_bin overlap")
-
-    if (len(J_bin) + len(J_int)) != len(c):
-        raise Exception("J_int and J_bin not fully specified")
 
     if constraint.has_eq and not constraint.has_iq:
         constraint.A_iq = sp.coo_matrix((0, constraint.A_eq.shape[1]))
@@ -142,7 +120,7 @@ def solve_ilp(c, constraint, J_int=None, J_bin=None, solver=default_solver, outp
             output,
         )
 
-    sol["status"] = return_codes[sol["rcode"]]
+    sol["status"] = RETURN_CODES[sol["rcode"]]
     return sol
 
 
@@ -156,6 +134,8 @@ def _solve_mosek(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
              x >= 0
         using the Mosek ILP solver
     """
+
+    import mosek
 
     def streamprinter(text):
         sys.stdout.write(text)
@@ -235,14 +215,6 @@ def _solve_mosek(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
     return sol
 
 
-def solCallback(model, where):
-    if where == GRB.callback.MIPSOL:
-        solcnt = model.cbGet(GRB.callback.MIPSOL_SOLCNT)
-        runtime = model.cbGet(GRB.callback.RUNTIME)
-        if solcnt > 0 and runtime > TIME_LIMIT:
-            model.terminate()
-
-
 def _solve_gurobi(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
     """
         Solve optimization problem
@@ -253,6 +225,16 @@ def _solve_gurobi(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
              x >= 0
         using the Gurobi solver
     """
+
+    from gurobipy import GRB, Model, LinExpr
+
+    def solCallback(model, where):
+        if where == GRB.callback.MIPSOL:
+            solcnt = model.cbGet(GRB.callback.MIPSOL_SOLCNT)
+            runtime = model.cbGet(GRB.callback.RUNTIME)
+            if solcnt > 0 and runtime > 10 * 3600:
+                model.terminate()
+
     num_var = Aiq.shape[1]
 
     Aiq = Aiq.tocsr()
@@ -265,7 +247,7 @@ def _solve_gurobi(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
 
     # Some solver parameters, see
     # http://www.gurobi.com/documentation/6.0/refman/mip_models.html
-    m.setParam(GRB.Param.TimeLimit, TIME_LIMIT)
+    m.setParam(GRB.Param.TimeLimit, 10 * 3600)
     m.setParam(GRB.Param.MIPFocus, 1)
 
     x = []
@@ -283,22 +265,22 @@ def _solve_gurobi(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
         end = Aiq.indptr[i + 1]
         variables = [x[j] for j in Aiq.indices[start:end]]
         coeff = Aiq.data[start:end]
-        expr = gurobipy.LinExpr(coeff, variables)
-        m.addConstr(lhs=expr, sense=gurobipy.GRB.LESS_EQUAL, rhs=biq[i])
+        expr = LinExpr(coeff, variables)
+        m.addConstr(lhs=expr, sense=GRB.LESS_EQUAL, rhs=biq[i])
 
     for i in range(Aeq.shape[0]):
         start = Aeq.indptr[i]
         end = Aeq.indptr[i + 1]
         variables = [x[j] for j in Aeq.indices[start:end]]
         coeff = Aeq.data[start:end]
-        expr = gurobipy.LinExpr(coeff, variables)
-        m.addConstr(lhs=expr, sense=gurobipy.GRB.EQUAL, rhs=beq[i])
+        expr = LinExpr(coeff, variables)
+        m.addConstr(lhs=expr, sense=GRB.EQUAL, rhs=beq[i])
 
     m.update()
     m.optimize(solCallback)
 
     sol = {}
-    if m.status == gurobipy.GRB.status.OPTIMAL:
+    if m.status == GRB.status.OPTIMAL:
         sol["x"] = np.array([var.x for var in x])
         sol["primal objective"] = m.objVal
     if m.status in [2, 3, 5]:

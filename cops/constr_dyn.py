@@ -22,7 +22,7 @@ def generate_powerset_dynamic_constraints(problem):
     return c_27 & c_28 & c_29 & c_30 & c_static
 
 
-def generate_flow_dynamic_constraints(problem, static_master=True):
+def generate_flow_dynamic_constraints(problem):
 
     # Define number of variables
     if problem.num_vars == None:
