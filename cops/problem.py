@@ -108,6 +108,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         self.always_src = False  # if true, always use source->sink type constraint
 
         self.reward_demand = 0.4  # fraction of total reward demanded
+        self.max_reward_demand_iter = 5 # max number of iterations to find a better solutions
         self.extra_constr = None  # additional constraints
 
         if "src" in kwargs:
@@ -600,7 +601,9 @@ class ConnectivityProblem(AbstractConnectivityProblem):
                 + Style.RESET_ALL
             )
 
+        iter = 0
         while not feasible_solution or small_optimal_value:
+            iter += 1
             self.T = T
 
             if "verbose" in kwargs and kwargs["verbose"]:
@@ -617,7 +620,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
             if (
                 num_frontiers > 0
                 and ("frontier_reward" in kwargs and kwargs["frontier_reward"])
-                and feasible_solution
+                and feasible_solution and iter < self.max_reward_demand_iter
             ):
                 if (
                     solution["primal objective"]
