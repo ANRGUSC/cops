@@ -315,6 +315,13 @@ class ConnectivityProblem(AbstractConnectivityProblem):
 
         # add frontier rewards
         if add_frontier_rewards:
+            max_weight = 0
+            for v in self.graph.nodes:
+                if (
+                    "frontiers" in self.graph.nodes[v]
+                    and self.graph.nodes[v]["frontiers"] > max_weight
+                ):
+                    max_weight = self.graph.nodes[v]["frontiers"]
             for v in self.graph.nodes:
                 if (
                     "frontiers" in self.graph.nodes[v]
@@ -323,7 +330,8 @@ class ConnectivityProblem(AbstractConnectivityProblem):
                     for k in range(1, self.num_r + 1):
                         obj[self.get_y_idx(v, k)] -= (
                             self.frontier_reward_decay ** (k - 1)
-                        ) * self.frontier_reward
+                        ) * self.frontier_reward * (
+                        self.graph.nodes[v]["frontiers"] / max_weight)
 
         # add transition weights
         for e, t, r in product(
