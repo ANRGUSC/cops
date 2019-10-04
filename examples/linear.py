@@ -24,7 +24,7 @@ cp.src = [2]
 cp.snk = [1]
 
 # Solve
-cp.solve_flow(master=True, frontier_reward=True, connectivity=True, cut=False)
+cp.solve_flow(master=True, frontier_reward=True, connectivity=True, cut=True)
 
 # Plot Graph (saves image as graph.png)
 # plot_solution(cp)
