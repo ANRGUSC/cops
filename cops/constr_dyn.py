@@ -29,13 +29,12 @@ def generate_flow_dynamic_constraints(problem):
         problem.compute_num_var()
 
     # Setup constraints
-    c_45 = _dynamic_constraint_45(problem)
     c_46 = _dynamic_constraint_46(problem)
     c_47 = _dynamic_constraint_47(problem)
     c_static = _dynamic_constraint_static(problem)
     c_agent_avoid = _dynamic_constraint_agent_avoidance(problem)
 
-    return c_45 & c_46 & c_47 & c_static & c_agent_avoid
+    return c_46 & c_47 & c_static & c_agent_avoid
 
 
 def generate_initial_constraints(problem):
@@ -154,24 +153,6 @@ def _dynamic_constraint_30(problem):
 
 # Flow#####################################################
 ##########################################################
-def _dynamic_constraint_45(problem):
-    # Constructing A_eq and b_eq for equality for agent existence as sp.coo matrix
-    A_eq_row = []
-    A_eq_col = []
-    A_eq_data = []
-
-    constraint_idx = 0
-    for t, r in product(range(problem.T + 1), problem.graph.agents):
-        for v in problem.graph.nodes:
-            A_eq_row.append(constraint_idx)
-            A_eq_col.append(problem.get_z_idx(r, v, t))
-            A_eq_data.append(1)
-        constraint_idx += 1
-    A_eq_45 = sp.coo_matrix(
-        (A_eq_data, (A_eq_row, A_eq_col)), shape=(constraint_idx, problem.num_vars)
-    )
-    return Constraint(A_eq=A_eq_45, b_eq=np.ones(constraint_idx))
-
 
 def _dynamic_constraint_46(problem):
     A_eq_row = []
