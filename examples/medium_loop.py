@@ -44,7 +44,7 @@ while not G.is_known():
     cp1.src = []
     cp1.snk = []
     cp1.diameter_solve_flow(master=True, connectivity=False)
-    agent_positions = {r: cp1.traj[(r, cp1.T)] for r in cp1.graph.agents}
+    agent_positions = {r: cp1.traj[(r, cp1.T_sol)] for r in cp1.graph.agents}
     problem_list.append(cp1)
 
     # Process2-EXPLORE FRONTIERS-----------------------------------------------------
@@ -62,10 +62,11 @@ while not G.is_known():
     cp2.master = master  # master_agent
     cp2.static_agents = static_agents  # static agents
     cp2.graph.agents = agent_positions  # end positions from process 1
-    cp2.src = [r for r in cp1.graph.agents if g.is_local_frontier(cp1.traj[(r, cp1.T)])]
+    cp2.src = [r for r in cp1.graph.agents if g.is_local_frontier(cp1.traj[(r, cp1.T_sol)])]
     cp2.snk = [0]
     cp2.linear_search_solve_flow(master=False, connectivity=True)
-    agent_positions = {r: cp2.traj[(r, cp2.T)] for r in cp2.graph.agents}
+    print(cp2.T_sol)
+    agent_positions = {r: cp2.traj[(r, cp2.T_sol)] for r in cp2.graph.agents}
 
     problem_list.append(cp2)
 

@@ -9,7 +9,6 @@ def get_linear_graph(n):
 
     return G
 
-
 def get_medium_graph():
 
     # Define a connectivity graph
@@ -72,6 +71,52 @@ def get_medium_graph():
 
     return G
 
+def get_small_graph():
+
+    # Define a connectivity graph
+    G = Graph()
+    # Add edges to graph
+    connectivity_edges = [0, 1, 2, 3, 4, 5]
+    transition_edges = [0, 1, 2, 3, 4, 5]
+    G.add_transition_path(transition_edges)
+    G.add_connectivity_path(connectivity_edges)
+    connectivity_edges = [4, 6, 7, 8]
+    transition_edges = [4, 6, 7, 8]
+    G.add_transition_path(transition_edges)
+    G.add_connectivity_path(connectivity_edges)
+    connectivity_edges = [1, 9, 10, 11, 12, 13]
+    transition_edges = [1, 9, 10, 11, 12, 13]
+    G.add_transition_path(transition_edges)
+    G.add_connectivity_path(connectivity_edges)
+    connectivity_edges = [9, 14, 15, 12]
+    transition_edges = [9, 14, 15, 12]
+    G.add_transition_path(transition_edges)
+    G.add_connectivity_path(connectivity_edges)
+    connectivity_edges = [8, 10]
+    G.add_connectivity_path(connectivity_edges)
+    # Set node positions
+    node_positions = {
+        0: (0, 0),
+        1: (0, 1.3),
+        2: (-0.4, 1.3),
+        3: (-0.4, 2.2),
+        4: (-0.7, 2.2),
+        5: (-0.7, 1),
+        6: (-1, 2.5),
+        7: (-1, 3.5),
+        8: (-0.7, 3.3),
+        9: (0, 3),
+        10: (-0.4, 3),
+        11: (-0.4, 4),
+        12: (0, 4),
+        13: (0, 5),
+        14: (0.4, 3),
+        15: (0.4, 4),
+    }
+
+    G.set_node_positions(node_positions)
+
+    return G
 
 def get_huge_graph():
 
