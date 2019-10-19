@@ -120,8 +120,8 @@ def animate(
     ax.axis("off")
 
     # nodes
-    node_size = 1400
-    agent_size = 1000
+    node_size = 350
+    agent_size = 140
     coll_npos = ax.scatter(
         npos[:, 0],
         npos[:, 1],
@@ -142,7 +142,7 @@ def animate(
             horizontalalignment="center",
             verticalalignment="center",
             zorder=5,
-            size=16,
+            size=8,
             color="black",
             family="sans-serif",
             weight="bold",
@@ -231,7 +231,7 @@ def animate(
             horizontalalignment="center",
             verticalalignment="center",
             zorder=10,
-            size=20,
+            size=8,
             color="k",
             family="sans-serif",
             weight="bold",
