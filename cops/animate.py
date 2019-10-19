@@ -67,6 +67,18 @@ def animate(
     tran_edge_thick = {t: [1.0 for v in graph.tran_edges()] for t in range(T + 1)}
     conn_edge_alpha = {t: [1.0 for v in graph.conn_edges()] for t in range(T + 1)}
 
+    # Transition colors: t,v1,v2 -> [c0 c1 c2]
+    tran_edge_dyn_color={}
+    for t, e in product(range(T), graph.tran_edges()):
+        tran_col_list = []
+        for ri, r in enumerate(rob_list):
+            if e[0] == traj[r, t] and e[1] == traj[r, t+1]:
+                tran_col_list.append((rob_col[ri]))
+        if len(tran_col_list):
+            tran_edge_dyn_color[(t,e[0],e[1])] = tran_col_list
+        else:
+            tran_edge_dyn_color[(t,e[0],e[1])] = []
+
     # Style exploration colors
     if node_explored is not None:
         for t in range(T + 1):
@@ -107,10 +119,12 @@ def animate(
     ax.axis("off")
 
     # nodes
+    node_size = 1400
+    agent_size = 1000
     coll_npos = ax.scatter(
         npos[:, 0],
         npos[:, 1],
-        s=350,
+        s=node_size,
         marker="o",
         c=nod_col[0],
         zorder=5,
@@ -127,7 +141,7 @@ def animate(
             horizontalalignment="center",
             verticalalignment="center",
             zorder=5,
-            size=8,
+            size=16,
             color="black",
             family="sans-serif",
             weight="bold",
@@ -143,9 +157,15 @@ def animate(
         edgelist=list(graph.tran_edges()),
         connectionstyle="arc",
         edge_color="gray",
+        node_size = node_size
     )
     coll_conn_edge = nx.draw_networkx_edges(
-        graph, dict_pos, ax=ax, edgelist=list(graph.conn_edges()), edge_color="gray"
+        graph,
+        dict_pos,
+        ax=ax,
+        edgelist=list(graph.conn_edges()),
+        edge_color="gray",
+        node_size = node_size
     )
     title_field = ax.text(
         (max(npos[:, 0]) + min(npos[:, 0])) / 2,
@@ -193,7 +213,7 @@ def animate(
     coll_rpos = ax.scatter(
         rob_pos[0][:, 0],
         rob_pos[0][:, 1],
-        s=140,
+        s=agent_size,
         marker="o",
         c=rob_col,
         zorder=7,
@@ -210,7 +230,7 @@ def animate(
             horizontalalignment="center",
             verticalalignment="center",
             zorder=10,
-            size=8,
+            size=20,
             color="k",
             family="sans-serif",
             weight="bold",
@@ -265,6 +285,13 @@ def animate(
                 col_list = conn_col[t, v1, v2]
                 coll_conn_edge[i].set_color(col_list[int(10 * alpha) % len(col_list)])
                 coll_conn_edge[i].set_linewidth(2.5)
+
+        # Update transition edge dynamic colors
+        for i, (v1, v2) in enumerate(graph.tran_edges()):
+            if (t, v1, v2) in tran_edge_dyn_color and len(tran_edge_dyn_color[t, v1, v2]):
+                col_list = tran_edge_dyn_color[t, v1, v2]
+                coll_tran_edge[i].set_color(col_list[int(10 * alpha) % len(col_list)])
+                coll_tran_edge[i].set_linewidth(2.5)
 
         # Update robot node and label positions
         pos = (1 - alpha) * rob_pos[min(T, t)] + alpha * rob_pos[min(T, t + 1)]
