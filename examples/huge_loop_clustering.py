@@ -33,7 +33,6 @@ agents_home = True
 # MAIN-LOOP----------------------------------------------------------------------
 while not G.is_known() or not agents_home:
 
-    # try:
     frontiers = {v: 2 for v in G.nodes if G.is_frontier(v)}
     G.set_frontiers(frontiers)
 
@@ -63,7 +62,6 @@ while not G.is_known() or not agents_home:
     tofront_data = cp1.solve_to_frontier_problem(verbose=True, soft=True, dead=True)
     agent_positions = {r: cp1.traj[(r, cp1.T_sol)] for r in cp1.graph.agents}
 
-    cp1.subgraphs = tofront_data.cs.subgraphs  # hack for animate..
     problem_list.append(cp1)
 
     # Process2-EXPLORE FRONTIERS---------------------------------------------
@@ -98,7 +96,6 @@ while not G.is_known() or not agents_home:
     cp2.solve_to_base_problem(tofront_data, verbose=True, dead=True)
     agent_positions = {r: cp2.traj[(r, cp2.T_sol)] for r in cp2.graph.agents}
 
-    cp2.subgraphs = tofront_data.cs.subgraphs  # hack for animate..
     problem_list.append(cp2)
 
     # check if all agents are home-------------------------------------------
@@ -110,9 +107,6 @@ while not G.is_known() or not agents_home:
     i_iter += 1
     if i_iter > MAXITER:
         break
-# except:
-#    print('Break')
-#    break
 
 # ANIMATION----------------------------------------------------------------------
 

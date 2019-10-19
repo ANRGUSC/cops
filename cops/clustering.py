@@ -324,6 +324,10 @@ class ClusterProblem(AbstractConnectivityProblem):
         self.prepare_problem(remove_dead=True)
 
         cs = clustering(self, verbose=verbose)
+        self.subgraphs = cs.subgraphs
+        for n in self.graph.nodes:
+            if not any(n in v_list for j, v_list in self.subgraphs.items()):
+                self.graph.nodes[n]['dead'] = True
 
         frontier_clusters = self.frontier_clusters(cs)
 
@@ -389,6 +393,10 @@ class ClusterProblem(AbstractConnectivityProblem):
         using data from a to_frontier solution"""
 
         self.prepare_problem(remove_dead=False)
+        self.subgraphs = tofront_data.cs.subgraphs
+        for n in self.graph.nodes:
+            if not any(n in v_list for j, v_list in self.subgraphs.items()):
+                self.graph.nodes[n]['dead'] = True
 
         problems = {}
         evac = {}
@@ -440,7 +448,7 @@ class ClusterProblem(AbstractConnectivityProblem):
 
 def agent_clustering(cp, num_clusters):
     """
-    cluster agents into k clusters 
+    cluster agents into k clusters
 
     INPUTS
     ======
@@ -531,7 +539,7 @@ def agent_clustering(cp, num_clusters):
 def inflate_agent_clusters(cp, cs):
     """
     inflate a clustering of agents to return a clustering of nodes
-    
+
     REQUIRES
     ========
         cp
@@ -707,7 +715,7 @@ def clustering(cp, verbose=False):
 
 def problem_size(graph, cs, verbose=False):
     """heuristic to estimate the size of a cluster problem
-    
+
     RETURNS
     =======
         cluster_size  : dict(c : int)
