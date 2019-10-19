@@ -22,6 +22,7 @@ def animate(
     FPS=20,
     size=10,
     filename="animation.mp4",
+    save_static_figures = False
 ):
 
     T = max(t for r, t in traj)
@@ -300,6 +301,9 @@ def animate(
             coll_rtext[i].set_x(pos[i, 0])
             coll_rtext[i].set_y(pos[i, 1])
 
+        if save_static_figures and anim_idx == 0:
+            fig.savefig(filename + '-' + str(t) + '.pdf')
+
     ani = animation.FuncAnimation(
         fig,
         animate_fcn,
@@ -310,7 +314,7 @@ def animate(
     ani.save(filename)
 
 
-def animate_sequence(graph, problem_list, **kwargs):
+def animate_sequence(graph, problem_list, save_static_figures = False, **kwargs):
 
     # Use a one to put one time step between problems
     start_time = [0] + list(accumulate([problem.T_sol + 1 for problem in problem_list]))
@@ -360,11 +364,13 @@ def animate_sequence(graph, problem_list, **kwargs):
             out = not out
 
     return animate(
-        graph, traj, conn, node_explored=node_explored, titles=titles, **kwargs
+        graph, traj, conn, node_explored=node_explored, titles=titles,
+        save_static_figures = save_static_figures, **kwargs
     )
 
 
-def animate_cluster(graph, traj, conn, subgraphs, dead_color="grey", **kwargs):
+def animate_cluster(graph, traj, conn, subgraphs, dead_color="grey",
+                    save_static_figures = False, **kwargs):
 
     T = max(t for r, t in traj)
 
@@ -387,10 +393,12 @@ def animate_cluster(graph, traj, conn, subgraphs, dead_color="grey", **kwargs):
         if not (r, t) in traj:
             traj[r, t] = traj[r, t - 1]
 
-    return animate(graph, traj, conn, node_colors=node_colors, **kwargs)
+    return animate(graph, traj, conn, node_colors=node_colors,
+                    save_static_figures = save_static_figures, **kwargs)
 
 
-def animate_cluster_sequence(graph, problem_list, **kwargs):
+def animate_cluster_sequence(graph, problem_list,
+                            save_static_figures = False, **kwargs):
 
     # Use a one to put one time step between problems
     start_time = [0] + list(accumulate([problem.T_sol + 1 for problem in problem_list]))
@@ -484,6 +492,7 @@ def animate_cluster_sequence(graph, problem_list, **kwargs):
         node_explored=node_explored,
         node_dead=node_dead,
         titles=titles,
+        save_static_figures = save_static_figures,
         **kwargs
     )
 

@@ -28,4 +28,4 @@ cp.big_agents = [0, 1, 2, 3]
 cp.solve_flow(master=False, connectivity=True, frontier_reward = False)
 
 # Animate solution
-animate(G, cp.traj, cp.conn)
+animate(G, cp.traj, cp.conn, save_static_figures = True)
