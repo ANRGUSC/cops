@@ -19,13 +19,13 @@ G.init_agents(agent_positions)
 # Set up the connectivity problem
 cp = ConnectivityProblem()
 cp.graph = G  # graph
-cp.T = 2  # time
+cp.T = 5  # time
 cp.master = [0]  # master_agent
 cp.static_agents = []  # static agents
 cp.big_agents = [0, 1, 2, 3]
 
 # Solve
-cp.solve_flow(master=False, connectivity=True, frontier_reward = False)
+cp.solve_flow(master=True, connectivity=True, frontier_reward = False)
 
 # Animate solution
-animate(G, cp.traj, cp.conn, save_static_figures = True)
+animate(G, cp.traj, cp.conn, save_static_figures = False)

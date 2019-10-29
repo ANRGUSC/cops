@@ -112,4 +112,4 @@ while not G.is_known() or not agents_home:
 
 print("Whole loop is completed!")
 
-animate_cluster_sequence(G, problem_list, FPS=15, STEP_T=0.5)
+animate_cluster_sequence(G, problem_list, FPS=15, STEP_T=0.5, save_static_figures = True)
