@@ -1,4 +1,5 @@
 import numpy as np
+import networkx as nx
 
 from cops.graph import Graph
 
@@ -57,9 +58,9 @@ def test_pre():
 
     G = Graph()
 
-    G.add_path([0, 1, 2, 3], type="transition")
-    G.add_path([3, 2], type="connectivity")
-    G.add_path([1, 0], type="connectivity")
+    nx.add_path(G, [0, 1, 2, 3], type="transition")
+    nx.add_path(G, [3, 2], type="connectivity")
+    nx.add_path(G, [1, 0], type="connectivity")
 
     print(G.edges(data=True))
 

@@ -42,7 +42,7 @@ class ClusterStructure(object):
         G.init_agents(agents)
 
         # basic rewards based on centrality
-        reward_dict = betweenness_centrality(G)
+        reward_dict = betweenness_centrality(nx.DiGraph(G))
         norm = max(reward_dict.values())
         if norm == 0:
             norm = 1
@@ -163,7 +163,7 @@ class ClusterProblem(AbstractConnectivityProblem):
         frontier_clusters = set(
             c
             for c in cs.subgraphs
-            if any(self.graph.node[v]["frontiers"] != 0 for v in cs.subgraphs[c])
+            if any(self.graph.nodes[v]["frontiers"] != 0 for v in cs.subgraphs[c])
         )
 
         for c in children_first_iter(cs.child_clusters):

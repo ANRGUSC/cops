@@ -9,7 +9,7 @@ G = get_medium_graph()
 small_nodes = [1]
 G.set_small_node(small_nodes)
 
-frontiers = {2: 1, 14: 3}
+frontiers = {2: 1, 14: 1}
 G.set_frontiers(frontiers)
 
 # Set initial position of agents

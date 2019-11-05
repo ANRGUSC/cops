@@ -63,15 +63,15 @@ class Graph(nx.MultiDiGraph):
     def add_transition_path(self, transition_list, w=None):
         if w == None:
             w = self.std_tran_weight
-        self.add_path(transition_list, type="transition", weight=w)
-        self.add_path(transition_list[::-1], type="transition", weight=w)
+        nx.add_path(self, transition_list, type="transition", weight=w)
+        nx.add_path(self, transition_list[::-1], type="transition", weight=w)
         self.add_self_loops()
 
     def add_connectivity_path(self, connectivity_list, w=None):
         if w == None:
             w = self.std_con_weight
-        self.add_path(connectivity_list, type="connectivity", weight=w)
-        self.add_path(connectivity_list[::-1], type="connectivity", weight=w)
+        nx.add_path(self, connectivity_list, type="connectivity", weight=w)
+        nx.add_path(self, connectivity_list[::-1], type="connectivity", weight=w)
 
     def add_self_loops(self):
         for n in self:
@@ -99,29 +99,29 @@ class Graph(nx.MultiDiGraph):
 
     def is_frontier(self, v):
         frontier = False
-        if self.node[v]["known"]:
+        if self.nodes[v]["known"]:
             for edge in self.tran_out_edges(v):
-                if not self.node[edge[1]]["known"]:
+                if not self.nodes[edge[1]]["known"]:
                     frontier = True
         return frontier
 
     def is_local_frontier(self, v):
-        if self.node[v]["frontiers"] != 0:
+        if self.nodes[v]["frontiers"] != 0:
             return True
         return False
 
     def is_known(self):
         for v in self:
-            if not self.node[v]["known"]:
+            if not self.nodes[v]["known"]:
                 return False
         return True
 
     def set_node_positions(self, position_dictionary):
         self.add_nodes_from(position_dictionary.keys())
         for n, p in position_dictionary.items():
-            self.node[n]["x"] = p[0]
-            self.node[n]["y"] = p[1]
-            self.node[n]["dead"] = False
+            self.nodes[n]["x"] = p[0]
+            self.nodes[n]["y"] = p[1]
+            self.nodes[n]["dead"] = False
 
     def conn_edges(self):
         for (i, j, data) in self.edges(data=True):
@@ -220,16 +220,16 @@ class Graph(nx.MultiDiGraph):
         self.agents = agent_dictionary
 
         for n in self:
-            self.node[n]["number_of_agents"] = 0
-            self.node[n]["agents"] = []
-            self.node[n]["known"] = False
+            self.nodes[n]["number_of_agents"] = 0
+            self.nodes[n]["agents"] = []
+            self.nodes[n]["known"] = False
 
         for _, n in self.agents.items():
-            self.node[n]["known"] = True
+            self.nodes[n]["known"] = True
 
         for agent, position in agent_dictionary.items():
-            self.node[position]["number_of_agents"] += 1
-            self.node[position]["agents"].append(agent)
+            self.nodes[position]["number_of_agents"] += 1
+            self.nodes[position]["agents"].append(agent)
 
     def transition_adjacency_matrix(self):
         num_nodes = self.number_of_nodes()
