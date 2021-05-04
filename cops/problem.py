@@ -185,11 +185,9 @@ class ConnectivityProblem(AbstractConnectivityProblem):
             self.snk = list(self.graph.agents.keys())
 
         if not set(self.src) <= set(self.graph.agents.keys()):
-            print((self.src, self.graph.agents.keys()))
             raise Exception("Invalid sources")
 
         if not set(self.snk) <= set(self.graph.agents.keys()):
-            print((self.snk, self.graph.agents.keys()))
             raise Exception("Invalid sinks")
 
         if not set(self.graph.agents.values()) <= set(self.graph.nodes()):
@@ -477,6 +475,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
         print("Constraints setup time {:.2f}s".format(time.time() - t0))
 
         valid_solution = False
+
         while not valid_solution:
             solution = self._solve(obj, constraint, cut=False, **kwargs)
             if solution["status"] == "infeasible":
@@ -485,6 +484,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
             constraint &= generate_connectivity_constraint(
                 self, range(self.num_src), add_S
             )
+
         # cut static part of solution
         solution = self.cut_solution(solution)
 
@@ -650,6 +650,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
                 feasible_solution = True
 
             T += 1
+        return solution
 
     def _solve(self, obj, constraint, cut=True, solver=None, verbose=False):
 
@@ -808,7 +809,7 @@ class ConnectivityProblem(AbstractConnectivityProblem):
                     valid = False
             if valid == False:
                 add_S.append(S)
-
+            
         if len(add_S) != 0:
             return False, add_S
         else:

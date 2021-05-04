@@ -3,6 +3,12 @@ import numpy as np
 from cops.graph import Graph
 from cops.problem import ConnectivityProblem
 
+def import_gurobi():
+    try:
+        import gurobipy
+        return True
+    except ModuleNotFoundError as e:
+        return False
 
 def test_horiz1():
     G = Graph()
@@ -29,19 +35,20 @@ def test_horiz1():
 
     cp.static_agents = [2]
 
-    cp.solve_powerset()
+    if import_gurobi():
+        cp.solve_powerset()
 
-    # positions of robot 0
-    np.testing.assert_equal(cp.traj[0, 0], 0)
-    np.testing.assert_equal(cp.traj[0, 1], 1)
+        # positions of robot 0
+        np.testing.assert_equal(cp.traj[0, 0], 0)
+        np.testing.assert_equal(cp.traj[0, 1], 1)
 
-    # positions of robot 1
-    np.testing.assert_equal(cp.traj[1, 0], 1)
-    np.testing.assert_equal(cp.traj[1, 1], 2)
+        # positions of robot 1
+        np.testing.assert_equal(cp.traj[1, 0], 1)
+        np.testing.assert_equal(cp.traj[1, 1], 2)
 
-    # positions of robot 2 (fixed)
-    np.testing.assert_equal(cp.traj[2, 0], 3)
-    np.testing.assert_equal(cp.traj[2, 1], 3)
+        # positions of robot 2 (fixed)
+        np.testing.assert_equal(cp.traj[2, 0], 3)
+        np.testing.assert_equal(cp.traj[2, 1], 3)
 
 
 def test_horiz2():
@@ -69,19 +76,20 @@ def test_horiz2():
 
     cp.static_agents = [0, 2]
 
-    cp.solve_powerset()
+    if import_gurobi():
+        cp.solve_powerset()
 
-    # positions of robot 0
-    np.testing.assert_equal(cp.traj[0, 0], 0)
-    np.testing.assert_equal(cp.traj[0, 1], 0)
-    np.testing.assert_equal(cp.traj[0, 2], 0)
+        # positions of robot 0
+        np.testing.assert_equal(cp.traj[0, 0], 0)
+        np.testing.assert_equal(cp.traj[0, 1], 0)
+        np.testing.assert_equal(cp.traj[0, 2], 0)
 
-    # positions of robot 1
-    np.testing.assert_equal(cp.traj[1, 0], 1)
-    np.testing.assert_equal(cp.traj[1, 1], 2)
-    np.testing.assert_equal(cp.traj[1, 2], 1)
+        # positions of robot 1
+        np.testing.assert_equal(cp.traj[1, 0], 1)
+        np.testing.assert_equal(cp.traj[1, 1], 2)
+        np.testing.assert_equal(cp.traj[1, 2], 1)
 
-    # positions of robot 2 (fixed)
-    np.testing.assert_equal(cp.traj[2, 0], 3)
-    np.testing.assert_equal(cp.traj[2, 1], 3)
-    np.testing.assert_equal(cp.traj[2, 2], 3)
+        # positions of robot 2 (fixed)
+        np.testing.assert_equal(cp.traj[2, 0], 3)
+        np.testing.assert_equal(cp.traj[2, 1], 3)
+        np.testing.assert_equal(cp.traj[2, 2], 3)

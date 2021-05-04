@@ -3,6 +3,12 @@ import numpy as np
 from cops.graph import Graph
 from cops.problem import ConnectivityProblem
 
+def import_gurobi():
+    try:
+        import gurobipy
+        return True
+    except ModuleNotFoundError as e:
+        return False
 
 def test_master_comm():
 
@@ -26,48 +32,46 @@ def test_master_comm():
     cp.snk = [1]
 
     # Solve with master, without frontier rewards
-    cp.solve_flow(frontier_reward=False, master=True, connectivity=True, cut=False)
-    print(cp.traj)
-    print(cp.conn)
+    if import_gurobi():
+        cp.solve_flow(frontier_reward=False, master=True, connectivity=True, cut=False)
 
-    # Check solution
-    for t in range(6):
-        np.testing.assert_equal(cp.traj[0, t], 0 if t == 0 else 1)
-        np.testing.assert_equal(cp.traj[1, t], 2)
-        np.testing.assert_equal(cp.traj[2, t], 3)
-        np.testing.assert_equal(
-            cp.conn[t],
-            set([(1, 2, "master"), (2, 3, "master"), (3, 2, 2)]) if t == 1 else set(),
-        )
+        # Check solution
+        for t in range(6):
+            np.testing.assert_equal(cp.traj[0, t], 0 if t == 0 else 1)
+            np.testing.assert_equal(cp.traj[1, t], 2)
+            np.testing.assert_equal(cp.traj[2, t], 3)
+            np.testing.assert_equal(
+                cp.conn[t],
+                set([(1, 2, "master"), (2, 3, "master"), (3, 2, 2)]) if t == 1 else set(),
+            )
 
-    # Solve with master, with frontier rewards
-    cp.solve_flow(frontier_reward=True, master=True, connectivity=True, cut=False)
+        cp.solve_flow(frontier_reward=True, master=True, connectivity=True, cut=False)
 
-    # Check solution
-    for t in range(6):
-        np.testing.assert_equal(cp.traj[0, t], 0 if t == 0 else 1)
-        np.testing.assert_equal(cp.traj[1, t], 2 if t < 2 else 1)
-        np.testing.assert_equal(cp.traj[2, t], [3, 3, 2, 1, 1, 1][t])
-        np.testing.assert_equal(
-            cp.conn[t], set([(1, 2, "master"), (2, 3, "master")]) if t == 1 else set()
-        )
+        # Check solution
+        for t in range(6):
+            np.testing.assert_equal(cp.traj[0, t], 0 if t == 0 else 1)
+            np.testing.assert_equal(cp.traj[1, t], 2 if t < 2 else 1)
+            np.testing.assert_equal(cp.traj[2, t], [3, 3, 2, 1, 1, 1][t])
+            np.testing.assert_equal(
+                cp.conn[t], set([(1, 2, "master"), (2, 3, "master")]) if t == 1 else set()
+            )
 
-    # Solve without master, without frontier rewards
-    cp.solve_flow(frontier_reward=False, master=False, connectivity=True, cut=False)
+        # Solve without master, without frontier rewards
+        cp.solve_flow(frontier_reward=False, master=False, connectivity=True, cut=False)
 
-    # Check solution
-    for t in range(6):
-        np.testing.assert_equal(cp.traj[0, t], 0)
-        np.testing.assert_equal(cp.traj[1, t], 2)
-        np.testing.assert_equal(cp.traj[2, t], 3)
-        np.testing.assert_equal(cp.conn[t], set([(3, 2, 2)]) if t == 0 else set())
+        # Check solution
+        for t in range(6):
+            np.testing.assert_equal(cp.traj[0, t], 0)
+            np.testing.assert_equal(cp.traj[1, t], 2)
+            np.testing.assert_equal(cp.traj[2, t], 3)
+            np.testing.assert_equal(cp.conn[t], set([(3, 2, 2)]) if t == 0 else set())
 
-    # Solve without master, with frontier rewards
-    cp.solve_flow(frontier_reward=True, master=False, connectivity=True, cut=False)
+        # Solve without master, with frontier rewards
+        cp.solve_flow(frontier_reward=True, master=False, connectivity=True, cut=False)
 
-    # Check solution
-    for t in range(6):
-        np.testing.assert_equal(cp.traj[0, t], 0 if t == 0 else 1)
-        np.testing.assert_equal(cp.traj[1, t], 2 if t < 1 else 1)
-        np.testing.assert_equal(cp.traj[2, t], [3, 2, 1, 1, 1, 1][t])
-        np.testing.assert_equal(cp.conn[t], set())
+        # Check solution
+        for t in range(6):
+            np.testing.assert_equal(cp.traj[0, t], 0 if t == 0 else 1)
+            np.testing.assert_equal(cp.traj[1, t], 2 if t < 1 else 1)
+            np.testing.assert_equal(cp.traj[2, t], [3, 2, 1, 1, 1, 1][t])
+            np.testing.assert_equal(cp.conn[t], set())

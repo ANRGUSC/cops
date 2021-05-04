@@ -3,6 +3,12 @@ import numpy as np
 from cops.graph import Graph
 from cops.clustering import ClusterProblem
 
+def import_gurobi():
+    try:
+        import gurobipy
+        return True
+    except ModuleNotFoundError as e:
+        return False
 
 def test_to_frontier():
     G = Graph()
@@ -71,9 +77,11 @@ def test_to_frontier():
     cp.k = 2  # number of desired clusters
     cp.master = 0
     cp.static_agents = [0]
-    cp.solve_to_frontier_problem(soft=True)
 
-    end_pos = set([cp.traj[r, cp.T_sol] for r in range(4)])
-    num_front = len(end_pos & set(frontiers.keys()))
+    if import_gurobi():
+        cp.solve_to_frontier_problem(soft=True)
 
-    np.testing.assert_array_less(3, num_front + 0.5)  # all three frontiers
+        end_pos = set([cp.traj[r, cp.T_sol] for r in range(4)])
+        num_front = len(end_pos & set(frontiers.keys()))
+
+        np.testing.assert_array_less(3, num_front + 0.5)  # all three frontiers

@@ -1,6 +1,14 @@
 import numpy as np
+
 from cops.graph import Graph
 from cops.problem import ConnectivityProblem
+
+def import_gurobi():
+    try:
+        import gurobipy
+        return True
+    except ModuleNotFoundError as e:
+        return False
 
 def test_frontier_weighting():
 
@@ -28,14 +36,15 @@ def test_frontier_weighting():
     cp.snk = [1]
 
     # Solve
-    cp.solve_flow(master=True, frontier_reward=True, connectivity=True, cut=True)
+    if import_gurobi():
+        cp.solve_flow(master=True, frontier_reward=True, connectivity=True, cut=True)
 
-    # Check solution
+        # Check solution
 
-    for t in range(3):
-        np.testing.assert_equal(cp.traj[0, t], [0, 1, 2 ,2][t])
-        np.testing.assert_equal(cp.traj[1, t], 2)
-        np.testing.assert_equal(cp.traj[2, t], 3)
-        np.testing.assert_equal(cp.conn[0], set())
-        np.testing.assert_equal(cp.conn[1], set())
-        np.testing.assert_equal(cp.conn[2], set([(2, 3, "master"), (3, 2, 2)]))
+        for t in range(3):
+            np.testing.assert_equal(cp.traj[0, t], [0, 1, 2 ,2][t])
+            np.testing.assert_equal(cp.traj[1, t], 2)
+            np.testing.assert_equal(cp.traj[2, t], 3)
+            np.testing.assert_equal(cp.conn[0], set())
+            np.testing.assert_equal(cp.conn[1], set())
+            np.testing.assert_equal(cp.conn[2], set([(2, 3, "master"), (3, 2, 2)]))

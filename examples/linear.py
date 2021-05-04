@@ -1,4 +1,3 @@
-from cops.graph import Graph
 from cops.problem import ConnectivityProblem
 from cops.animate import animate
 
@@ -24,10 +23,7 @@ cp.src = [2]
 cp.snk = [1]
 
 # Solve
-cp.solve_flow(master=True, frontier_reward=True, connectivity=True, cut=True)
-
-# Plot Graph (saves image as graph.png)
-# plot_solution(cp)
+cp.solve_flow(master=True, frontier_reward=True, connectivity=True, cut=True, solver='gurobi')
 
 # Animate solution
 animate(G, cp.traj, cp.conn)

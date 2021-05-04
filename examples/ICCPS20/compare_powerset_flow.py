@@ -29,7 +29,6 @@ def create_quadratic_graph(n):
     G.set_node_positions(positions)
     agent_positions = {0: 0, 1: n*n-1}
     G.init_agents(agent_positions)
-    print(positions)
     return G
 
 def run_linear_powerset(n):

@@ -119,7 +119,7 @@ def solve_ilp(c, constraint, J_int=None, J_bin=None, solver="gurobi", output=0):
             J_bin,
             output,
         )
-
+    
     sol["status"] = RETURN_CODES[sol["rcode"]]
     return sol
 
@@ -172,7 +172,7 @@ def _solve_mosek(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
 
     # Integers
     task.putvartypelist(
-        J_int + J_bin, [mosek.variabletype.type_int] * len(J_int + J_bin)
+        J_bin + J_int , [mosek.variabletype.type_int] * len(J_int + J_bin)
     )
 
     # Inequality constraints
@@ -189,20 +189,20 @@ def _solve_mosek(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
     task.optimize()
 
     sol = {}
-    sol["x"] = np.zeros(num_var, float)
+    sol["x"] = np.zeros(num_var, int)
 
     if len(J_int + J_bin) > 0:
         solsta = task.getsolsta(mosek.soltype.itg)
         task.getxx(mosek.soltype.itg, sol["x"])
+        sol["primal objective"] = task.getprimalobj(mosek.soltype.itg)
     else:
         solsta = task.getsolsta(mosek.soltype.bas)
         task.getxx(mosek.soltype.bas, sol["x"])
+        sol["primal objective"] = task.getprimalobj(mosek.soltype.bas)
 
     if solsta in [
         solsta.optimal,
-        solsta.near_optimal,
         solsta.integer_optimal,
-        solsta.near_integer_optimal,
     ]:
         sol["rcode"] = 2
     elif solsta in [solsta.dual_infeas_cer, solsta.near_dual_infeas_cer]:
@@ -287,5 +287,5 @@ def _solve_gurobi(c, Aiq, biq, Aeq, beq, J_int, J_bin, output):
         sol["rcode"] = m.status
     else:
         sol["rcode"] = 1
-
+    
     return sol

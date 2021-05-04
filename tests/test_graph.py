@@ -3,7 +3,6 @@ import networkx as nx
 
 from cops.graph import Graph
 
-
 def test_pre_S():
     G = Graph()
     connectivity_edges = [0, 1, 2, 3]  # directed connectivity path (one way)
@@ -61,8 +60,6 @@ def test_pre():
     nx.add_path(G, [0, 1, 2, 3], type="transition")
     nx.add_path(G, [3, 2], type="connectivity")
     nx.add_path(G, [1, 0], type="connectivity")
-
-    print(G.edges(data=True))
 
     np.testing.assert_equal(G.pre_tran([2, 3]), set([1, 2]))
     np.testing.assert_equal(G.pre_tran([2]), set([1]))

@@ -318,7 +318,7 @@ class ClusterProblem(AbstractConnectivityProblem):
         self.traj = traj
         self.conn = conn
 
-    def solve_to_frontier_problem(self, verbose=False, soft=False, dead=False):
+    def solve_to_frontier_problem(self, verbose=False, soft=False, dead=False, **kwargs):
         """solve a connectivity problem to get robots to frontiers"""
 
         self.prepare_problem(remove_dead=True)
@@ -358,9 +358,9 @@ class ClusterProblem(AbstractConnectivityProblem):
                     connectivity=not soft,
                     frontier_reward=True,
                     verbose=verbose,
+                    **kwargs
                 )
 
-                print("Solved cluster {}".format(c))
                 problems[c] = cp
 
                 # set soft reward to optimal value plus evacuation value
@@ -385,10 +385,10 @@ class ClusterProblem(AbstractConnectivityProblem):
             initial_pos=self.graph.agents,
             cs=cs,
             frontier_clusters=frontier_clusters,
-            active_agents=active_agents,
+            active_agents=active_agents
         )
 
-    def solve_to_base_problem(self, tofront_data, verbose=False, dead=True):
+    def solve_to_base_problem(self, tofront_data, verbose=False, dead=True, **kwargs):
         """solve a connectivity problem to get information back to the base,
         using data from a to_frontier solution"""
 
@@ -435,6 +435,7 @@ class ClusterProblem(AbstractConnectivityProblem):
                     connectivity=True,
                     frontier_reward=False,
                     verbose=verbose,
+                    **kwargs
                 )
 
                 problems[c] = cp
