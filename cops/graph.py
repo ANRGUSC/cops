@@ -11,6 +11,20 @@ class Graph(nx.MultiDiGraph):
         self.std_tran_weight = 1
         self.std_con_weight = 0.01
 
+    # USE CAREFULLY
+    def __eq__(self, other):
+        if isinstance(other, Graph):
+            if self.agents == other.agents:
+                if len(self) == len(other):
+                    for n in self.nodes:
+                        if self.nodes[n] != other.nodes[n]:
+                            return False
+                    return True
+        return False
+
+    def __hash__(self):
+        return hash(str(self.agents)+str(self.nodes))
+
     def plot_graph(self, filename=None):
 
         # copy graph to add plot attributes
@@ -115,6 +129,12 @@ class Graph(nx.MultiDiGraph):
             if not self.nodes[v]["known"]:
                 return False
         return True
+
+    def count_known(self):
+        count = 0
+        for n in self.nodes:
+            count += self.nodes[n]["known"]
+        return count
 
     def set_node_positions(self, position_dictionary):
         self.add_nodes_from(position_dictionary.keys())
