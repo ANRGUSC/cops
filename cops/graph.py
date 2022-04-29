@@ -13,14 +13,23 @@ class Graph(nx.MultiDiGraph):
 
     # USE CAREFULLY
     def __eq__(self, other):
-        if isinstance(other, Graph):
-            if self.agents == other.agents:
-                if len(self) == len(other):
-                    for n in self.nodes:
-                        if self.nodes[n] != other.nodes[n]:
-                            return False
-                    return True
-        return False
+        if not isinstance(other, Graph):
+            return False
+        if len(self.agents) != len(other.agents):
+            return False
+        for a in self.agents:
+            if a not in other.agents:
+                return False
+            if self.agents[a] != other.agents[a]:
+                return False
+        if len(self.nodes) != len(other.nodes):
+            return False
+        for n in self.nodes:
+            if n not in other.nodes:
+                return False
+            if self.nodes[n] != other.nodes[n]:
+                return False
+        return True
 
     def __hash__(self):
         return hash(str(self.agents)+str(self.nodes))
