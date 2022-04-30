@@ -113,6 +113,9 @@ class Graph(nx.MultiDiGraph):
             else:
                 self.nodes[v]["frontiers"] = 0
 
+    def get_frontiers(self):
+        return([v for v in self.nodes if self.is_frontier(v)])
+
     def set_small_node(self, small_nodes):
         for v in self.nodes:
             if v in small_nodes:

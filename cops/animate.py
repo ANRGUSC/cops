@@ -6,6 +6,7 @@ import matplotlib.animation as animation
 
 from cops.clustering import ClusterProblem
 from cops.explore_problem import ExplorationProblem
+from cops.agent_problem import AgentProblem
 
 
 def animate(
@@ -342,7 +343,7 @@ def animate_sequence(graph, problem_list, save_static_figures = False, **kwargs)
     ### Prepare explored/unexplored
     node_explored = {(0, v): False for v in graph.nodes}
     for i, problem in enumerate(problem_list):
-        if isinstance(problem, ExplorationProblem):
+        if isinstance(problem, ExplorationProblem) or isinstance(problem, AgentProblem):
             for t, g in enumerate(problem.graph_list):
                 for n in g.nodes:
                     if g.nodes[n]["known"]:
@@ -362,6 +363,8 @@ def animate_sequence(graph, problem_list, save_static_figures = False, **kwargs)
         if isinstance(problem, ClusterProblem):
             titles[start_time[i]] = "To Frontiers" if out else "To base"
             out = not out
+        if isinstance(problem, AgentProblem):
+            titles[start_time[i]] = "Agent-Centric Decision-Making"
 
     return animate(
         graph, traj, conn, node_explored=node_explored, titles=titles,
