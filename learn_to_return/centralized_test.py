@@ -64,6 +64,7 @@ def main_function_testing(policy_name=None):
             for a in actions:
                 if Q[G][a] > q:
                     action = a
+                    q = Q[G][a]
 
         #### TAKE ACTION
         G_new = deepcopy(G)

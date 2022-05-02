@@ -315,10 +315,11 @@ def animate(
     ani.save(filename)
 
 
-def animate_sequence(graph, problem_list, save_static_figures = False, **kwargs):
+def animate_sequence(graph, problem_list, save_static_figures = False, extra_title_info="", **kwargs):
 
     # Use a one to put one time step between problems
-    start_time = [0] + list(accumulate([problem.T_sol + 1 for problem in problem_list]))
+    # start_time = [0] + list(accumulate([problem.T_sol + 1 for problem in problem_list]))
+    start_time = [0] + list(accumulate([problem.T_sol + 0 for problem in problem_list]))
 
     T = start_time[-1]
 
@@ -364,7 +365,7 @@ def animate_sequence(graph, problem_list, save_static_figures = False, **kwargs)
             titles[start_time[i]] = "To Frontiers" if out else "To base"
             out = not out
         if isinstance(problem, AgentProblem):
-            titles[start_time[i]] = "Agent-Centric Decision-Making"
+            titles[start_time[i]] = "Agent-Centric Decision-Making"+extra_title_info
 
     return animate(
         graph, traj, conn, node_explored=node_explored, titles=titles,

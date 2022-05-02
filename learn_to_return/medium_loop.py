@@ -36,11 +36,15 @@ for i in range(MAXITER):
     ap.graph = G
     ap.static_agents = static_agents
     ap.graph.agents = agent_positions
-    ap.solve_explore()
+    if i % 5 < 4:
+        ap.solve_explore()
+    else:
+        ap.solve_return()
+        # pass
     problem_list.append(ap)
 
-    if G.is_known():
-        print("DONE EXPLORING")
+    if G.is_known() and G.agents[1] == 0:
+        print("DONE EXPLORING and HOME")
         break
 
 # ANIMATION----------------------------------------------------------------------

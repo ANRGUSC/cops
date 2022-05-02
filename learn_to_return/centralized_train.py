@@ -127,9 +127,9 @@ def main_function_training():
             if action_state_machine == "at_base":
                 actions = ["to_frontier"]
             elif action_state_machine == "at_frontier":
-                actions = [action for action in all_actions if "explore" in action]#+["return"]
+                actions = [action for action in all_actions if "explore" in action]+["return"]
             elif action_state_machine == "explored":
-                actions = ["return"]#+[action for action in all_actions if "explore" in action]
+                actions = ["return"]+[action for action in all_actions if "explore" in action]
 
             if G not in Q:
                 Q[G] = {action:0 for action in all_actions}
@@ -145,6 +145,7 @@ def main_function_training():
                 for a in actions:
                     if Q[G][a] > q:
                         action = a
+                        q = Q[G][a]
 
             #### TAKE ACTION
             G_new = deepcopy(G)

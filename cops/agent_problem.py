@@ -83,15 +83,17 @@ class AgentProblem(object):
         # get to the closest frontier
         shortest_path, path_length = None, np.inf
         frontiers = self.graph.get_frontiers()
-        print("AGENT POSITION:",AGENT_v)
-        print("FRONTIERS:",frontiers)
+        if not frontiers:
+            return
+        # print("AGENT POSITION:",AGENT_v)
+        # print("FRONTIERS:",frontiers)
         for f in frontiers:
             this_l = nx.shortest_path_length(self.known_graph, AGENT_v, f)
             if this_l < path_length:
                 shortest_path = nx.shortest_path(self.known_graph, AGENT_v, f)
                 path_length = this_l
         shortest_path = shortest_path[1:]
-        print("SHORTEST PATH TO FRONTIER:",shortest_path)
+        # print("SHORTEST PATH TO FRONTIER:",shortest_path)
 
         v = AGENT_v
         for t in range(len(shortest_path)):
@@ -99,19 +101,20 @@ class AgentProblem(object):
             self.traj[(0,t)] = self.graph.agents[0]
             self.traj[(AGENT,t)] = v
             self.graph.nodes[v]["known"] = True
-            for (r,v) in self.graph.agents.items():
-                for nbr_v in self.graph.conn_out_edges(v):
+            for (r,rv) in self.graph.agents.items():
+                for nbr_v in self.graph.conn_out_edges(rv):
                     if nbr_v in self.graph.agents.values():
-                        self.conn[t] = (v,nbr_v,None)
+                        self.conn[t] = (rv,nbr_v,None)
             self.graph_list.append(deepcopy(self.graph))
             T_sol += 1
 
         # take one more step to EXPLORE
+        # print("OUT EDGES:",[(a,b) for (a,b) in self.graph.tran_out_edges(v)])
         next_frontiers = [(a,b) for (a,b) in self.graph.tran_out_edges(v) if not self.graph.nodes[b]["known"]]
-        print("NEXT FRONTIERS:",next_frontiers)
+        # print("NEXT FRONTIERS:",next_frontiers)
         if next_frontiers:
             next_v = random.choice(next_frontiers)[1]
-            print("NEXT CHOICE:",next_v)
+            # print("NEXT CHOICE:",next_v)
             t = len(shortest_path)
             self.traj[(0,t)] = self.graph.agents[0]
             self.traj[(AGENT,t)] = next_v
@@ -125,12 +128,53 @@ class AgentProblem(object):
             T_sol +=1
 
         self.T_sol = T_sol
-        print("TRAJ:",self.traj)
-        print("CONN:",self.conn)
+        # print("TRAJ:",self.traj)
+        # print("CONN:",self.conn)
 
         frontiers = self.graph.get_frontiers()
         self.graph.agents[AGENT] = self.traj[(AGENT,self.T_sol-1)]
-        print("AGENT POSITION:",self.graph.agents[AGENT])
-        print("FRONTIERS:",frontiers)
+        # print("AGENT POSITION:",self.graph.agents[AGENT])
+        # print("FRONTIERS:",frontiers)
 
-        print("*****************")
+        # print("*****************")
+
+    def solve_return(self):
+        self.prepare_problem()
+
+        # solve
+        T_sol = 0
+        AGENT = 1 # TODO
+        HOME = 0
+        AGENT_v = self.graph.agents[AGENT]
+
+        if AGENT_v == HOME:
+            return
+
+        # get to the closest frontier
+        # print("AGENT POSITION:",AGENT_v)
+        shortest_path = nx.shortest_path(self.known_graph, AGENT_v, HOME)
+        shortest_path = shortest_path[1:]
+        # print("SHORTEST PATH TO BASE:",shortest_path)
+
+        v = AGENT_v
+        for t in range(len(shortest_path)):
+            v = shortest_path[t]
+            self.traj[(0,t)] = self.graph.agents[0]
+            self.traj[(AGENT,t)] = v
+            for (r,v) in self.graph.agents.items():
+                for nbr_v in self.graph.conn_out_edges(v):
+                    if nbr_v in self.graph.agents.values():
+                        self.conn[t] = (v,nbr_v,None)
+            self.graph_list.append(deepcopy(self.graph))
+            T_sol += 1
+
+        self.T_sol = T_sol
+        # print("TRAJ:",self.traj)
+        # print("CONN:",self.conn)
+
+        frontiers = self.graph.get_frontiers()
+        self.graph.agents[AGENT] = self.traj[(AGENT,self.T_sol-1)]
+        # print("AGENT POSITION:",self.graph.agents[AGENT])
+        # print("FRONTIERS (unchanged):",frontiers)
+
+        # print("*****************")
