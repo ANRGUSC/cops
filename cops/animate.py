@@ -243,7 +243,8 @@ def animate(
 
     ########## LOOP #############
 
-    FRAMES_PER_STEP = max(2, int(STEP_T * FPS))
+    # FRAMES_PER_STEP = max(2, int(STEP_T * FPS))
+    FRAMES_PER_STEP = max(1, int(STEP_T * FPS))
     total_time = T + 2
 
     def animate_fcn(i):
@@ -349,7 +350,7 @@ def animate_sequence(graph, problem_list, save_static_figures = False, extra_tit
         if isinstance(problem, ExplorationProblem) or isinstance(problem, AgentProblem):
             for t, g in enumerate(problem.graph_list):
                 for n in g.nodes:
-                    if g.nodes[n]["known"]:
+                    if g.nodes[n]["known"][0]: # TODO
                         node_explored[start_time[i] + t, n] = True
 
     # Fill in missing values with blanks
@@ -467,12 +468,12 @@ def animate_cluster_sequence(graph, problem_list,
         if isinstance(problem, ExplorationProblem):
             for t, g in enumerate(problem.graph_list):
                 for n in g.nodes:
-                    if g.nodes[n]["known"]:
+                    if g.nodes[n]["known"][0]: # TODO
                         node_explored[start_time[i] + t, n] = True
         # Added else for subT implementation
         else:
             for n in problem.graph.nodes:
-                if problem.graph.nodes[n]["known"]:
+                if problem.graph.nodes[n]["known"][0]: # TODO
                     node_explored[start_time[i], n] = True
 
     # Fill in missing values with blanks

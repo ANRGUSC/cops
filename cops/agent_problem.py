@@ -11,13 +11,13 @@ from itertools import chain, combinations, product
 from networkx.drawing.nx_agraph import to_agraph
 
 class AgentProblem(object):
-    def __init__(self):
+    def __init__(self,r):
         # Problem definition
         self.graph = None  # full graph
         self.static_agents = None
-        self.frontier_robot_dict = None
         self.graph_list = []
         self.eagents = None
+        self.r = r
 
         # Solution
         self.T_sol = 0
@@ -25,10 +25,6 @@ class AgentProblem(object):
         self.conn = {}
 
     ##PROPERTIES##
-    @property
-    def num_r(self):
-        return len(self.frontier_robot_dict)
-
     @property
     def num_v(self):
         return self.graph.number_of_nodes()
@@ -42,7 +38,7 @@ class AgentProblem(object):
 
         # create subgraph
         self.known_graph = deepcopy(self.graph)
-        unknown = [v for v in self.graph.nodes if not self.graph.nodes[v]["known"]]
+        unknown = [v for v in self.graph.nodes if not self.graph.nodes[v]["known"][self.r]]
         self.known_graph.remove_nodes_from(unknown)
 
         if self.static_agents is None:  # no static agents
@@ -63,27 +59,20 @@ class AgentProblem(object):
         # add initial graph to graph_list
         self.graph_list.append(deepcopy(self.graph))
 
-        # create frontier robot dictionary
-        frontier_robots = []
-        for r in self.graph.agents:
-            if self.graph.is_frontier(self.graph.agents[r]):
-                frontier_robots.append(r)
-        self.frontier_robot_dict = {i: r for i, r in enumerate(frontier_robots)}
-
     ##SOLVER FUNCTIONS##
 
     def solve_explore(self):
-        print("solve_explore")
+        print("solve_explore agent", self.r)
         self.prepare_problem()
 
         # solve
         T_sol = 0
-        AGENT = 1 # TODO
+        AGENT = self.r
         AGENT_v = self.graph.agents[AGENT]
 
         # get to the closest frontier
         shortest_path, path_length = None, np.inf
-        frontiers = self.graph.get_frontiers()
+        frontiers = self.graph.get_frontiers(AGENT)
         if not frontiers:
             return
         # print("AGENT POSITION:",AGENT_v)
@@ -96,46 +85,39 @@ class AgentProblem(object):
         shortest_path = shortest_path[1:]
         # print("SHORTEST PATH TO FRONTIER:",shortest_path)
 
-        v = AGENT_v
+        if not shortest_path:
+            next_frontiers = [(a,b) for (a,b) in self.graph.tran_out_edges(AGENT_v) if not self.graph.nodes[b]["known"][AGENT]]
+        else:
+            next_frontiers = [(a,b) for (a,b) in self.graph.tran_out_edges(shortest_path[-1]) if not self.graph.nodes[b]["known"][AGENT]]
+        if next_frontiers:
+            next_v = random.choice(next_frontiers)[1]
+        shortest_path.append(next_v)
+
         for t in range(len(shortest_path)):
-            self.conn[t-1] = set()
+            self.conn[t] = set()
             v = shortest_path[t]
             self.traj[(0,t)] = self.graph.agents[0]
             self.traj[(AGENT,t)] = v
-            self.graph.nodes[v]["known"] = True
+            self.graph.nodes[v]["known"][AGENT] = True
             agent_locs = {0:self.graph.agents[0], AGENT:v}
             for (r,rv) in agent_locs.items():
                 for (nbr_u, nbr_v) in self.graph.conn_out_edges(rv):
-                    if nbr_v in agent_locs.values():
-                        self.conn[t-1].add((rv,nbr_v,r))
+                    for (other_agent, other_agent_v) in agent_locs.items(): # TODO
+                        if nbr_v == other_agent_v:
+                            self.conn[t].add((rv,nbr_v,r))
+                            print("Sharing known",rv,"->",nbr_v)
+                            for ver in self.graph:
+                                if self.graph.nodes[ver]["known"][AGENT]:
+                                    print("setting",ver,"known about by",other_agent)
+                                    self.graph.nodes[ver]["known"][other_agent] = True
             self.graph_list.append(deepcopy(self.graph))
             T_sol += 1
-
-        # take one more step to EXPLORE
-        # print("OUT EDGES:",[(a,b) for (a,b) in self.graph.tran_out_edges(v)])
-        next_frontiers = [(a,b) for (a,b) in self.graph.tran_out_edges(v) if not self.graph.nodes[b]["known"]]
-        # print("NEXT FRONTIERS:",next_frontiers)
-        if next_frontiers:
-            next_v = random.choice(next_frontiers)[1]
-            # print("NEXT CHOICE:",next_v)
-            t = len(shortest_path)
-            self.conn[t-1] = set()
-            self.traj[(0,t)] = self.graph.agents[0]
-            self.traj[(AGENT,t)] = next_v
-            self.graph.nodes[next_v]["known"] = True
-            agent_locs = {0:self.graph.agents[0], AGENT:v}
-            for (r,rv) in agent_locs.items():
-                for (nbr_u, nbr_v) in self.graph.conn_out_edges(rv):
-                    if nbr_v in agent_locs.values():
-                        self.conn[t-1].add((rv,nbr_v,r))
-            self.graph_list.append(deepcopy(self.graph))
-            T_sol +=1
 
         self.T_sol = T_sol
         # print("TRAJ:",self.traj)
         # print("CONN:",self.conn)
 
-        frontiers = self.graph.get_frontiers()
+        frontiers = self.graph.get_frontiers(r)
         self.graph.agents[AGENT] = self.traj[(AGENT,self.T_sol-1)]
         # print("AGENT POSITION:",self.graph.agents[AGENT])
         # print("FRONTIERS:",frontiers)
@@ -172,6 +154,11 @@ class AgentProblem(object):
                 for (nbr_u, nbr_v) in self.graph.conn_out_edges(rv):
                     if nbr_v in agent_locs.values():
                         self.conn[t].add((rv,nbr_v,r))
+                        print("Sharing known",rv,"->",nbr_v)
+                        for ver in self.graph:
+                            if self.graph.nodes[ver]["known"][AGENT]:
+                                print("setting",ver,"known about by",other_agent)
+                                self.graph.nodes[ver]["known"][other_agent] = True
             self.graph_list.append(deepcopy(self.graph))
             T_sol += 1
 

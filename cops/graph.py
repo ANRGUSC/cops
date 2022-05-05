@@ -106,15 +106,22 @@ class Graph(nx.MultiDiGraph):
             if add_transition:
                 self.add_edge(n, n, type="transition", weight=0)
 
-    def set_frontiers(self, frontiers):
+    def set_frontiers(self, frontiers, r):
+        '''
+        set frontiers for robot r
+        '''
         for v in self:
             if v in frontiers:
-                self.nodes[v]["frontiers"] = frontiers[v]
+                if "frontiers" not in self.nodes[v]:
+                    self.nodes[v]["frontiers"] = {}
+                self.nodes[v]["frontiers"][r] = frontiers[v]
             else:
-                self.nodes[v]["frontiers"] = 0
+                if "frontiers" not in self.nodes[v]:
+                    self.nodes[v]["frontiers"] = {}
+                self.nodes[v]["frontiers"][r] = 0
 
-    def get_frontiers(self):
-        return([v for v in self.nodes if self.is_frontier(v)])
+    def get_frontiers(self, r):
+        return([v for v in self.nodes if self.is_frontier(v, r)])
 
     def set_small_node(self, small_nodes):
         for v in self.nodes:
@@ -123,29 +130,32 @@ class Graph(nx.MultiDiGraph):
             else:
                 self.nodes[v]["small"] = False
 
-    def is_frontier(self, v):
+    def is_frontier(self, v, r):
+        '''
+        is graph vertex v a frontier for robot r
+        '''
         frontier = False
-        if self.nodes[v]["known"]:
+        if self.nodes[v]["known"][r]:
             for edge in self.tran_out_edges(v):
-                if not self.nodes[edge[1]]["known"]:
+                if not self.nodes[edge[1]]["known"][r]:
                     frontier = True
         return frontier
 
-    def is_local_frontier(self, v):
-        if self.nodes[v]["frontiers"] != 0:
+    def is_local_frontier(self, v, r):
+        if self.nodes[v]["frontiers"][r] != 0:
             return True
         return False
 
-    def is_known(self):
+    def is_known(self, r):
         for v in self:
-            if not self.nodes[v]["known"]:
+            if not self.nodes[v]["known"][r]:
                 return False
         return True
 
-    def count_known(self):
+    def count_known(self,r):
         count = 0
         for n in self.nodes:
-            count += self.nodes[n]["known"]
+            count += self.nodes[n]["known"][r]
         return count
 
     def set_node_positions(self, position_dictionary):
@@ -254,10 +264,12 @@ class Graph(nx.MultiDiGraph):
         for n in self:
             self.nodes[n]["number_of_agents"] = 0
             self.nodes[n]["agents"] = []
-            self.nodes[n]["known"] = False
+            # self.nodes[n]["known"] = False
+            self.nodes[n]["known"] = {r:False for r in self.agents}
 
-        for _, n in self.agents.items():
-            self.nodes[n]["known"] = True
+        for r, n in self.agents.items():
+            # self.nodes[n]["known"] = True
+            self.nodes[n]["known"][r] = True
 
         for agent, position in agent_dictionary.items():
             self.nodes[position]["number_of_agents"] += 1

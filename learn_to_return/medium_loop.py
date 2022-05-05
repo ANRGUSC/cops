@@ -13,10 +13,10 @@ agent_positions = {0: 0, 1: 0}  # agent:position
 G.init_agents(agent_positions)
 
 # Set known attribute
-for v in G.nodes():
-    G.nodes[v]["known"] = False
-for r, v in agent_positions.items():
-    G.nodes[v]["known"] = True
+# for v in G.nodes():
+#     G.nodes[v]["known"] = False
+# for r, v in agent_positions.items():
+#     G.nodes[v]["known"] = True
 
 
 problem_list = []
@@ -29,31 +29,32 @@ MAXITER = 10
 for i in range(MAXITER):
 
     # find frontiers
-    frontiers = {v: 1 for v in G.nodes if G.is_frontier(v)}
-    G.set_frontiers(frontiers)
+    for r in G.agents:
+        frontiers = {v: 1 for v in G.nodes if G.is_frontier(v,r)}
+        G.set_frontiers(frontiers,r)
 
     if i == 0:
         ### For the visualization
-        ap = AgentProblem()
+        ap = AgentProblem(1)
         ap.graph = G
         ap.traj = {(a,i):agent_positions[a] for a in G.agents}
         ap.T_sol = 1
         problem_list.append(ap)
 
-    ap = AgentProblem()
+    ap = AgentProblem(1)
     ap.graph = G
     ap.static_agents = static_agents
     ap.graph.agents = agent_positions
-    if i % 5 < 4:
+    if i % 5 < 5:
         ap.solve_explore()
     else:
         ap.solve_return()
         # pass
     problem_list.append(ap)
 
-    if G.is_known() and G.agents[1] == 0:
+    if G.is_known(1) and G.agents[1] == 0:
         print("DONE EXPLORING and HOME")
         break
 
 # ANIMATION----------------------------------------------------------------------
-animate_sequence(G, problem_list, FPS=15, STEP_T=0.5, filename="medium_loop_animate_fixstart.mp4")
+animate_sequence(G, problem_list, FPS=2, STEP_T=0.5, filename="test_animate.mp4")
