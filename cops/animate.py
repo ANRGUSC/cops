@@ -341,6 +341,8 @@ def animate_sequence(graph, problem_list, save_static_figures = False, extra_tit
             for t, conn_list in problem_list[i].conn.items():
                 conn[start_time[i] + t] = conn_list
 
+    # print("conn",conn)
+
     ### Prepare explored/unexplored
     node_explored = {(0, v): False for v in graph.nodes}
     for i, problem in enumerate(problem_list):

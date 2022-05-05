@@ -1,4 +1,4 @@
-from cops.animate import animate_sequence
+from cops.animate import animate_sequence, animate_cluster_sequence
 from cops.problem import ConnectivityProblem
 from cops.explore_problem import ExplorationProblem
 from cops.agent_problem import AgentProblem
@@ -25,12 +25,20 @@ master = 0
 static_agents = [0]
 
 # MAIN-LOOP----------------------------------------------------------------------
-MAXITER = 50
+MAXITER = 10
 for i in range(MAXITER):
 
     # find frontiers
     frontiers = {v: 1 for v in G.nodes if G.is_frontier(v)}
     G.set_frontiers(frontiers)
+
+    if i == 0:
+        ### For the visualization
+        ap = AgentProblem()
+        ap.graph = G
+        ap.traj = {(a,i):agent_positions[a] for a in G.agents}
+        ap.T_sol = 1
+        problem_list.append(ap)
 
     ap = AgentProblem()
     ap.graph = G
@@ -48,4 +56,4 @@ for i in range(MAXITER):
         break
 
 # ANIMATION----------------------------------------------------------------------
-animate_sequence(G, problem_list, FPS=15, STEP_T=0.5)
+animate_sequence(G, problem_list, FPS=15, STEP_T=0.5, filename="medium_loop_animate_fixstart.mp4")

@@ -73,6 +73,7 @@ class AgentProblem(object):
     ##SOLVER FUNCTIONS##
 
     def solve_explore(self):
+        print("solve_explore")
         self.prepare_problem()
 
         # solve
@@ -97,14 +98,16 @@ class AgentProblem(object):
 
         v = AGENT_v
         for t in range(len(shortest_path)):
+            self.conn[t-1] = set()
             v = shortest_path[t]
             self.traj[(0,t)] = self.graph.agents[0]
             self.traj[(AGENT,t)] = v
             self.graph.nodes[v]["known"] = True
-            for (r,rv) in self.graph.agents.items():
-                for nbr_v in self.graph.conn_out_edges(rv):
-                    if nbr_v in self.graph.agents.values():
-                        self.conn[t] = (rv,nbr_v,None)
+            agent_locs = {0:self.graph.agents[0], AGENT:v}
+            for (r,rv) in agent_locs.items():
+                for (nbr_u, nbr_v) in self.graph.conn_out_edges(rv):
+                    if nbr_v in agent_locs.values():
+                        self.conn[t-1].add((rv,nbr_v,r))
             self.graph_list.append(deepcopy(self.graph))
             T_sol += 1
 
@@ -116,14 +119,15 @@ class AgentProblem(object):
             next_v = random.choice(next_frontiers)[1]
             # print("NEXT CHOICE:",next_v)
             t = len(shortest_path)
+            self.conn[t-1] = set()
             self.traj[(0,t)] = self.graph.agents[0]
             self.traj[(AGENT,t)] = next_v
             self.graph.nodes[next_v]["known"] = True
-            self.graph.agents[AGENT] = next_v
-            for (r,v) in self.graph.agents.items():
-                for nbr_v in self.graph.conn_out_edges(v):
-                    if nbr_v in self.graph.agents.values():
-                        self.conn[t] = (v,nbr_v,None)
+            agent_locs = {0:self.graph.agents[0], AGENT:v}
+            for (r,rv) in agent_locs.items():
+                for (nbr_u, nbr_v) in self.graph.conn_out_edges(rv):
+                    if nbr_v in agent_locs.values():
+                        self.conn[t-1].add((rv,nbr_v,r))
             self.graph_list.append(deepcopy(self.graph))
             T_sol +=1
 
@@ -139,6 +143,7 @@ class AgentProblem(object):
         # print("*****************")
 
     def solve_return(self):
+        print("solve_return")
         self.prepare_problem()
 
         # solve
@@ -158,13 +163,15 @@ class AgentProblem(object):
 
         v = AGENT_v
         for t in range(len(shortest_path)):
+            self.conn[t] = set()
             v = shortest_path[t]
             self.traj[(0,t)] = self.graph.agents[0]
             self.traj[(AGENT,t)] = v
-            for (r,v) in self.graph.agents.items():
-                for nbr_v in self.graph.conn_out_edges(v):
-                    if nbr_v in self.graph.agents.values():
-                        self.conn[t] = (v,nbr_v,None)
+            agent_locs = {0:self.graph.agents[0], AGENT:v}
+            for (r,rv) in agent_locs.items():
+                for (nbr_u, nbr_v) in self.graph.conn_out_edges(rv):
+                    if nbr_v in agent_locs.values():
+                        self.conn[t].add((rv,nbr_v,r))
             self.graph_list.append(deepcopy(self.graph))
             T_sol += 1
 
